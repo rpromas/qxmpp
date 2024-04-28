@@ -7,12 +7,18 @@
 
 #include "QXmppLogger.h"
 
-class QDomElement;
+#include "StreamError.h"
+
+#include <QDomDocument>
+#include <QXmlStreamReader>
+
 class QSslSocket;
 class TestStream;
 class tst_QXmppStream;
 
 namespace QXmpp::Private {
+
+struct StreamOpen;
 
 struct ServerAddress {
     enum ConnectionType {
@@ -31,6 +37,31 @@ public:
     virtual bool sendData(const QByteArray &) = 0;
 };
 
+class DomReader
+{
+public:
+    struct Unfinished { };
+
+    enum ErrorType {
+        InvalidState,
+        NotWellFormed,
+        UnsupportedXmlFeature,
+    };
+    struct Error {
+        ErrorType type;
+        QString text;
+    };
+
+    using Result = std::variant<QDomElement, Unfinished, Error>;
+
+    Result process(QXmlStreamReader &);
+
+private:
+    QDomDocument doc;
+    QDomElement currentElement;
+    uint depth = 0;
+};
+
 class QXMPP_EXPORT XmppSocket : public QXmppLoggable, public SendDataInterface
 {
     Q_OBJECT
@@ -45,23 +76,28 @@ public:
     void connectToHost(const ServerAddress &);
     void disconnectFromHost();
     bool sendData(const QByteArray &) override;
+    void resetStream();
+    bool isStreamReceived() const { return m_streamReceived; }
 
     Q_SIGNAL void started();
     Q_SIGNAL void stanzaReceived(const QDomElement &);
-    Q_SIGNAL void streamReceived(const QDomElement &);
+    Q_SIGNAL void streamReceived(const QXmpp::Private::StreamOpen &);
     Q_SIGNAL void streamClosed();
+    Q_SIGNAL void errorOccurred(const QString &text, StreamError condition);
 
 private:
+    void throwError(const QString &text, StreamError condition);
     void processData(const QString &data);
 
     friend class ::tst_QXmppStream;
 
-    QString m_dataBuffer;
+    QXmlStreamReader m_reader;
+    std::optional<DomReader> m_domReader;
+    bool m_streamReceived = false;
     bool m_directTls = false;
-    QSslSocket *m_socket = nullptr;
+    bool m_acceptInput = true;
 
-    // incoming stream state
-    QString m_streamOpenElement;
+    QSslSocket *m_socket = nullptr;
 };
 
 }  // namespace QXmpp::Private

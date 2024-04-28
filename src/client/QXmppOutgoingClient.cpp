@@ -176,12 +176,15 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
 
     connect(socket, &QAbstractSocket::disconnected, this, &QXmppOutgoingClient::_q_socketDisconnected);
     connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingClient::socketSslErrors);
-    connect(socket, &QSslSocket::errorOccurred, this, &QXmppOutgoingClient::socketError);
+    connect(socket, &QSslSocket::errorOccurred, this, [this, socket](auto error) {
+        handleSocketError(socket->errorString(), error);
+    });
 
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingClient::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingClient::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingClient::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingClient::handleSocketError);
 }
 
 QXmppOutgoingClient::~QXmppOutgoingClient()
@@ -603,7 +606,7 @@ void QXmppOutgoingClient::setError(const QString &text, ConnectionError &&detail
     Q_EMIT errorOccurred(d->error->text, d->error->details, clientError);
 }
 
-void QXmppOutgoingClient::socketError(QAbstractSocket::SocketError socketError)
+void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError> error)
 {
     if (!d->sessionStarted &&
         (d->serverAddresses.size() > d->nextServerAddressIndex)) {
@@ -616,7 +619,7 @@ void QXmppOutgoingClient::socketError(QAbstractSocket::SocketError socketError)
             d->connectToNextAddress();
         }
     } else {
-        setError(d->socket.socket()->errorString(), socketError);
+        setError(d->socket.socket()->errorString(), into<ConnectionError>(error));
     }
 }
 
@@ -642,16 +645,16 @@ void QXmppOutgoingClient::handleStart()
     }));
 }
 
-void QXmppOutgoingClient::handleStream(const QDomElement &streamElement)
+void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
     if (d->streamId.isEmpty()) {
-        d->streamId = streamElement.attribute(u"id"_s);
+        d->streamId = stream.id;
     }
     if (d->streamFrom.isEmpty()) {
-        d->streamFrom = streamElement.attribute(u"from"_s);
+        d->streamFrom = stream.from;
     }
     if (d->streamVersion.isEmpty()) {
-        d->streamVersion = streamElement.attribute(u"version"_s);
+        d->streamVersion = stream.version;
 
         // no version specified, signals XMPP Version < 1.0.
         // switch to old auth mechanism if enabled
@@ -744,6 +747,7 @@ void QXmppOutgoingClient::handleStreamFeatures(const QXmppStreamFeatures &featur
                 debug(u"Authenticated"_s);
                 d->isAuthenticated = true;
                 d->authenticationMethod = AuthenticationMethod::Sasl;
+                d->socket.resetStream();
                 handleStart();
             } else {
                 auto [text, err] = std::get<SaslManager::AuthError>(std::move(result));
