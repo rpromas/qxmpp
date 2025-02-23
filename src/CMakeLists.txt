@@ -303,6 +303,25 @@ set(SOURCE_FILES
     server/QXmppServerPlugin.cpp
 )
 
+if(WITH_GSTREAMER)
+    set(SOURCE_FILES
+    ${SOURCE_FILES}
+    #modified addind call manager here
+    client/QXmppCall.cpp
+    client/QXmppCallManager.cpp
+    client/QXmppCallStream.cpp
+    )
+
+    set(INSTALL_HEADER_FILES
+    ${INSTALL_HEADER_FILES}
+    # modified adding callmanager here
+    client/QXmppCall.h
+    client/QXmppCallManager.h
+    client/QXmppCallStream.h
+    )
+endif()
+
+
 if(BUILD_SHARED)
     add_library(${QXMPP_TARGET} SHARED ${SOURCE_FILES})
 else()
@@ -333,37 +352,57 @@ target_link_libraries(${QXMPP_TARGET}
 )
 
 if(WITH_GSTREAMER)
-    find_package(GStreamer REQUIRED)
-    find_package(GLIB2 REQUIRED)
-    find_package(GObject REQUIRED)
 
-    set(INSTALL_HEADER_FILES
-        ${INSTALL_HEADER_FILES}
-        client/QXmppCall.h
-        client/QXmppCallManager.h
-        client/QXmppCallStream.h
-    )
+    # set(INSTALL_HEADER_FILES
+    #     ${INSTALL_HEADER_FILES}
+    #     client/QXmppCall.h
+    #     client/QXmppCallManager.h
+    #     client/QXmppCallStream.h
+    # )
 
-    target_sources(${QXMPP_TARGET}
-        PRIVATE
-        client/QXmppCall.cpp
-        client/QXmppCallManager.cpp
-        client/QXmppCallStream.cpp
-    )
+    # target_sources(${QXMPP_TARGET}
+    #     PUBLIC
+    #     client/QXmppCall.cpp
+    #     client/QXmppCallManager.cpp
+    #     client/QXmppCallStream.cpp
+    # )
 
-    target_link_libraries(${QXMPP_TARGET}
-        PRIVATE
-        ${GLIB2_LIBRARIES}
-        ${GOBJECT_LIBRARIES}
-        ${GSTREAMER_LIBRARY}
-    )
+    if (IOS)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE
+            /Users/romas/Library/Developer/GStreamer/iPhone.sdk/GStreamer.framework
+            "-framework GStreamer"
+            iconv
+        )
+        include_directories("/Users/romas/Library/Developer/GStreamer/iPhone.sdk/GStreamer.framework/Versions/1.0/Headers")
+    elseif (APPLE)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE
+            /Library/Frameworks/GStreamer.framework
+            "-framework GStreamer"
+            iconv
+        )
+        include_directories("/Library/Frameworks/GStreamer.framework/Versions/1.0/Headers")
+    else ()
+        find_package(GStreamer REQUIRED)
+        find_package(GLIB2 REQUIRED)
+        find_package(GObject REQUIRED)
 
-    target_include_directories(${QXMPP_TARGET}
-        PRIVATE
-        ${GLIB2_INCLUDE_DIR}
-        ${GOBJECT_INCLUDE_DIR}
-        ${GSTREAMER_INCLUDE_DIRS}
-    )
+
+        target_link_libraries(${QXMPP_TARGET}
+            PRIVATE
+            ${GLIB2_LIBRARIES}
+            ${GOBJECT_LIBRARIES}
+            ${GSTREAMER_LIBRARY}
+        )
+
+        target_include_directories(${QXMPP_TARGET}
+            PRIVATE
+            ${GLIB2_INCLUDE_DIR}
+            ${GOBJECT_INCLUDE_DIR}
+            ${GSTREAMER_INCLUDE_DIRS}
+        )
+    endif()
+
+
 endif()
 
 if(BUILD_OMEMO)

@@ -64,10 +64,9 @@ endif()
 if(BUILD_OMEMO)
     add_definitions(-DBUILD_OMEMO)
 
-    # libomemo-c
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(OmemoC REQUIRED IMPORTED_TARGET libomemo-c)
-
+    # # libomemo-c
+    # find_package(PkgConfig REQUIRED)
+    # pkg_check_modules(OmemoC REQUIRED IMPORTED_TARGET libomemo-c)
     # QCA
     if(NOT WITH_QCA)
         message(FATAL_ERROR "OMEMO requires QCA (Qt Cryptographic Architecture)")

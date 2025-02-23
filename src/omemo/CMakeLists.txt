@@ -4,6 +4,9 @@
 
 include(CMakePackageConfigHelpers)
 
+add_subdirectory(../../../libomemo-c libomemo-c)
+add_subdirectory(../../../qca qca)
+
 set(OMEMO_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${QXMPPOMEMO_TARGET}")
 set(OMEMO_HEADER_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${QXMPP_TARGET}/Omemo")
 set(OMEMO_INSTALL_HEADER_FILES
@@ -31,7 +34,7 @@ target_link_libraries(${QXMPPOMEMO_TARGET}
     ${QXMPP_TARGET}
     Qt${QT_VERSION_MAJOR}::Core
     PRIVATE
-    PkgConfig::OmemoC
+    omemo-c
     qca-qt${QT_VERSION_MAJOR}
 )
 target_include_directories(${QXMPPOMEMO_TARGET}
