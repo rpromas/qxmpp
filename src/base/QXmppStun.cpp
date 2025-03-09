@@ -2393,10 +2393,18 @@ static QList<QUdpSocket *> reservePort(const QList<QHostAddress> &addresses, qui
         auto *socket = new QUdpSocket(parent);
         socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
         sockets << socket;
-        if (!socket->bind(address, port)) {
+        if (!socket->bind(
+                          address,
+                          port,
+                          QSysInfo::productType() == u"ios" ? QAbstractSocket::ReuseAddressHint : QAbstractSocket::DefaultForPlatform)) {
+            qDebug() << "Bind failed for" << address.toString() << port << socket->errorString();
             qDeleteAll(sockets);
             sockets.clear();
             break;
+        }
+        else
+        {
+            qDebug() << "Bind suceeded for" << address.toString() << port;
         }
     }
     return sockets;
@@ -2454,6 +2462,11 @@ QList<QHostAddress> QXmppIceComponent::discoverAddresses()
 ///
 QList<QUdpSocket *> QXmppIceComponent::reservePorts(const QList<QHostAddress> &addresses, int count, QObject *parent)
 {
+    for(const QHostAddress& add : addresses)
+    {
+        qDebug() << add.toString();
+    }
+
     QList<QUdpSocket *> sockets;
     if (addresses.isEmpty() || !count) {
         return sockets;
@@ -2491,6 +2504,7 @@ QList<QUdpSocket *> QXmppIceComponent::reservePorts(const QList<QHostAddress> &a
         if (sockets.size() != expectedSize) {
             qDeleteAll(sockets);
             sockets.clear();
+            break;
         }
     }
     return sockets;
