@@ -15,6 +15,7 @@
 #include "StringLiterals.h"
 
 #include <gst/gst.h>
+#include <ranges>
 
 #include <QDomElement>
 #include <QTimer>
@@ -30,10 +31,8 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
 
 QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid) const
 {
-    for (auto *call : calls) {
-        if (call->sid() == sid) {
-            return call;
-        }
+    if (auto call = std::ranges::find(calls, sid, &QXmppCall::sid); call != calls.end()) {
+        return *call;
     }
     return nullptr;
 }
