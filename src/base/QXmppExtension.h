@@ -8,7 +8,6 @@
 #include "QXmppGlobal.h"
 
 class QXMPP_EXPORT QXmppExtension
-{
-};
+{ };
 
 #endif  // QXMPPEXTENSION_H

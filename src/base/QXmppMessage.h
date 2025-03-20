@@ -292,8 +292,10 @@ public:
 
     // XEP-0428: Fallback Indication
 #if QXMPP_DEPRECATED_SINCE(1, 7)
-    [[deprecated("Use fallbackMarkers()")]] bool isFallback() const;
-    [[deprecated("Use setFallbackMarkers()")]] void setIsFallback(bool isFallback);
+    [[deprecated("Use fallbackMarkers()")]]
+    bool isFallback() const;
+    [[deprecated("Use setFallbackMarkers()")]]
+    void setIsFallback(bool isFallback);
 #endif
     const QVector<QXmppFallback> &fallbackMarkers() const;
     void setFallbackMarkers(const QVector<QXmppFallback> &);

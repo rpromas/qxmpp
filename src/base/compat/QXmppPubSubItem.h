@@ -19,20 +19,27 @@ class QXmppPubSubItemPrivate;
 class QXMPP_EXPORT QXmppPubSubItem
 {
 public:
-    [[deprecated]] QXmppPubSubItem();
+    [[deprecated]]
+    QXmppPubSubItem();
     QXmppPubSubItem(const QXmppPubSubItem &iq);
     ~QXmppPubSubItem();
 
     QXmppPubSubItem &operator=(const QXmppPubSubItem &iq);
 
-    [[deprecated]] QString id() const;
-    [[deprecated]] void setId(const QString &id);
+    [[deprecated]]
+    QString id() const;
+    [[deprecated]]
+    void setId(const QString &id);
 
-    [[deprecated]] QXmppElement contents() const;
-    [[deprecated]] void setContents(const QXmppElement &contents);
+    [[deprecated]]
+    QXmppElement contents() const;
+    [[deprecated]]
+    void setContents(const QXmppElement &contents);
 
-    [[deprecated]] void parse(const QDomElement &element);
-    [[deprecated]] void toXml(QXmlStreamWriter *writer) const;
+    [[deprecated]]
+    void parse(const QDomElement &element);
+    [[deprecated]]
+    void toXml(QXmlStreamWriter *writer) const;
 
 private:
     QSharedDataPointer<QXmppPubSubItemPrivate> d;
