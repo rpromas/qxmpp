@@ -12,10 +12,12 @@
 class QXMPP_EXPORT QXmppSessionIq : public QXmppIq
 {
 public:
-    [[deprecated]] static bool isSessionIq(const QDomElement &element);
+    [[deprecated]]
+    static bool isSessionIq(const QDomElement &element);
 
 private:
-    [[deprecated]] void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
+    [[deprecated]]
+    void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
 };
 #endif
 

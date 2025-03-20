@@ -43,16 +43,20 @@ public:
     void setActionType(QXmppMixIq::Type);
 
 #if QXMPP_DEPRECATED_SINCE(1, 7)
-    [[deprecated("Use participantId() and channelJid()")]] QString jid() const;
-    [[deprecated("Use setParticipantId() and setChannelJid()")]] void setJid(const QString &);
+    [[deprecated("Use participantId() and channelJid()")]]
+    QString jid() const;
+    [[deprecated("Use setParticipantId() and setChannelJid()")]]
+    void setJid(const QString &);
 #endif
 
     QString participantId() const;
     void setParticipantId(const QString &);
 
 #if QXMPP_DEPRECATED_SINCE(1, 7)
-    [[deprecated("Use channelId()")]] QString channelName() const;
-    [[deprecated("Use setChannelId()")]] void setChannelName(const QString &);
+    [[deprecated("Use channelId()")]]
+    QString channelName() const;
+    [[deprecated("Use setChannelId()")]]
+    void setChannelName(const QString &);
 #endif
 
     QString channelId() const;
@@ -62,8 +66,10 @@ public:
     void setChannelJid(const QString &);
 
 #if QXMPP_DEPRECATED_SINCE(1, 7)
-    [[deprecated("Use subscriptions()")]] QStringList nodes() const;
-    [[deprecated("Use setSubscriptions()")]] void setNodes(const QStringList &);
+    [[deprecated("Use subscriptions()")]]
+    QStringList nodes() const;
+    [[deprecated("Use setSubscriptions()")]]
+    void setNodes(const QStringList &);
 #endif
 
     QXmppMixConfigItem::Nodes subscriptions() const;

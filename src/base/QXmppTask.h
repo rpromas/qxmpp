@@ -140,7 +140,11 @@ public:
     /// This does not mean that the result is still stored, it might have been taken using
     /// takeResult() or handled using then().
     ///
-    [[nodiscard]] bool isFinished() const { return d.isFinished(); }
+    [[nodiscard]]
+    bool isFinished() const
+    {
+        return d.isFinished();
+    }
 
     ///
     /// Returns whether the task is finished and the value has not been taken yet.
@@ -148,7 +152,8 @@ public:
 #ifndef QXMPP_DOC
     template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
 #endif
-    [[nodiscard]] bool hasResult() const
+    [[nodiscard]]
+    bool hasResult() const
     {
         return d.result() != nullptr;
     }
@@ -159,10 +164,12 @@ public:
     /// \warning This can only be used once the operation is finished.
     ///
 #ifdef QXMPP_DOC
-    [[nodiscard]] const T &result() const
+    [[nodiscard]]
+    const T &result() const
 #else
     template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
-    [[nodiscard]] const U &result() const
+    [[nodiscard]]
+    const U &result() const
 #endif
     {
         Q_ASSERT(isFinished());
@@ -176,10 +183,12 @@ public:
     /// \warning This can only be used once and only after the operation has finished.
     ///
 #ifdef QXMPP_DOC
-    [[nodiscard]] T takeResult()
+    [[nodiscard]]
+    T takeResult()
 #else
     template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
-    [[nodiscard]] U takeResult()
+    [[nodiscard]]
+    U takeResult()
 #endif
     {
         Q_ASSERT(isFinished());

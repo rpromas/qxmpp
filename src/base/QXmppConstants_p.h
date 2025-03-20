@@ -23,7 +23,7 @@ namespace QXmpp::Private {
 constexpr quint16 XMPP_DEFAULT_PORT = 5222;
 constexpr quint16 XMPPS_DEFAULT_PORT = 5223;
 constexpr quint16 XMPP_SERVER_DEFAULT_PORT = 5269;
-}
+}  // namespace QXmpp::Private
 
 // QXmpp
 inline constexpr QStringView ns_qxmpp_credentials = u"org.qxmpp.credentials";

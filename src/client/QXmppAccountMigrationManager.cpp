@@ -32,7 +32,8 @@ struct XmlElementId {
         return tagName == other.tagName && xmlns == other.xmlns;
     }
 
-    bool operator<(const XmlElementId &other) const {
+    bool operator<(const XmlElementId &other) const
+    {
         const auto result = xmlns.compare(other.xmlns);
 
         if (result == 0) {

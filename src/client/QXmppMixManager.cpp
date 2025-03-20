@@ -46,12 +46,14 @@ struct MixData {
         QString jid;
         QString nick;
 
-        void parse(const QDomElement &element) {
+        void parse(const QDomElement &element)
+        {
             jid = element.attribute(u"jid"_s);
             nick = element.attribute(u"nick"_s);
         }
 
-        void toXml(QXmlStreamWriter *writer) const {
+        void toXml(QXmlStreamWriter *writer) const
+        {
             writer->writeStartElement(QSL65("item"));
             writeOptionalXmlAttribute(writer, u"jid", jid);
             writeOptionalXmlAttribute(writer, u"nick", nick);
@@ -1142,7 +1144,7 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
                         } else {
                             const auto participants = std::get<QVector<QXmppMixParticipantItem>>(participantsResult);
 
-                            for (const QXmppMixParticipantItem &participant: participants) {
+                            for (const QXmppMixParticipantItem &participant : participants) {
                                 if (participant.id() == participantId) {
                                     result->items.append({ channelId, participant.nick() });
                                     break;
