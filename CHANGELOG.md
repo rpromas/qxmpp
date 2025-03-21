@@ -9,6 +9,11 @@ QXmpp 1.11.0 (UNRELEASED)
 
 *under development*
 
+QXmpp 1.10.3 (March 21, 2025)
+-----------------------------
+
+ - OmemoManager: Clear complete in-memory cache on local own device reset (@melvo, !692)
+
 QXmpp 1.10.2 (March 19, 2025)
 -----------------------------
 
