@@ -105,13 +105,13 @@ void tst_QXmppRpcIq::testArray()
 void tst_QXmppRpcIq::testStruct()
 {
     QMap<QString, QVariant> map;
-    map["bar"] = u"hello world"_s;
+    map["bar"] = u"hello \n world"_s;
     map["foo"] = double(-12.214);
     checkVariant(map,
                  QByteArray("<value><struct>"
                             "<member>"
                             "<name>bar</name>"
-                            "<value><string>hello world</string></value>"
+                            "<value><string>hello \n world</string></value>"
                             "</member>"
                             "<member>"
                             "<name>foo</name>"
@@ -135,6 +135,12 @@ void tst_QXmppRpcIq::testInvoke()
         "<param>"
         "<value><i4>6</i4></value>"
         "</param>"
+        "<param>"
+        "<value><string>two\nlines</string></value>"
+        "</param>"
+        "<param>"
+        "<value><string><![CDATA[\n\n]]></string></value>"
+        "</param>"
         "</params>"
         "</methodCall>"
         "</query>"
@@ -142,9 +148,15 @@ void tst_QXmppRpcIq::testInvoke()
 
     QXmppRpcInvokeIq iq;
     parsePacket(iq, xml);
-    QCOMPARE(iq.method(), QLatin1String("examples.getStateName"));
-    QCOMPARE(iq.arguments(), QVariantList() << int(6));
-    serializePacket(iq, xml);
+    QCOMPARE(iq.method(), u"examples.getStateName");
+    QCOMPARE(iq.arguments(), QVariantList() << int(6) << u"two\nlines"_s << u"\n\n"_s);
+
+    const auto data = packetToXml(iq);
+    if (data != xml) {
+        qDebug() << "expect " << xml;
+        qDebug() << "writing" << data;
+    }
+    QCOMPARE(data, xml);
 }
 
 void tst_QXmppRpcIq::testResponse()

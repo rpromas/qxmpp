@@ -11,6 +11,8 @@
 
 #include "StringLiterals.h"
 
+#include <ranges>
+
 #include <QDateTime>
 #include <QDomElement>
 #include <QMap>
@@ -127,7 +129,15 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
 #else
         } else if (value.canConvert(QVariant::String)) {
 #endif
-            writer->writeTextElement(QSL65("string"), value.toString());
+            const auto string = value.toString();
+            writer->writeStartElement(QSL65("string"));
+            if (std::ranges::all_of(string, [](auto c) { return c.isSpace(); })) {
+                // strings with only whitespace get stripped by some parsers
+                writer->writeCDATA(string);
+            } else {
+                writer->writeCharacters(string);
+            }
+            writer->writeEndElement();
         }
         break;
     }
