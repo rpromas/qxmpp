@@ -48,27 +48,27 @@ QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
         qFatal("Failed to create pipeline");
         return;
     }
-    rtpbin = gst_element_factory_make("rtpbin", nullptr);
-    if (!rtpbin) {
+    rtpBin = gst_element_factory_make("rtpbin", nullptr);
+    if (!rtpBin) {
         qFatal("Failed to create rtpbin");
         return;
     }
     // We do not want to build up latency over time
-    g_object_set(rtpbin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
-    if (!gst_bin_add(GST_BIN(pipeline.get()), rtpbin)) {
+    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
+    if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
         qFatal("Could not add rtpbin to the pipeline");
     }
-    g_signal_connect_swapped(rtpbin, "pad-added",
+    g_signal_connect_swapped(rtpBin, "pad-added",
                              G_CALLBACK(+[](QXmppCallPrivate *p, GstPad *pad) {
                                  p->padAdded(pad);
                              }),
                              this);
-    g_signal_connect_swapped(rtpbin, "request-pt-map",
+    g_signal_connect_swapped(rtpBin, "request-pt-map",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint pt) {
                                  p->ptMap(sessionId, pt);
                              }),
                              this);
-    g_signal_connect_swapped(rtpbin, "on-ssrc-active",
+    g_signal_connect_swapped(rtpBin, "on-ssrc-active",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint ssrc) {
                                  p->ssrcActive(sessionId, ssrc);
                              }),
@@ -92,7 +92,7 @@ void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
 {
     Q_UNUSED(ssrc)
     GstElement *rtpSession;
-    g_signal_emit_by_name(rtpbin, "get-session", static_cast<uint>(sessionId), &rtpSession);
+    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(sessionId), &rtpSession);
     // TODO: implement bitrate controller
 }
 
@@ -396,7 +396,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         return nullptr;
     }
 
-    auto *stream = new QXmppCallStream(pipeline, rtpbin, media, creator, name, ++nextId, useDtls);
+    auto *stream = new QXmppCallStream(pipeline, rtpBin, media, creator, name, ++nextId, useDtls);
 
     // Fill local payload payload types
     auto &codecs = media == AUDIO_MEDIA ? audioCodecs : videoCodecs;

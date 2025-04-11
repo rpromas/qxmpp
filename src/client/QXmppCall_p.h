@@ -83,7 +83,7 @@ public:
     QXmppCall::State state;
 
     GstElementPtr pipeline;
-    GstElement *rtpbin;
+    GstElement *rtpBin;
 
     // Media streams
     QList<QXmppCallStream *> streams;
