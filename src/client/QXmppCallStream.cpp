@@ -391,6 +391,16 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
     }
 }
 
+void QXmppCallStreamPrivate::enableDtlsClientMode()
+{
+    gst_element_set_state(dtlsSrtpEncoder, GST_STATE_READY);
+    gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_READY);
+    g_object_set(dtlsSrtpEncoder, "is-client", true, nullptr);
+    g_object_set(dtlsSrtcpEncoder, "is-client", true, nullptr);
+    gst_element_set_state(dtlsSrtpEncoder, GST_STATE_PLAYING);
+    gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_PLAYING);
+}
+
 ///
 /// \class QXmppCallStream
 ///
@@ -465,14 +475,4 @@ void QXmppCallStream::setSendPadCallback(std::function<void(GstPad *)> cb)
     if (d->sendPad) {
         d->sendPadCB(d->sendPad);
     }
-}
-
-void QXmppCallStreamPrivate::toDtlsClientMode()
-{
-    gst_element_set_state(dtlsSrtpEncoder, GST_STATE_READY);
-    gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_READY);
-    g_object_set(dtlsSrtpEncoder, "is-client", true, nullptr);
-    g_object_set(dtlsSrtcpEncoder, "is-client", true, nullptr);
-    gst_element_set_state(dtlsSrtpEncoder, GST_STATE_PLAYING);
-    gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_PLAYING);
 }
