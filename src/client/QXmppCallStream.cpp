@@ -60,14 +60,30 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         g_object_set(dtlsSrtpDecoder, "async-handling", true, "connection-id", dtlsRtpId.toLatin1().data(), nullptr);
         g_object_set(dtlsSrtcpDecoder, "async-handling", true, "connection-id", dtlsRtcpId.toLatin1().data(), nullptr);
 
-        /* Copy the certificate to the RTCP decoder so that they both share the same fingerprint. */
-        GCharPtr pem;
-        pem = getCharProperty(dtlsSrtpDecoder, "pem"_L1);
-        g_object_set(dtlsSrtcpDecoder, "pem", pem.get(), nullptr);  // TODO why does this fail?
+        // setting a certificate is not supported
+        // assert that both factories use the same certificate automatically
+        Q_ASSERT(QSslCertificate(getCharProperty(dtlsSrtpDecoder, "pem"_L1).get()) ==
+                 QSslCertificate(getCharProperty(dtlsSrtcpDecoder, "pem"_L1).get()));
 
         /* Calculate the fingerprint to transmit to the remote party. */
+        GCharPtr pem = getCharProperty(dtlsSrtpDecoder, "pem"_L1);
         QSslCertificate certificate(pem.get());
-        digest = certificate.digest(QCryptographicHash::Sha256);
+        ownCertificateDigest = certificate.digest(QCryptographicHash::Sha256);
+
+        q->debug(u"DTLS-SRTP own certificate fingerprint: %1"_s.arg(QString::fromUtf8(ownCertificateDigest.toHex())));
+
+        // peer certificate received
+        g_signal_connect_swapped(
+            dtlsSrtpDecoder, "notify::peer-pem", G_CALLBACK(+[](QXmppCallStreamPrivate *p) {
+                p->onPeerCertificateReceived(getCharProperty(p->dtlsSrtpDecoder, "peer-pem"_L1));
+            }),
+            this);
+
+        g_signal_connect_swapped(
+            dtlsSrtpDecoder, "notify::connection-state", G_CALLBACK(+[](QXmppCallStreamPrivate *p) {
+                p->onDtlsConnectionStateChanged(GstDtlsConnectionState(getIntProperty(p->dtlsSrtpDecoder, "connection-state"_L1)));
+            }),
+            this);
 
         // Setup encoders
         dtlsSrtpEncoder = gst_element_factory_make("dtlssrtpenc", nullptr);
@@ -78,20 +94,6 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
 
         g_object_set(dtlsSrtpEncoder, "async-handling", true, "connection-id", dtlsRtpId.toLatin1().data(), "is-client", false, nullptr);
         g_object_set(dtlsSrtcpEncoder, "async-handling", true, "connection-id", dtlsRtcpId.toLatin1().data(), "is-client", false, nullptr);
-
-        g_signal_connect_swapped(dtlsSrtpEncoder, "on-key-set",
-                                 G_CALLBACK(+[](QXmppCallStreamPrivate *p) {
-                                     // TODO check remote fingerprint (peer-pem on decoders)
-                                     qWarning("================ ON_KEY_SET ==============");
-                                     p->dtlsHandshakeComplete = true;
-                                     if (p->sendPadCB && p->encoderBin) {
-                                         p->sendPadCB(p->sendPad);
-                                     }
-                                     if (p->receivePadCB && p->decoderBin) {
-                                         p->receivePadCB(p->receivePad);
-                                     }
-                                 }),
-                                 this);
 
         if (!gst_bin_add(GST_BIN(iceReceiveBin), dtlsSrtpDecoder) ||
             !gst_bin_add(GST_BIN(iceReceiveBin), dtlsSrtcpDecoder) ||
@@ -392,6 +394,28 @@ void QXmppCallStreamPrivate::enableDtlsClientMode()
     g_object_set(dtlsSrtcpEncoder, "is-client", true, nullptr);
     gst_element_set_state(dtlsSrtpEncoder, GST_STATE_PLAYING);
     gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_PLAYING);
+}
+
+void QXmppCallStreamPrivate::onDtlsConnectionStateChanged(GstDtlsConnectionState state)
+{
+    if (state == GstDtlsConnectionState::Connected && !dtlsHandshakeComplete) {
+        q->info(u"DTLS-SRTP handshake completed (%1)."_s.arg(media));
+
+        dtlsHandshakeComplete = true;
+        if (sendPadCB && encoderBin) {
+            sendPadCB(sendPad);
+        }
+        if (receivePadCB && decoderBin) {
+            receivePadCB(receivePad);
+        }
+    }
+}
+
+void QXmppCallStreamPrivate::onPeerCertificateReceived(GCharPtr pem)
+{
+    QSslCertificate peerCertificate(pem.get());
+    peerCertificateDigest = peerCertificate.digest(QCryptographicHash::Sha256);
+    q->debug(u"DTLS-SRTP remote peer fingerprint received: %1"_s.arg(QString::fromUtf8(peerCertificateDigest.toHex())));
 }
 
 ///

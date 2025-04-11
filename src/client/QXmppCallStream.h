@@ -34,6 +34,7 @@ private:
 
     QXmppCallStreamPrivate *d;
 
+    friend class QXmppCallStreamPrivate;
     friend class QXmppCall;
     friend class QXmppCallPrivate;
 };
