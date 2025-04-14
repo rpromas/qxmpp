@@ -51,6 +51,8 @@ public:
     void onDtlsConnectionStateChanged(QXmpp::Private::GstDtlsConnectionState);
     void onPeerCertificateReceived(QXmpp::Private::GCharPtr pem);
 
+    Q_SIGNAL void peerCertificateReceived(bool fingerprintMatches);
+
     QXmppCallStream *q;
 
     quint32 localSsrc;
@@ -86,6 +88,7 @@ public:
     bool useDtls;
     QByteArray ownCertificateDigest;
     QByteArray peerCertificateDigest;
+    QByteArray expectedPeerCertificateDigest;
     bool dtlsHandshakeComplete = false;
 
     QList<QXmppJinglePayloadType> payloadTypes;

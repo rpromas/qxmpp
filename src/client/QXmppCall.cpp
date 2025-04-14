@@ -248,6 +248,14 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
 
 bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content)
 {
+    if (!content.transportFingerprint().isEmpty()) {
+        if (content.transportFingerprintHash() != u"sha-256") {
+            q->warning(u"Unsupported hashing algorithm for DTLS fingerprint: %1."_s.arg(content.transportFingerprintHash()));
+            return false;
+        }
+        stream->d->expectedPeerCertificateDigest = content.transportFingerprint();
+    }
+
     stream->d->connection->setRemoteUser(content.transportUser());
     stream->d->connection->setRemotePassword(content.transportPassword());
     const auto candidates = content.transportCandidates();
@@ -425,6 +433,17 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
 
     QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected,
                      q, &QXmppCall::hangup);
+
+    connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this](bool fingerprintMatches) {
+        if (!fingerprintMatches) {
+            q->warning(u"DTLS handshake returned unexpected certificate fingerprint."_s);
+
+            // TODO: only cancel this stream (e.g. only video)
+            terminate(QXmppJingleIq::Reason::SecurityError);
+        } else {
+            q->debug(u"DTLS handshake returned certificate with expected fingerprint."_s);
+        }
+    });
 
     Q_EMIT q->streamCreated(stream);
 

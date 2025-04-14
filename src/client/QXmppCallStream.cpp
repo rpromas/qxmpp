@@ -414,8 +414,16 @@ void QXmppCallStreamPrivate::onDtlsConnectionStateChanged(GstDtlsConnectionState
 void QXmppCallStreamPrivate::onPeerCertificateReceived(GCharPtr pem)
 {
     QSslCertificate peerCertificate(pem.get());
-    peerCertificateDigest = peerCertificate.digest(QCryptographicHash::Sha256);
+    auto digest = peerCertificate.digest(QCryptographicHash::Sha256);
+
+    // ignore subsequent calls with the same certificate (happens)
+    if (peerCertificateDigest == digest) {
+        return;
+    }
+    peerCertificateDigest = digest;
+
     q->debug(u"DTLS-SRTP remote peer fingerprint received: %1"_s.arg(QString::fromUtf8(peerCertificateDigest.toHex())));
+    Q_EMIT peerCertificateReceived(expectedPeerCertificateDigest == peerCertificateDigest);
 }
 
 ///
