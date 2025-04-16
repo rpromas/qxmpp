@@ -33,6 +33,22 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
       id(id_),
       useDtls(useDtls_)
 {
+    //
+    // Flow chart (incoming data, with DTLS):
+    //
+    //  QXmppIceComponent    QXmppIceComponent
+    //           ↓                  ↓
+    //       appRtpSrc          appRtcpSrc
+    //           │                  │
+    // (DTLS-SRTP packets) (DTLS-SRTCP packets)
+    //           ↓                  ↓
+    // dtlsSrtpDecoder     dtlsSrtcpDecoder
+    //           │                  │
+    // RTP (plain, decrypted)  RTCP (plain)
+    //           ↓                  ↓
+    // →→→→→→ rtpbin (RTP session logic) →→→→→→
+    //
+
     localSsrc = QRandomGenerator::global()->generate();
 
     iceReceiveBin = gst_bin_new(u"receive_%1"_s.arg(id).toLatin1().data());
@@ -159,16 +175,16 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     if (useDtls) {
         GstPadPtr dtlsRtpSinkPad = gst_element_get_static_pad(dtlsSrtpDecoder, "sink");
         GstPadPtr dtlsRtcpSinkPad = gst_element_get_static_pad(dtlsSrtcpDecoder, "sink");
-        gst_pad_link(rtpRecvPad, dtlsRtpSinkPad);
-        gst_pad_link(rtcpRecvPad, dtlsRtcpSinkPad);
+        linkPads(rtpRecvPad, dtlsRtpSinkPad);
+        linkPads(rtcpRecvPad, dtlsRtcpSinkPad);
         rtpRecvPad = gst_element_get_static_pad(dtlsSrtpDecoder, "rtp_src");
         rtcpRecvPad = gst_element_get_static_pad(dtlsSrtcpDecoder, "rtcp_src");
     }
 
     GstPadPtr rtpSinkPad = gst_element_request_pad_simple(rtpBin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
     GstPadPtr rtcpSinkPad = gst_element_request_pad_simple(rtpBin, u"recv_rtcp_sink_%1"_s.arg(id).toLatin1().data());
-    gst_pad_link(rtpRecvPad, rtpSinkPad);
-    gst_pad_link(rtcpRecvPad, rtcpSinkPad);
+    linkPads(rtpRecvPad, rtpSinkPad);
+    linkPads(rtcpRecvPad, rtcpSinkPad);
 
     /* Link pads - sending side */
     GstPadPtr rtpSendPad = gst_element_get_static_pad(appRtpSink, "sink");
@@ -177,8 +193,8 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     if (useDtls) {
         GstPadPtr dtlsRtpSrcPad = gst_element_get_static_pad(dtlsSrtpEncoder, "src");
         GstPadPtr dtlsRtcpSrcPad = gst_element_get_static_pad(dtlsSrtcpEncoder, "src");
-        gst_pad_link(dtlsRtpSrcPad, rtpSendPad);
-        gst_pad_link(dtlsRtcpSrcPad, rtcpSendPad);
+        linkPads(dtlsRtpSrcPad, rtpSendPad);
+        linkPads(dtlsRtcpSrcPad, rtcpSendPad);
         rtpSendPad = gst_element_request_pad_simple(dtlsSrtpEncoder, u"rtp_sink_%1"_s.arg(id).toLatin1().data());
         rtcpSendPad = gst_element_request_pad_simple(dtlsSrtcpEncoder, u"rtcp_sink_%1"_s.arg(id).toLatin1().data());
     }
@@ -198,10 +214,8 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
 
     GstPadPtr rtpbinRtpSendPad = gst_element_get_static_pad(rtpBin, u"send_rtp_src_%1"_s.arg(id).toLatin1().data());
     GstPadPtr rtpbinRtcpSendPad = gst_element_request_pad_simple(rtpBin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data());
-    if (gst_pad_link(rtpbinRtpSendPad, internalRtpPad) != GST_PAD_LINK_OK ||
-        gst_pad_link(rtpbinRtcpSendPad, internalRtcpPad) != GST_PAD_LINK_OK) {
-        qFatal("Failed to link rtp pads");
-    }
+    linkPads(rtpbinRtpSendPad, internalRtpPad);
+    linkPads(rtpbinRtcpSendPad, internalRtcpPad);
 }
 
 QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
@@ -373,8 +387,8 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
         qFatal("Failed to set receive pad");
     }
 
-    if (gst_pad_link(pad, internalReceivePad) != GST_PAD_LINK_OK ||
-        !gst_element_link_many(depay, decoder, queue, nullptr)) {
+    linkPads(pad, internalReceivePad);
+    if (!gst_element_link_many(depay, decoder, queue, nullptr)) {
         qFatal("Could not link all decoder pads");
         return;
     }
