@@ -71,6 +71,7 @@ using GCharPtr = CustomUniquePtr<gchar, void, g_free>;
 bool checkGstFeature(QLatin1String feature);
 GCharPtr getCharProperty(gpointer object, QLatin1String propertyName);
 int getIntProperty(gpointer, QLatin1String propertyName, int defaultValue = -1);
+void linkPads(GstPad *srcPad, GstPad *sinkPad);
 
 }  // namespace QXmpp::Private
 

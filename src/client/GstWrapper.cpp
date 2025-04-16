@@ -4,7 +4,9 @@
 
 #include "GstWrapper.h"
 
+#include <format>
 #include <gst/gst.h>
+#include <stdexcept>
 
 namespace QXmpp::Private {
 
@@ -29,6 +31,16 @@ int getIntProperty(gpointer object, QLatin1String propertyName, int defaultValue
     int value = defaultValue;
     g_object_get(object, propertyName.data(), &value, nullptr);
     return value;
+}
+
+void linkPads(GstPad *srcPad, GstPad *sinkPad)
+{
+    auto result = gst_pad_link(srcPad, sinkPad);
+    if (result != GST_PAD_LINK_OK) {
+        throw std::runtime_error(std::format(
+            "gst pad link error ({} -> {}): {}",
+            gst_pad_get_name(srcPad), gst_pad_get_name(sinkPad), gst_pad_link_get_name(result)));
+    }
 }
 
 }  // namespace QXmpp::Private
