@@ -364,7 +364,7 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
     }
 
     receivePad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SRC);
-    internalReceivePad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
+    GstPad *internalReceivePad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
     gst_element_add_pad(decoderBin, receivePad);
     gst_element_add_pad(decoderBin, internalReceivePad);
 

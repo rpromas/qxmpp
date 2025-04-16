@@ -61,7 +61,6 @@ public:
     GstElement *rtpBin = nullptr;
     GstPad *sendPad = nullptr;
     GstPad *receivePad = nullptr;
-    GstPad *internalReceivePad = nullptr;
     GstElement *encoderBin = nullptr;
     GstElement *decoderBin = nullptr;
     GstElement *iceReceiveBin = nullptr;
