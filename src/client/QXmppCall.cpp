@@ -85,6 +85,8 @@ QXmppCallPrivate::~QXmppCallPrivate()
     if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
         qFatal("Unable to set the pipeline to the null state");
     }
+    // Delete streams before pipeline.
+    // Streams still need to be children of QXmppCall for logging to work.
     qDeleteAll(streams);
 }
 
@@ -396,7 +398,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         return nullptr;
     }
 
-    auto *stream = new QXmppCallStream(pipeline, rtpBin, media, creator, name, ++nextId, useDtls);
+    auto *stream = new QXmppCallStream(pipeline, rtpBin, media, creator, name, ++nextId, useDtls, q);
 
     // Fill local payload payload types
     auto &codecs = media == AUDIO_MEDIA ? audioCodecs : videoCodecs;

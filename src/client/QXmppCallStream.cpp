@@ -411,10 +411,10 @@ void QXmppCallStreamPrivate::enableDtlsClientMode()
 /// \since QXmpp 1.3
 ///
 
-QXmppCallStream::QXmppCallStream(GstElement *pipeline, GstElement *rtpbin,
-                                 QString media, QString creator, QString name, int id, bool useDtls)
+QXmppCallStream::QXmppCallStream(GstElement *pipeline, GstElement *rtpbin, QString media, QString creator, QString name, int id, bool useDtls, QObject *parent)
+    : QXmppLoggable(parent),
+      d(new QXmppCallStreamPrivate(this, pipeline, rtpbin, std::move(media), std::move(creator), std::move(name), id, useDtls))
 {
-    d = new QXmppCallStreamPrivate(this, pipeline, rtpbin, std::move(media), std::move(creator), std::move(name), id, useDtls);
 }
 
 ///
