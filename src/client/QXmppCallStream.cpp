@@ -315,8 +315,8 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
 
-    GstPadPtr targetPad = gst_element_get_static_pad(queue, "sink");
-    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(sendPad), targetPad)) {
+    GstPadPtr queueSinkPad = gst_element_get_static_pad(queue, "sink");
+    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(sendPad), queueSinkPad)) {
         qFatal("Failed to set send pad");
         return;
     }
@@ -368,13 +368,13 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
 
     gst_bin_add_many(GST_BIN(decoderBin), depay, decoder, queue, nullptr);
 
-    GstPadPtr targetPad = gst_element_get_static_pad(depay, "sink");
-    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalReceivePad), targetPad)) {
+    GstPadPtr depaySinkPad = gst_element_get_static_pad(depay, "sink");
+    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalReceivePad), depaySinkPad)) {
         qFatal("Failed to set receive pad");
     }
 
-    targetPad = gst_element_get_static_pad(queue, "src");
-    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(receivePad), targetPad)) {
+    GstPadPtr queueSrcPad = gst_element_get_static_pad(queue, "src");
+    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(receivePad), queueSrcPad)) {
         qFatal("Failed to set receive pad");
     }
 
