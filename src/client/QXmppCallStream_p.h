@@ -53,6 +53,9 @@ public:
 
     Q_SIGNAL void peerCertificateReceived(bool fingerprintMatches);
 
+    bool sendPadCbReady() const { return sendPadCB && sendPad && (dtlsHandshakeComplete || !useDtls); }
+    bool receivePadCbReady() const { return receivePadCB && receivePad && (dtlsHandshakeComplete || !useDtls); }
+
     QXmppCallStream *q;
 
     quint32 localSsrc;

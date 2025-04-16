@@ -342,7 +342,7 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
 
-    if (sendPadCB && (dtlsHandshakeComplete || !useDtls)) {
+    if (sendPadCbReady()) {
         sendPadCB(sendPad);
     }
 
@@ -407,7 +407,7 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
 
     gst_element_sync_state_with_parent(decoderBin);
 
-    if (receivePadCB && (dtlsHandshakeComplete || !useDtls)) {
+    if (receivePadCbReady()) {
         receivePadCB(receivePad);
     }
 }
@@ -428,10 +428,10 @@ void QXmppCallStreamPrivate::onDtlsConnectionStateChanged(GstDtlsConnectionState
         q->info(u"DTLS-SRTP handshake completed (%1)."_s.arg(media));
 
         dtlsHandshakeComplete = true;
-        if (sendPadCB && encoderBin) {
+        if (sendPadCbReady()) {
             sendPadCB(sendPad);
         }
-        if (receivePadCB && decoderBin) {
+        if (receivePadCbReady()) {
             receivePadCB(receivePad);
         }
     }
@@ -510,7 +510,7 @@ int QXmppCallStream::id() const
 void QXmppCallStream::setReceivePadCallback(std::function<void(GstPad *)> cb)
 {
     d->receivePadCB = std::move(cb);
-    if (d->receivePad) {
+    if (d->receivePadCbReady()) {
         d->receivePadCB(d->receivePad);
     }
 }
@@ -523,7 +523,7 @@ void QXmppCallStream::setReceivePadCallback(std::function<void(GstPad *)> cb)
 void QXmppCallStream::setSendPadCallback(std::function<void(GstPad *)> cb)
 {
     d->sendPadCB = std::move(cb);
-    if (d->sendPad) {
+    if (d->sendPadCbReady()) {
         d->sendPadCB(d->sendPad);
     }
 }
