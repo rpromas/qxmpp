@@ -55,6 +55,13 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     iceSendBin = gst_bin_new(u"send_%1"_s.arg(id).toLatin1().data());
     gst_bin_add_many(GST_BIN(pipeline), iceReceiveBin, iceSendBin, nullptr);
 
+    GstPad *internalRtpRecvPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SRC);
+    GstPad *internalRtcpRecvPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SRC);
+    if (!gst_element_add_pad(iceReceiveBin, internalRtpRecvPad) ||
+        !gst_element_add_pad(iceReceiveBin, internalRtcpRecvPad)) {
+        qFatal("Failed to add ghost pads to receive bin");
+    }
+
     GstPad *internalRtpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
     GstPad *internalRtcpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
     if (!gst_element_add_pad(iceSendBin, internalRtpPad) ||
@@ -183,8 +190,13 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
 
     GstPadPtr rtpSinkPad = gst_element_request_pad_simple(rtpBin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
     GstPadPtr rtcpSinkPad = gst_element_request_pad_simple(rtpBin, u"recv_rtcp_sink_%1"_s.arg(id).toLatin1().data());
-    linkPads(rtpRecvPad, rtpSinkPad);
-    linkPads(rtcpRecvPad, rtcpSinkPad);
+    linkPads(internalRtpRecvPad, rtpSinkPad);
+    linkPads(internalRtcpRecvPad, rtcpSinkPad);
+
+    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalRtpRecvPad), rtpRecvPad) ||
+        !gst_ghost_pad_set_target(GST_GHOST_PAD(internalRtcpRecvPad), rtcpRecvPad)) {
+        qFatal("Failed to link rtp recv pads to internal ghost pads");
+    }
 
     /* Link pads - sending side */
     GstPadPtr rtpSendPad = gst_element_get_static_pad(appRtpSink, "sink");
