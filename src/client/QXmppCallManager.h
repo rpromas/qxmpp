@@ -60,17 +60,15 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when a new incoming call is received.
     ///
     /// To accept the call, invoke the call's QXmppCall::accept() method.
     /// To refuse the call, invoke the call's QXmppCall::hangup() method.
-    void callReceived(QXmppCall *call);
+    Q_SIGNAL void callReceived(QXmppCall *call);
 
     /// This signal is emitted when a call (incoming or outgoing) is started.
-    void callStarted(QXmppCall *call);
+    Q_SIGNAL void callStarted(QXmppCall *call);
 
-public Q_SLOTS:
     QXmppCall *call(const QString &jid);
 
 protected:
@@ -79,13 +77,12 @@ protected:
     void onUnregistered(QXmppClient *client) override;
     /// \endcond
 
-private Q_SLOTS:
+private:
     void _q_callDestroyed(QObject *object);
     void _q_disconnected();
     void _q_jingleIqReceived(const QXmppJingleIq &iq);
     void _q_presenceReceived(const QXmppPresence &presence);
 
-private:
     const std::unique_ptr<QXmppCallManagerPrivate> d;
     friend class QXmppCall;
     friend class QXmppCallPrivate;
