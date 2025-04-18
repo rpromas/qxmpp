@@ -377,6 +377,8 @@ public:
     };
 
     QXmppJingleReason();
+    QXmppJingleReason(Type, const QString &, std::optional<RtpErrorCondition>);
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleReason)
 
     QString text() const;
     void setText(const QString &text);
@@ -390,10 +392,7 @@ public:
     /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-
     /// \endcond
-
-    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleReason)
 
 private:
     QSharedDataPointer<QXmppJingleIqReasonPrivate> d;

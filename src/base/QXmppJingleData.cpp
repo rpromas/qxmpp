@@ -1011,18 +1011,10 @@ QString QXmppJingleIq::Content::toSdp() const
 class QXmppJingleIqReasonPrivate : public QSharedData
 {
 public:
-    QXmppJingleIqReasonPrivate();
-
     QString m_text;
-    QXmppJingleReason::Type m_type;
-    QXmppJingleReason::RtpErrorCondition m_rtpErrorCondition;
+    QXmppJingleReason::Type m_type = QXmppJingleReason::None;
+    QXmppJingleReason::RtpErrorCondition m_rtpErrorCondition = QXmppJingleReason::NoErrorCondition;
 };
-
-QXmppJingleIqReasonPrivate::QXmppJingleIqReasonPrivate()
-    : m_type(QXmppJingleReason::Type::None),
-      m_rtpErrorCondition(QXmppJingleReason::RtpErrorCondition::NoErrorCondition)
-{
-}
 
 ///
 /// \class QXmppJingleReason
@@ -1031,34 +1023,41 @@ QXmppJingleIqReasonPrivate::QXmppJingleIqReasonPrivate()
 /// QXmppJingle element.
 ///
 
+/// Constructs an empty QXmppJingleReason.
 QXmppJingleReason::QXmppJingleReason()
     : d(new QXmppJingleIqReasonPrivate())
 {
 }
 
-/// Returns the reason's textual description.
+///
+/// Constructs a QXmppJingleReason with specific type, error text and RTP error condition.
+///
+/// \since QXmpp 1.11
+///
+QXmppJingleReason::QXmppJingleReason(Type type, const QString &text, std::optional<RtpErrorCondition> rtpError)
+    : d(new QXmppJingleIqReasonPrivate { {}, text, type, rtpError.value_or(NoErrorCondition) })
+{
+}
 
+/// Returns the reason's textual description.
 QString QXmppJingleReason::text() const
 {
     return d->m_text;
 }
 
 /// Sets the reason's textual description.
-
 void QXmppJingleReason::setText(const QString &text)
 {
     d->m_text = text;
 }
 
 /// Gets the reason's type.
-
 QXmppJingleReason::Type QXmppJingleReason::type() const
 {
     return d->m_type;
 }
 
 /// Sets the reason's type.
-
 void QXmppJingleReason::setType(QXmppJingleReason::Type type)
 {
     d->m_type = type;
