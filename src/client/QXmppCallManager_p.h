@@ -25,7 +25,7 @@ class QXmppCallManager;
 class QXmppCallManagerPrivate
 {
 public:
-    QXmppCallManagerPrivate(QXmppCallManager *qq);
+    explicit QXmppCallManagerPrivate(QXmppCallManager *qq);
     QXmppCall *findCall(const QString &sid) const;
     QXmppCall *findCall(const QString &sid, QXmppCall::Direction direction) const;
 

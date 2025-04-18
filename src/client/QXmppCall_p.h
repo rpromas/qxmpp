@@ -46,7 +46,7 @@ public:
         QList<Property> encProps;
     };
 
-    QXmppCallPrivate(QXmppCall *qq);
+    explicit QXmppCallPrivate(QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
