@@ -470,13 +470,7 @@ void PubSubIqBase::parseElementFromChild(const QDomElement &element)
         break;
     case Items:
         // Result Set Management (incomplete items result received)
-        for (const auto &rsmEl : iterChildElements(pubSubElement, u"set")) {
-            if (rsmEl.namespaceURI() == ns_rsm) {
-                QXmppResultSetReply reply;
-                reply.parse(rsmEl);
-                d->itemsContinuation = reply;
-            }
-        }
+        d->itemsContinuation = parseOptionalChildElement<QXmppResultSetReply>(pubSubElement, u"set", ns_rsm);
         [[fallthrough]];
     case Publish:
     case Retract:

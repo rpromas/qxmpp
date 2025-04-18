@@ -138,6 +138,26 @@ inline DomChildElements iterChildElements(const QDomElement &el, QStringView tag
 
 std::vector<QString> parseTextElements(DomChildElements elements);
 
+// Parse T with T::parse() if DOM element is not null (no namespace check).
+template<typename T>
+auto parseOptionalElement(const QDomElement &domEl) -> std::optional<T>
+{
+    if (domEl.isNull()) {
+        return {};
+    }
+
+    T element;
+    element.parse(domEl);
+    return element;
+}
+
+// Parse T with T::parse() with first child element with the correct tag name and namespace.
+template<typename T>
+auto parseOptionalChildElement(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
+{
+    return parseOptionalElement<T>(firstChildElement(parentEl, tagName, xmlns));
+}
+
 QByteArray serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *));
 template<typename T>
 inline QByteArray serializeXml(const T &packet)

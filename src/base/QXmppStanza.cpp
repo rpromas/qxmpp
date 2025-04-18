@@ -1026,12 +1026,8 @@ void QXmppStanza::parse(const QDomElement &element)
     d->id = element.attribute(u"id"_s);
     d->lang = element.attribute(u"lang"_s);
 
-    QDomElement errorElement = firstChildElement(element, u"error");
-    if (!errorElement.isNull()) {
-        Error error;
-        error.parse(errorElement);
-        d->error = error.d;
-    }
+    auto error = parseOptionalChildElement<Error>(element, u"error", element.namespaceURI());
+    d->error = error ? error->d : decltype(d->error) {};
 
     // XEP-0033: Extended Stanza Addressing
     for (const auto &addressElement : iterChildElements(firstChildElement(element, u"addresses"), u"address")) {

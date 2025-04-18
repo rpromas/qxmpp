@@ -645,14 +645,9 @@ void QXmppMixIq::parseElementFromChild(const QDomElement &element)
         }
 
         d->nick = firstChildElement(child, u"nick").text();
-
-        if (const auto invitationElement = firstChildElement(child, u"invitation"); !invitationElement.isNull()) {
-            d->invitation = QXmppMixInvitation();
-            d->invitation->parse(invitationElement);
-        }
+        d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child, u"invitation", ns_mix_misc);
 
         QVector<QString> subscriptions;
-
         for (const auto &node : iterChildElements(child, u"subscribe")) {
             subscriptions << node.attribute(u"node"_s);
         }

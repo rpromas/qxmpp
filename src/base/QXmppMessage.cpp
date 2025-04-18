@@ -1654,9 +1654,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         // XEP-0353: Jingle Message Initiation
         if (QXmppJingleMessageInitiationElement::isJingleMessageInitiationElement(element)) {
-            QXmppJingleMessageInitiationElement jingleMessageInitiationElement;
-            jingleMessageInitiationElement.parse(element);
-            d->jingleMessageInitiationElement = jingleMessageInitiationElement;
+            d->jingleMessageInitiationElement = parseOptionalElement<QXmppJingleMessageInitiationElement>(element);
             return true;
         }
         // XEP-0359: Unique and Stable Stanza IDs
@@ -1686,17 +1684,13 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
 #ifdef BUILD_OMEMO
         // XEP-0384: OMEMO Encryption
         if (QXmppOmemoElement::isOmemoElement(element)) {
-            QXmppOmemoElement omemoElement;
-            omemoElement.parse(element);
-            d->omemoElement = omemoElement;
+            d->omemoElement = parseOptionalElement<QXmppOmemoElement>(element);
             return true;
         }
 #endif
         // XEP-0482: Call Invites
         if (QXmppCallInviteElement::isCallInviteElement(element)) {
-            QXmppCallInviteElement callInviteElement;
-            callInviteElement.parse(element);
-            d->callInviteElement = callInviteElement;
+            d->callInviteElement = parseOptionalElement<QXmppCallInviteElement>(element);
             return true;
         }
     }
@@ -1832,23 +1826,17 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
         if (checkElement(element, u"invitation", ns_mix_misc)) {
-            QXmppMixInvitation mixInvitation;
-            mixInvitation.parse(element);
-            d->mixInvitation = mixInvitation;
+            d->mixInvitation = parseOptionalElement<QXmppMixInvitation>(element);
             return true;
         }
         // XEP-0434: Trust Messages (TM)
         if (QXmppTrustMessageElement::isTrustMessageElement(element)) {
-            QXmppTrustMessageElement trustMessageElement;
-            trustMessageElement.parse(element);
-            d->trustMessageElement = trustMessageElement;
+            d->trustMessageElement = parseOptionalElement<QXmppTrustMessageElement>(element);
             return true;
         }
         // XEP-0444: Message Reactions
         if (QXmppMessageReaction::isMessageReaction(element)) {
-            QXmppMessageReaction reaction;
-            reaction.parse(element);
-            d->reaction = std::move(reaction);
+            d->reaction = parseOptionalElement<QXmppMessageReaction>(element);
             return true;
         }
         // XEP-0447: Stateless file sharing
