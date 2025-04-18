@@ -1144,7 +1144,10 @@ public:
     QString mujiGroupChatJid;
 
     QList<QXmppJingleIq::Content> contents;
-    QXmppJingleReason reason;
+
+    // not a std::optional because of deprecated T &reason() getter
+    bool actionReasonSet = false;
+    QXmppJingleReason actionReason;
 
     std::optional<QXmppJingleIq::RtpSessionState> rtpSessionState;
 };
@@ -1231,16 +1234,50 @@ void QXmppJingleIq::setInitiator(const QString &initiator)
     d->initiator = initiator;
 }
 
-/// Returns a reference to the IQ's reason element.
-QXmppJingleReason &QXmppJingleIq::reason()
+///
+/// Returns the reason for the action (in most cases the error).
+///
+/// \since QXmpp 1.11
+///
+std::optional<QXmppJingleReason> QXmppJingleIq::actionReason() const
 {
-    return d->reason;
+    if (d->actionReasonSet) {
+        return d->actionReason;
+    }
+    return {};
 }
 
+///
+/// Sets the reason for the action (in most cases the error).
+///
+/// \since QXmpp 1.11
+///
+void QXmppJingleIq::setActionReason(const std::optional<QXmppJingleReason> &reason)
+{
+    d->actionReasonSet = reason.has_value();
+    if (reason) {
+        d->actionReason = *reason;
+    }
+}
+
+///
+/// Returns a reference to the IQ's reason element.
+///
+/// \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
+///
+QXmppJingleReason &QXmppJingleIq::reason()
+{
+    return d->actionReason;
+}
+
+///
 /// Returns a const reference to the IQ's reason element.
+///
+/// \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
+///
 const QXmppJingleReason &QXmppJingleIq::reason() const
 {
-    return d->reason;
+    return d->actionReason;
 }
 
 /// Returns the session responder.
@@ -1388,7 +1425,8 @@ void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
         addContent(content);
     }
 
-    d->reason.parse(firstChildElement(jingleElement, u"reason"));
+    // reason
+    setActionReason(parseOptionalChildElement<QXmppJingleReason>(jingleElement, u"reason", ns_jingle));
 
     for (const auto &childElement : iterChildElements(jingleElement, {}, ns_jingle_rtp_info)) {
         const auto elementTag = childElement.tagName();
@@ -1439,7 +1477,7 @@ void QXmppJingleIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         content.toXml(writer);
     }
 
-    d->reason.toXml(writer);
+    writeOptional(writer, actionReason());
 
     const auto writeStartElementWithNamespace = [=](const QString &tagName) {
         writer->writeStartElement(tagName);

@@ -561,8 +561,15 @@ public:
     QString initiator() const;
     void setInitiator(const QString &initiator);
 
+    std::optional<QXmppJingleReason> actionReason() const;
+    void setActionReason(const std::optional<QXmppJingleReason> &);
+
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+    [[deprecated("Use actionReason() instead.")]]
     QXmppJingleReason &reason();
+    [[deprecated("Use actionReason() instead.")]]
     const QXmppJingleReason &reason() const;
+#endif
 
     QString responder() const;
     void setResponder(const QString &responder);
