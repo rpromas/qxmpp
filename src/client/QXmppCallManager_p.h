@@ -11,7 +11,9 @@
 #include <QList>
 
 class QXmppCallManager;
+class QXmppJingleReason;
 
+//
 //  W A R N I N G
 //  -------------
 //

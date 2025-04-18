@@ -72,7 +72,7 @@ public:
     void setState(QXmppCall::State state);
     bool sendAck(const QXmppJingleIq &iq);
     void sendInvite();
-    void terminate(QXmppJingleIq::Reason::Type reasonType);
+    void terminate(QXmppJingleReason reason);
 
     QXmppCall::Direction direction;
     QString jid;

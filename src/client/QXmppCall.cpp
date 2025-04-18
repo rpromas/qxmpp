@@ -291,7 +291,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             !handleTransport(stream, content)) {
 
             // terminate call
-            terminate(QXmppJingleIq::Reason::FailedApplication);
+            terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             return;
         }
 
@@ -360,7 +360,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             iq.setType(QXmppIq::Set);
             iq.setAction(QXmppJingleIq::ContentReject);
             iq.setSid(q->sid());
-            iq.reason().setType(QXmppJingleIq::Reason::FailedApplication);
+            iq.setActionReason(QXmppJingleReason(QXmppJingleReason::FailedApplication, {}, {}));
             manager->client()->sendIq(std::move(iq));
             streams.removeAll(stream);
             delete stream;
@@ -439,7 +439,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
             q->warning(u"DTLS handshake returned unexpected certificate fingerprint."_s);
 
             // TODO: only cancel this stream (e.g. only video)
-            terminate(QXmppJingleIq::Reason::SecurityError);
+            terminate({ QXmppJingleReason::SecurityError, {}, {} });
         } else {
             q->debug(u"DTLS handshake returned certificate with expected fingerprint."_s);
         }
@@ -523,7 +523,7 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
 ///
 /// Request graceful call termination
 ///
-void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
+void QXmppCallPrivate::terminate(QXmppJingleReason reason)
 {
     if (state == QXmppCall::DisconnectingState ||
         state == QXmppCall::FinishedState) {
@@ -536,7 +536,7 @@ void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::SessionTerminate);
     iq.setSid(sid);
-    iq.reason().setType(reasonType);
+    iq.setActionReason(std::move(reason));
 
     setState(QXmppCall::DisconnectingState);
 
@@ -652,7 +652,7 @@ QXmppCall::Direction QXmppCall::direction() const
 ///
 void QXmppCall::hangup()
 {
-    d->terminate(QXmppJingleIq::Reason::None);
+    d->terminate({ QXmppJingleReason::None, {}, {} });
 }
 
 ///

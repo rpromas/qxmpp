@@ -246,7 +246,7 @@ void QXmppCallManager::_q_callDestroyed(QObject *object)
 void QXmppCallManager::_q_disconnected()
 {
     for (auto *call : std::as_const(d->calls)) {
-        call->d->terminate(QXmppJingleIq::Reason::Gone);
+        call->d->terminate({ QXmppJingleReason::Gone, {}, {} });
     }
 }
 
@@ -270,13 +270,13 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
         call->d->sid = iq.sid();
 
         if (dtlsRequested && !d->supportsDtls) {
-            call->d->terminate(QXmppJingleIq::Reason::FailedApplication);
+            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             return;
         }
 
         auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
         if (!stream) {
-            call->d->terminate(QXmppJingleIq::Reason::FailedApplication);
+            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             return;
         }
         call->d->streams << stream;
@@ -289,7 +289,7 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
             !call->d->handleTransport(stream, content)) {
 
             // terminate call
-            call->d->terminate(QXmppJingleIq::Reason::FailedApplication);
+            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             call->terminated();
             delete call;
             return;
@@ -336,7 +336,7 @@ void QXmppCallManager::_q_presenceReceived(const QXmppPresence &presence)
     for (auto *call : std::as_const(d->calls)) {
         if (presence.from() == call->jid()) {
             // the remote party has gone away, terminate call
-            call->d->terminate(QXmppJingleIq::Reason::Gone);
+            call->d->terminate({ QXmppJingleReason::Gone, {}, {} });
         }
     }
 }
