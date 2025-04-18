@@ -34,11 +34,12 @@ public:
     QList<QXmppCall *> calls;
     QList<QPair<QHostAddress, quint16>> stunServers;
     QHostAddress turnHost;
-    quint16 turnPort;
+    quint16 turnPort = 0;
     QString turnUser;
     QString turnPassword;
 
-    bool supportsDtls;
+    bool dtlsRequired = false;
+    bool supportsDtls = false;
 
 private:
     QXmppCallManager *q;

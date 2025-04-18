@@ -54,6 +54,8 @@ public:
     void setTurnServer(const QHostAddress &host, quint16 port = 3478);
     void setTurnUser(const QString &user);
     void setTurnPassword(const QString &password);
+    bool dtlsRequired() const;
+    void setDtlsRequired(bool);
 
     /// \cond
     QStringList discoveryFeatures() const override;

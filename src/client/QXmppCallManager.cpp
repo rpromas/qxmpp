@@ -27,8 +27,7 @@
 using namespace QXmpp::Private;
 
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
-    : turnPort(0),
-      q(qq)
+    : q(qq)
 {
     // Initialize GStreamer
     if (!gst_is_initialized()) {
@@ -137,6 +136,11 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         return nullptr;
     }
 
+    if (d->dtlsRequired && !d->supportsDtls) {
+        warning(u"DTLS encryption for calls is required, but not supported locally."_s);
+        return nullptr;
+    }
+
     QXmppCall *call = new QXmppCall(jid, QXmppCall::OutgoingDirection, this);
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
@@ -154,6 +158,12 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         bool remoteSupportsDtls = info.features().contains(ns_jingle_dtls);
 
         call->d->useDtls = d->supportsDtls && remoteSupportsDtls;
+
+        if (!call->d->useDtls && d->dtlsRequired) {
+            warning(u"Remote does not support DTLS, but required locally."_s);
+            call->terminated();
+            return;
+        }
 
         QXmppCallStream *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
         call->d->streams << stream;
@@ -233,6 +243,28 @@ void QXmppCallManager::setTurnPassword(const QString &password)
 }
 
 ///
+/// Returns whether the call manager requires encryption using \xep{0320, Use of DTLS-SRTP in
+/// Jingle Sessions} for all calls.
+///
+/// \since QXmpp 1.11
+///
+bool QXmppCallManager::dtlsRequired() const
+{
+    return d->dtlsRequired;
+}
+
+///
+/// Sets whether the call manager requires encryption using \xep{0320, Use of DTLS-SRTP in
+/// Jingle Sessions} for all calls.
+///
+/// \since QXmpp 1.11
+///
+void QXmppCallManager::setDtlsRequired(bool dtlsRequired)
+{
+    d->dtlsRequired = dtlsRequired;
+}
+
+///
 /// Handles call destruction.
 ///
 void QXmppCallManager::_q_callDestroyed(QObject *object)
@@ -270,7 +302,11 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
         call->d->sid = iq.sid();
 
         if (dtlsRequested && !d->supportsDtls) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
+            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} });
+            return;
+        }
+        if (!dtlsRequested && d->dtlsRequired) {
+            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS required."_s, {} });
             return;
         }
 
