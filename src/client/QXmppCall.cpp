@@ -32,7 +32,6 @@
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 
-/// \cond
 QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
     : direction(QXmppCall::IncomingDirection),
       manager(0),
@@ -570,7 +569,6 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason)
     // schedule forceful termination in 5s
     QTimer::singleShot(5s, q, &QXmppCall::terminated);
 }
-/// \endcond
 
 ///
 /// \class QXmppCall

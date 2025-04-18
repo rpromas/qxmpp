@@ -23,27 +23,6 @@ class QXmppJingleIq;
 class QXmppJinglePayloadType;
 class QXmppPresence;
 
-/// \brief The QXmppCallManager class provides support for making and
-/// receiving voice calls.
-///
-/// Session initiation is performed as described by \xep{0166}: Jingle,
-/// \xep{0167}: Jingle RTP Sessions and \xep{0176}: Jingle ICE-UDP Transport
-/// Method.
-///
-/// The data stream is connected using Interactive Connectivity Establishment
-/// (RFC 5245) and data is transferred using Real Time Protocol (RFC 3550)
-/// packets.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// QXmppCallManager *manager = new QXmppCallManager;
-/// client->addExtension(manager);
-/// \endcode
-///
-/// \ingroup Managers
-
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 {
     Q_OBJECT

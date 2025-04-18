@@ -58,6 +58,42 @@ QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid, QXmppCall::Dire
 }
 
 ///
+/// \class QXmppCallManager
+///
+/// \brief The QXmppCallManager class provides support for making and receiving voice calls.
+///
+/// Session initiation is performed as described by \xep{0166, Jingle}, \xep{0167, Jingle RTP
+/// Sessions} and \xep{0176, Jingle ICE-UDP Transport Method}.
+///
+/// The data stream is connected using Interactive Connectivity Establishment (RFC 5245) and data
+/// is transferred using Real Time Protocol (RFC 3550) packets.
+///
+/// To make use of this manager, you need to instantiate it and load it into the QXmppClient
+/// instance as follows:
+/// ```cpp
+/// auto *client = new QXmppClient();
+/// auto *callManager = client->addNewExtension<QXmppCallManager>();
+/// ```
+///
+/// ### XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+///
+/// DTLS-SRTP allows to encrypt peer-to-peer calls. Internally, a TLS handshake is done to
+/// negotiate keys for SRTP (Secure RTP). By default DTLS is not enforced, this can be done using
+/// setDtlsRequired(), though.
+///
+/// DTLS-SRTP by default exchanges the fingerprint via unencrypted XMPP packets. This means that
+/// the XMPP server could potentially replace the fingerprint or prevent the clients from using
+/// DTLS at all. However, the actual media connection is typically peer-to-peer, so the XMPP server
+/// does not have access to the transmitted data.
+///
+/// Support for DTLS-SRTP is available since QXmpp 1.11.
+///
+/// \warning THIS API IS NOT FINALIZED YET
+///
+/// \ingroup Managers
+///
+
+///
 /// Constructs a QXmppCallManager object to handle incoming and outgoing
 /// Voice-Over-IP calls.
 ///
