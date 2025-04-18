@@ -9,6 +9,7 @@
 #include "QXmppCall_p.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppTask.h"
@@ -136,24 +137,35 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         return nullptr;
     }
 
-    /* Determine support for XEP-0320: Use of DTLS-SRTP in Jingle Sessions */
-    QXmppRosterManager *rosterManager = client()->findExtension<QXmppRosterManager>();
-    QXmppPresence presence = rosterManager->getPresence(QXmppUtils::jidToBareJid(jid), QXmppUtils::jidToResource(jid));
-    // bool remoteSupportsDtls = presence.capabilityExt().contains(ns_jingle_dtls);
-    bool remoteSupportsDtls = true;
+    QXmppCall *call = new QXmppCall(jid, QXmppCall::OutgoingDirection, this);
 
-    QXmppCall *call = new QXmppCall(jid, QXmppCall::OutgoingDirection, remoteSupportsDtls && d->supportsDtls, this);
-    QXmppCallStream *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
-    call->d->streams << stream;
-    call->d->sid = QXmppUtils::generateStanzaHash();
+    auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
+    Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
+    discoManager->requestDiscoInfo(jid).then(this, [this, call](auto result) {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Error fetching service discovery features for calling %1: %2"_s
+                        .arg(call->jid(), error->description));
+            call->terminated();
+            return;
+        }
 
-    // register call
-    d->calls << call;
-    connect(call, &QObject::destroyed,
-            this, &QXmppCallManager::_q_callDestroyed);
-    Q_EMIT callStarted(call);
+        // determine supported features of remote
+        auto &&info = std::get<QXmppDiscoveryIq>(std::move(result));
+        bool remoteSupportsDtls = info.features().contains(ns_jingle_dtls);
 
-    call->d->sendInvite();
+        call->d->useDtls = d->supportsDtls && remoteSupportsDtls;
+
+        QXmppCallStream *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
+        call->d->streams << stream;
+        call->d->sid = QXmppUtils::generateStanzaHash();
+
+        // register call
+        d->calls << call;
+        connect(call, &QObject::destroyed, this, &QXmppCallManager::_q_callDestroyed);
+        Q_EMIT callStarted(call);
+
+        call->d->sendInvite();
+    });
 
     return call;
 }
@@ -249,14 +261,15 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
     }
 
     if (iq.action() == QXmppJingleIq::SessionInitiate) {
-        const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().first();
+        const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
+        bool dtlsRequested = !content.transportFingerprint().isEmpty();
 
         // build call
-        bool useDtls = !content.transportFingerprint().isEmpty();
-        QXmppCall *call = new QXmppCall(iq.from(), QXmppCall::IncomingDirection, useDtls, this);
+        QXmppCall *call = new QXmppCall(iq.from(), QXmppCall::IncomingDirection, this);
+        call->d->useDtls = d->supportsDtls && dtlsRequested;
         call->d->sid = iq.sid();
 
-        if (useDtls && !d->supportsDtls) {
+        if (dtlsRequested && !d->supportsDtls) {
             call->d->terminate(QXmppJingleIq::Reason::FailedApplication);
             return;
         }

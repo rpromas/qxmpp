@@ -558,14 +558,13 @@ void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
 /// \note THIS API IS NOT FINALIZED YET
 ///
 
-QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, bool useDtls, QXmppCallManager *parent)
+QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppCallPrivate>(this))
 {
     d->direction = direction;
     d->jid = jid;
     d->ownJid = parent->client()->configuration().jid();
-    d->useDtls = useDtls;
     d->manager = parent;
 }
 

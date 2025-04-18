@@ -87,7 +87,7 @@ private:
     void onLocalCandidatesChanged(QXmppCallStream *stream);
     void terminated();
 
-    QXmppCall(const QString &jid, QXmppCall::Direction direction, bool useDtls, QXmppCallManager *parent);
+    QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent);
 
     const std::unique_ptr<QXmppCallPrivate> d;
     friend class QXmppCallManager;
