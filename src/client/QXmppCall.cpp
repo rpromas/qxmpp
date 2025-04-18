@@ -248,12 +248,30 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
 
 bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content)
 {
-    if (!content.transportFingerprint().isEmpty()) {
+    if (stream->d->useDtls && !content.transportFingerprint().isEmpty()) {
         if (content.transportFingerprintHash() != u"sha-256") {
             q->warning(u"Unsupported hashing algorithm for DTLS fingerprint: %1."_s.arg(content.transportFingerprintHash()));
             return false;
         }
         stream->d->expectedPeerCertificateDigest = content.transportFingerprint();
+
+        // active/passive part negotiation
+        const auto setup = content.transportFingerprintSetup();
+        if (setup == u"actpass") {
+            stream->d->dtlsPeerSetup = Actpass;
+        } else if (setup == u"active") {
+            stream->d->dtlsPeerSetup = Active;
+        } else if (setup == u"passive") {
+            stream->d->dtlsPeerSetup = Passive;
+        } else {
+            // invalid setup attribute
+            return false;
+        }
+
+        q->debug(u"Decided to be DTLS %1"_s.arg(stream->d->isDtlsClient() ? u"client (active)" : u"server (passive)"));
+        if (stream->d->isDtlsClient()) {
+            stream->d->enableDtlsClientMode();
+        }
     }
 
     stream->d->connection->setRemoteUser(content.transportUser());
@@ -293,10 +311,6 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             // terminate call
             terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             return;
-        }
-
-        if (useDtls && content.transportFingerprintSetup() == u"passive") {
-            stream->d->enableDtlsClientMode();
         }
 
         // check for call establishment
@@ -373,8 +387,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         iq.setType(QXmppIq::Set);
         iq.setAction(QXmppJingleIq::ContentAccept);
         iq.setSid(q->sid());
-        iq.addContent(localContent(stream, u"active"_s));
-        stream->d->enableDtlsClientMode();
+        iq.addContent(localContent(stream));
         manager->client()->sendIq(std::move(iq));
 
     } else if (iq.action() == QXmppJingleIq::TransportInfo) {
@@ -450,7 +463,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     return stream;
 }
 
-QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream, QString dtlsSetup) const
+QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) const
 {
     QXmppJingleIq::Content content;
     content.setCreator(stream->creator());
@@ -472,7 +485,14 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream, Q
         Q_ASSERT(!stream->d->ownCertificateDigest.isEmpty());
         content.setTransportFingerprint(stream->d->ownCertificateDigest);
         content.setTransportFingerprintHash(u"sha-256"_s);
-        content.setTransportFingerprintSetup(dtlsSetup);
+
+        // choose whether we are DTLS client or server
+        if (stream->d->dtlsPeerSetup.has_value()) {
+            content.setTransportFingerprintSetup(stream->d->isDtlsClient() ? u"active"_s : u"passive"_s);
+        } else {
+            // let other end decide
+            content.setTransportFingerprintSetup(u"actpass"_s);
+        }
     }
 
     return content;
@@ -502,7 +522,7 @@ void QXmppCallPrivate::sendInvite()
     iq.setAction(QXmppJingleIq::SessionInitiate);
     iq.setInitiator(ownJid);
     iq.setSid(sid);
-    iq.addContent(localContent(stream, u"actpass"_s));
+    iq.addContent(localContent(stream));
     manager->client()->send(std::move(iq));
 }
 
@@ -586,8 +606,7 @@ void QXmppCall::accept()
         iq.setAction(QXmppJingleIq::SessionAccept);
         iq.setResponder(d->ownJid);
         iq.setSid(d->sid);
-        iq.addContent(d->localContent(stream, u"active"_s));
-        stream->d->enableDtlsClientMode();
+        iq.addContent(d->localContent(stream));
         d->manager->client()->sendIq(std::move(iq));
 
         // notify user
@@ -665,7 +684,7 @@ void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::TransportInfo);
     iq.setSid(d->sid);
-    iq.addContent(d->localContent(stream, {}));
+    iq.addContent(d->localContent(stream));
     d->manager->client()->sendIq(std::move(iq));
 }
 
@@ -721,7 +740,7 @@ void QXmppCall::addVideo()
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::ContentAdd);
     iq.setSid(d->sid);
-    iq.addContent(d->localContent(stream, u"actpass"_s));
+    iq.addContent(d->localContent(stream));
     d->manager->client()->sendIq(std::move(iq));
 }
 

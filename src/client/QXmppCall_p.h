@@ -64,7 +64,7 @@ public:
     QXmppCallStream *findStreamByMedia(QStringView media);
     QXmppCallStream *findStreamByName(QStringView name);
     QXmppCallStream *findStreamById(int id);
-    QXmppJingleIq::Content localContent(QXmppCallStream *stream, QString dtlsSetup) const;
+    QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void handleRequest(const QXmppJingleIq &iq);

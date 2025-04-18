@@ -33,6 +33,15 @@ static const int RTCP_COMPONENT = 2;
 constexpr QStringView AUDIO_MEDIA = u"audio";
 constexpr QStringView VIDEO_MEDIA = u"video";
 
+namespace QXmpp::Private {
+
+enum DtlsClientSetup {
+    Actpass,
+    Active,
+    Passive,
+};
+}
+
 class QXmppCallStreamPrivate : public QObject
 {
     Q_OBJECT
@@ -47,6 +56,7 @@ public:
 
     void addEncoder(QXmppCallPrivate::GstCodec &codec);
     void addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec &codec);
+    bool isDtlsClient() const;
     void enableDtlsClientMode();
     void onDtlsConnectionStateChanged(QXmpp::Private::GstDtlsConnectionState);
     void onPeerCertificateReceived(QXmpp::Private::GCharPtr pem);
@@ -88,6 +98,8 @@ public:
     int id;
 
     bool useDtls;
+    // DTLS setup mode received from the other peer
+    std::optional<QXmpp::Private::DtlsClientSetup> dtlsPeerSetup;
     QByteArray ownCertificateDigest;
     QByteArray peerCertificateDigest;
     QByteArray expectedPeerCertificateDigest;

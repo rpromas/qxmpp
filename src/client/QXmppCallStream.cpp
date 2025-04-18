@@ -412,6 +412,11 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
     }
 }
 
+bool QXmppCallStreamPrivate::isDtlsClient() const
+{
+    return dtlsPeerSetup && (dtlsPeerSetup == Actpass || dtlsPeerSetup == Passive);
+}
+
 void QXmppCallStreamPrivate::enableDtlsClientMode()
 {
     gst_element_set_state(dtlsSrtpEncoder, GST_STATE_READY);
