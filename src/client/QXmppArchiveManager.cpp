@@ -6,7 +6,8 @@
 
 #include "QXmppArchiveIq.h"
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
+
+#include "Constants.h"
 
 #include <QDomElement>
 

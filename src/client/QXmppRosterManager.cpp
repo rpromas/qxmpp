@@ -9,7 +9,6 @@
 
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppFutureUtils_p.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPresence.h"
@@ -18,6 +17,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

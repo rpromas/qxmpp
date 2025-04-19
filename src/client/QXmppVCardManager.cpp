@@ -6,7 +6,6 @@
 
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppError.h"
 #include "QXmppFutureUtils_p.h"
 #include "QXmppTask.h"
@@ -14,6 +13,7 @@
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 
+#include "Constants.h"
 #include "StringLiterals.h"
 
 using namespace QXmpp::Private;

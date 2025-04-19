@@ -5,12 +5,12 @@
 #include "QXmppEntityTimeManager.h"
 
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppEntityTimeIq.h"
 #include "QXmppFutureUtils_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
+#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDateTime>

@@ -6,7 +6,6 @@
 
 #include "QXmppCarbonManager.h"
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppFutureUtils_p.h"
 #include "QXmppMessage.h"
@@ -14,6 +13,8 @@
 #include "QXmppTrustMessageKeyOwner.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+
+#include "Constants.h"
 
 using namespace QXmpp;
 using namespace QXmpp::Private;

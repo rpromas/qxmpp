@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include "QXmppConstants_p.h"
 #include "QXmppElement.h"
 #include "QXmppPubSubIq.h"
 #include "QXmppPubSubItem.h"
@@ -11,6 +10,7 @@
 #include "QXmppStartTlsPacket.h"
 #include "QXmppUtils_p.h"
 
+#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

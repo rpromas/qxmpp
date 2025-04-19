@@ -6,7 +6,6 @@
 
 #include "QXmppByteStreamIq.h"
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppIbbIq.h"
 #include "QXmppSocks.h"
 #include "QXmppStreamInitiationIq_p.h"
@@ -15,6 +14,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QCryptographicHash>

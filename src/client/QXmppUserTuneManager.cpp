@@ -4,9 +4,10 @@
 
 #include "QXmppUserTuneManager.h"
 
-#include "QXmppConstants_p.h"
 #include "QXmppPep_p.h"
 #include "QXmppUserTuneItem.h"
+
+#include "Constants.h"
 
 using namespace QXmpp::Private;
 

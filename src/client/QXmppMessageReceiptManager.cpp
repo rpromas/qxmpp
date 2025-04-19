@@ -6,11 +6,12 @@
 #include "QXmppMessageReceiptManager.h"
 
 #include "QXmppClient.h"
-#include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
+
+#include "Constants.h"
 
 #include <QDomElement>
 
