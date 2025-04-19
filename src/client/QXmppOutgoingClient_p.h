@@ -184,10 +184,7 @@ public:
         TryNext,
     } nextAddressState = Current;
 
-    // Stream
     QString streamId;
-    QString streamFrom;
-    QString streamVersion;
 
     // Redirection
     std::optional<StreamErrorElement::SeeOtherHost> redirect;

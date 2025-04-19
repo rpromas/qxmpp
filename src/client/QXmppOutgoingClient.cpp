@@ -436,7 +436,7 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
 
 void QXmppOutgoingClient::startNonSaslAuth()
 {
-    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->streamFrom, d->config.user()).then(this, [this](auto result) {
+    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->config.domain(), d->config.user()).then(this, [this](auto result) {
         if (auto *options = std::get_if<NonSaslAuthOptions>(&result)) {
             bool plainText = false;
 
@@ -625,10 +625,7 @@ void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<QX
 
 void QXmppOutgoingClient::handleStart()
 {
-    // reset stream information
     d->streamId.clear();
-    d->streamFrom.clear();
-    d->streamVersion.clear();
 
     // reset active manager (e.g. authentication)
     d->listener = this;
@@ -647,20 +644,12 @@ void QXmppOutgoingClient::handleStart()
 
 void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
-    if (d->streamId.isEmpty()) {
-        d->streamId = stream.id;
-    }
-    if (d->streamFrom.isEmpty()) {
-        d->streamFrom = stream.from;
-    }
-    if (d->streamVersion.isEmpty()) {
-        d->streamVersion = stream.version;
+    d->streamId = stream.id;
 
-        // no version specified, signals XMPP Version < 1.0.
-        // switch to old auth mechanism if enabled
-        if (d->streamVersion.isEmpty() && configuration().useNonSASLAuthentication()) {
-            startNonSaslAuth();
-        }
+    // no version specified, signals XMPP Version < 1.0.
+    // switch to old auth mechanism if enabled
+    if (stream.version.isEmpty() && configuration().useNonSASLAuthentication()) {
+        startNonSaslAuth();
     }
 }
 
@@ -982,7 +971,7 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
     return Rejected;
 }
 
-QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(const QString &streamFrom, const QString &username)
+QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(const QString &domain, const QString &username)
 {
     // no other running query
     Q_ASSERT(std::holds_alternative<NoQuery>(m_query));
@@ -992,7 +981,7 @@ QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(co
 
     QXmppNonSASLAuthIq authQuery;
     authQuery.setType(QXmppIq::Get);
-    authQuery.setTo(streamFrom);
+    authQuery.setTo(domain);
     // FIXME : why are we setting the username, XEP-0078 states we should
     // not attempt to guess the required fields?
     authQuery.setUsername(username);
