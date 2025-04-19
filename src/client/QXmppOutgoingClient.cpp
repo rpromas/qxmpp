@@ -644,6 +644,26 @@ void QXmppOutgoingClient::handleStart()
 
 void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
+    if (stream.from != d->config.domain()) {
+        setError(u"Peer serves '%1' instead of '%2' as expected."_s.arg(stream.from, d->config.domain()),
+                 StreamError::HostUnknown);
+        disconnectFromHost();
+        return;
+    }
+    // If we include a 'from' attribute, the server must respond with the same 'to' attribute.
+    if (!d->config.user().isEmpty() && stream.to != d->config.jidBare()) {
+        setError(u"Server did not include our JID in the stream 'to' attribute."_s,
+                 StreamError::UndefinedCondition);
+        disconnectFromHost();
+        return;
+    }
+    if (stream.id.isEmpty()) {
+        setError(u"Server did not respond with a stream ID."_s, StreamError::UndefinedCondition);
+        disconnectFromHost();
+        return;
+    }
+    // TODO: Do numeric comparison of version number as defined in https://datatracker.ietf.org/doc/html/rfc6120#section-4.7.5
+
     d->streamId = stream.id;
 
     // no version specified, signals XMPP Version < 1.0.
