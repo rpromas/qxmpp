@@ -333,10 +333,6 @@ target_link_libraries(${QXMPP_TARGET}
 )
 
 if(WITH_GSTREAMER)
-    find_package(GStreamer 1.20 REQUIRED)
-    find_package(GLIB2 REQUIRED)
-    find_package(GObject REQUIRED)
-
     set(INSTALL_HEADER_FILES
         ${INSTALL_HEADER_FILES}
         client/QXmppCall.h
@@ -354,16 +350,8 @@ if(WITH_GSTREAMER)
 
     target_link_libraries(${QXMPP_TARGET}
         PRIVATE
-        ${GLIB2_LIBRARIES}
-        ${GOBJECT_LIBRARIES}
-        ${GSTREAMER_LIBRARY}
-    )
-
-    target_include_directories(${QXMPP_TARGET}
-        PRIVATE
-        ${GLIB2_INCLUDE_DIR}
-        ${GOBJECT_INCLUDE_DIR}
-        ${GSTREAMER_INCLUDE_DIRS}
+        PkgConfig::GStreamer
+        PkgConfig::GStreamerBase
     )
 endif()
 

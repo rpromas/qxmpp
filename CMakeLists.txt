@@ -15,7 +15,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules")
+find_package(PkgConfig REQUIRED)
 
 # Qt
 if(BUILD_WITH_QT6)
@@ -69,7 +69,6 @@ if(BUILD_OMEMO)
     add_definitions(-DBUILD_OMEMO)
 
     # libomemo-c
-    find_package(PkgConfig REQUIRED)
     pkg_check_modules(OmemoC REQUIRED IMPORTED_TARGET libomemo-c)
 
     # QCA
@@ -80,6 +79,11 @@ endif()
 
 if(WITH_QCA)
     add_definitions(-DWITH_QCA)
+endif()
+
+if(WITH_GSTREAMER)
+    pkg_check_modules(GStreamer REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.20)
+    pkg_check_modules(GStreamerBase REQUIRED IMPORTED_TARGET gstreamer-base-1.0)
 endif()
 
 add_subdirectory(src)
