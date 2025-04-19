@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#ifndef QXMPPSTREAMERROR_P_H
-#define QXMPPSTREAMERROR_P_H
+#ifndef STREAMERROR_H
+#define STREAMERROR_H
 
 #include "QXmppError.h"
 #include "QXmppStreamError.h"
@@ -38,4 +38,4 @@ struct StreamErrorElement {
 
 }  // namespace QXmpp::Private
 
-#endif  // QXMPPSTREAMERROR_P_H
+#endif  // STREAMERROR_H

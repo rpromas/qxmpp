@@ -2,21 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#ifndef QXMPPCONSTANTS_H
-#define QXMPPCONSTANTS_H
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 
 #include <QStringView>
-
-//
-//  W A R N I N G
-//  -------------
-//
-// This file is not part of the QXmpp API.  It exists for the convenience
-// of QXmpp's own classes.  This header file may change from version to
-// version without notice, or even be removed.
-//
-// We mean it.
-//
 
 namespace QXmpp::Private {
 
@@ -267,4 +256,4 @@ inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
 inline constexpr auto ns_fast = u"urn:xmpp:fast:0";
 
-#endif  // QXMPPCONSTANTS_H
+#endif  // CONSTANTS_H
