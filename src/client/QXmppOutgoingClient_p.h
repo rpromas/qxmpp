@@ -9,9 +9,9 @@
 #include "QXmppPromise.h"
 #include "QXmppSaslManager_p.h"
 #include "QXmppSasl_p.h"
-#include "QXmppStreamError_p.h"
 #include "QXmppStreamManagement_p.h"
 
+#include "StreamError.h"
 #include "XmppSocket.h"
 
 #include <QDnsLookup>

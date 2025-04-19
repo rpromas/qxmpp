@@ -7,9 +7,9 @@
 #include "Stream.h"
 
 #include "QXmppConstants_p.h"
-#include "QXmppStreamError_p.h"
 #include "QXmppUtils_p.h"
 
+#include "StreamError.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 
