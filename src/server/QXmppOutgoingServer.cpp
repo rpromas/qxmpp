@@ -40,8 +40,8 @@ public:
     QString remoteDomain;
     QString verifyId;
     QString verifyKey;
-    QTimer *dialbackTimer;
-    bool ready;
+    QTimer *dialbackTimer = nullptr;
+    bool ready = false;
 };
 
 QXmppOutgoingServerPrivate::QXmppOutgoingServerPrivate(QObject *q)
@@ -79,7 +79,6 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     connect(d->dialbackTimer, &QTimer::timeout, this, &QXmppOutgoingServer::sendDialback);
 
     d->localDomain = domain;
-    d->ready = false;
 
     connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingServer::slotSslErrors);
 }
