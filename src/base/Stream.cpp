@@ -296,6 +296,11 @@ XmppSocket::XmppSocket(QObject *parent)
 
 void XmppSocket::setSocket(QSslSocket *socket)
 {
+    if (m_socket) {
+        // disconnect all signals from us
+        QObject::disconnect(m_socket, nullptr, this, nullptr);
+    }
+
     m_socket = socket;
     if (!m_socket) {
         return;
