@@ -140,12 +140,12 @@ void QXmppOutgoingClientPrivate::connectToHost(const ServerAddress &address)
     sslConfig.setAllowedNextProtocols({ QByteArrayLiteral("xmpp-client") });
 
     // set new ssl config
-    q->socket()->setSslConfiguration(sslConfig);
+    socket.internalSocket()->setSslConfiguration(sslConfig);
 
     // respect proxy
-    q->socket()->setProxy(config.networkProxy());
+    socket.internalSocket()->setProxy(config.networkProxy());
     // set the name the SSL certificate should match
-    q->socket()->setPeerVerifyName(config.domain());
+    socket.internalSocket()->setPeerVerifyName(config.domain());
 
     socket.connectToHost(address);
 }
@@ -336,11 +336,6 @@ QXmppTask<IqResult> QXmppOutgoingClient::sendIq(QXmppIq &&iq)
     return d->iqManager.sendIq(std::move(iq), to.isEmpty() ? d->config.jidBare() : to);
 }
 
-QSslSocket *QXmppOutgoingClient::socket() const
-{
-    return d->socket.socket();
-}
-
 void QXmppOutgoingClient::handleSocketDisconnected()
 {
     debug(u"Socket disconnected"_s);
@@ -372,7 +367,7 @@ void QXmppOutgoingClient::handleSocketSslErrors(const QList<QSslError> &errors)
 
     // if configured, ignore the errors
     if (configuration().ignoreSslErrors()) {
-        socket()->ignoreSslErrors();
+        d->socket.internalSocket()->ignoreSslErrors();
     }
 }
 
@@ -859,7 +854,7 @@ bool QXmppOutgoingClient::handleStanza(const QDomElement &stanza)
 
 bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
 {
-    if (!socket()->isEncrypted()) {
+    if (!d->socket.internalSocket()->isEncrypted()) {
         // determine TLS mode to use
         auto localSecurity = configuration().streamSecurityMode();
         auto remoteSecurity = features.tlsMode();
@@ -885,7 +880,7 @@ bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
             // enable TLS as it is support by both parties
             d->socket.sendData(serializeXml(StarttlsRequest()));
             d->setListener<StarttlsManager>().task().then(this, [this] {
-                socket()->startClientEncryption();
+                d->socket.internalSocket()->startClientEncryption();
             });
             return true;
         }

@@ -833,8 +833,9 @@ QXmppClient::State QXmppClient::state() const
 {
     if (d->stream->isConnected()) {
         return QXmppClient::ConnectedState;
-    } else if (d->stream->socket()->state() != QAbstractSocket::UnconnectedState &&
-               d->stream->socket()->state() != QAbstractSocket::ClosingState) {
+    }
+    auto state = d->stream->xmppSocket().internalSocket()->state();
+    if (state != QAbstractSocket::UnconnectedState && state != QAbstractSocket::ClosingState) {
         return QXmppClient::ConnectingState;
     } else {
         return QXmppClient::DisconnectedState;
@@ -886,13 +887,13 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
 /// Returns the socket error if error() is QXmppClient::SocketError.
 QAbstractSocket::SocketError QXmppClient::socketError()
 {
-    return d->stream->socket()->error();
+    return d->stream->xmppSocket().internalSocket()->error();
 }
 
 /// Returns the human-readable description of the last socket error if error() is QXmppClient::SocketError.
 QString QXmppClient::socketErrorString() const
 {
-    return d->stream->socket()->errorString();
+    return d->stream->xmppSocket().internalSocket()->errorString();
 }
 
 /// Returns the XMPP stream error if QXmppClient::Error is QXmppClient::XmppStreamError.

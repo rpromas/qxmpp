@@ -94,8 +94,6 @@ public:
     bool isConnected() const;
     QXmppTask<IqResult> sendIq(QXmppIq &&);
 
-    /// Returns the used socket
-    QSslSocket *socket() const;
     QXmppStanza::Error::Condition xmppStreamError();
 
     QXmppConfiguration &configuration();
