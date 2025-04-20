@@ -610,7 +610,7 @@ void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<St
             d->connectToNextAddress();
         }
     } else {
-        setError(d->socket.internalSocket()->errorString(), into<ConnectionError>(error));
+        setError(text, into<ConnectionError>(error));
     }
 }
 
