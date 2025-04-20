@@ -83,7 +83,7 @@ void QXmppIncomingClientPrivate::checkCredentials(const QByteArray &response)
 
 QString QXmppIncomingClientPrivate::origin() const
 {
-    auto *sslSocket = this->socket.socket();
+    auto *sslSocket = socket.internalSocket();
     if (sslSocket) {
         return sslSocket->peerAddress().toString() + u' ' + QString::number(sslSocket->peerPort());
     } else {
@@ -220,7 +220,7 @@ void QXmppIncomingClient::sendStreamFeatures()
 {
     // send stream features
     QXmppStreamFeatures features;
-    auto *socket = d->socket.socket();
+    auto *socket = d->socket.internalSocket();
     if (socket && !socket->isEncrypted() && !socket->localCertificate().isNull() && !socket->privateKey().isNull()) {
         features.setTlsMode(QXmppStreamFeatures::Enabled);
     }
@@ -256,8 +256,8 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
 
     if (StarttlsRequest::fromDom(nodeRecv)) {
         sendData(serializeXml(StarttlsProceed()));
-        d->socket.socket()->flush();
-        d->socket.socket()->startServerEncryption();
+        d->socket.internalSocket()->flush();
+        d->socket.internalSocket()->startServerEncryption();
         return;
     } else if (ns == ns_sasl_2) {
         if (!d->passwordChecker) {

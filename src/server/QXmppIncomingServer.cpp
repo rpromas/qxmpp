@@ -45,7 +45,7 @@ QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QSslSocket *socket, QXmpp
 
 QString QXmppIncomingServerPrivate::origin() const
 {
-    auto *tcpSocket = socket.socket();
+    auto *tcpSocket = socket.internalSocket();
     if (tcpSocket) {
         return tcpSocket->peerAddress().toString() + u' ' + QString::number(tcpSocket->peerPort());
     } else {
@@ -134,7 +134,7 @@ void QXmppIncomingServer::handleStream(const StreamOpen &stream)
 
     // send stream features
     QXmppStreamFeatures features;
-    auto *socket = d->socket.socket();
+    auto *socket = d->socket.internalSocket();
     if (!socket->isEncrypted() && !socket->localCertificate().isNull() && !socket->privateKey().isNull()) {
         features.setTlsMode(QXmppStreamFeatures::Enabled);
     }
@@ -145,8 +145,8 @@ void QXmppIncomingServer::handleStanza(const QDomElement &stanza)
 {
     if (StarttlsRequest::fromDom(stanza)) {
         sendData(serializeXml(StarttlsProceed()));
-        d->socket.socket()->flush();
-        d->socket.socket()->startServerEncryption();
+        d->socket.internalSocket()->flush();
+        d->socket.internalSocket()->startServerEncryption();
         return;
     } else if (QXmppDialback::isDialback(stanza)) {
         QXmppDialback request;

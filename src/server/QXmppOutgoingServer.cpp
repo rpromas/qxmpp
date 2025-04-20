@@ -116,11 +116,11 @@ void QXmppOutgoingServer::onDnsLookupFinished()
     }
 
     // set the name the SSL certificate should match
-    d->socket.socket()->setPeerVerifyName(d->remoteDomain);
+    d->socket.internalSocket()->setPeerVerifyName(d->remoteDomain);
 
     // connect to server
     info(u"Connecting to %1:%2"_s.arg(host, QString::number(port)));
-    d->socket.socket()->connectToHost(host, port);
+    d->socket.internalSocket()->connectToHost(host, port);
 }
 
 void QXmppOutgoingServer::onSocketDisconnected()
@@ -156,7 +156,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         QXmppStreamFeatures features;
         features.parse(stanza);
 
-        if (!d->socket.socket()->isEncrypted()) {
+        if (!d->socket.internalSocket()->isEncrypted()) {
             // check we can satisfy TLS constraints
             if (!QSslSocket::supportsSsl() &&
                 features.tlsMode() == QXmppStreamFeatures::Required) {
@@ -178,7 +178,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         sendDialback();
     } else if (StarttlsProceed::fromDom(stanza)) {
         debug(u"Starting encryption"_s);
-        d->socket.socket()->startClientEncryption();
+        d->socket.internalSocket()->startClientEncryption();
         return;
     } else if (QXmppDialback::isDialback(stanza)) {
         QXmppDialback response;
@@ -300,7 +300,7 @@ void QXmppOutgoingServer::slotSslErrors(const QList<QSslError> &errors)
     for (int i = 0; i < errors.count(); ++i) {
         warning(errors.at(i).errorString());
     }
-    d->socket.socket()->ignoreSslErrors();
+    d->socket.internalSocket()->ignoreSslErrors();
 }
 
 void QXmppOutgoingServer::onSocketError(const QString &, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>)

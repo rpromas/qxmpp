@@ -72,7 +72,7 @@ public:
     XmppSocket(QSslSocket *socket, QObject *parent);
     ~XmppSocket() override = default;
 
-    QSslSocket *socket() const { return m_socket; }
+    QSslSocket *internalSocket() const { return m_socket; }
     void resetInternalSocket();
 
     bool isConnected() const;
