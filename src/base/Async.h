@@ -2,18 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#ifndef QXMPPFUTUREUTILS_P_H
-#define QXMPPFUTUREUTILS_P_H
-
-//
-//  W A R N I N G
-//  -------------
-//
-// This file is not part of the QXmpp API.  This header file may change from
-// version to version without notice, or even be removed.
-//
-// We mean it.
-//
+#ifndef ASYNC_H
+#define ASYNC_H
 
 #include "QXmppIq.h"
 #include "QXmppPromise.h"
@@ -222,4 +212,4 @@ auto chainMapSuccess(QXmppTask<Input> &&source, QObject *context, Converter conv
 
 }  // namespace QXmpp::Private
 
-#endif  // QXMPPFUTUREUTILS_P_H
+#endif  // ASYNC_H

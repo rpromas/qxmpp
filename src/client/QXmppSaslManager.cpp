@@ -5,7 +5,6 @@
 
 #include "QXmppConfiguration.h"
 #include "QXmppCredentials.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSaslManager_p.h"
 #include "QXmppSasl_p.h"
@@ -13,6 +12,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"

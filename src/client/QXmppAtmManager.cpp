@@ -7,13 +7,13 @@
 #include "QXmppCarbonManager.h"
 #include "QXmppClient.h"
 #include "QXmppE2eeMetadata.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMessage.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppTrustMessageKeyOwner.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "Constants.h"
 
 using namespace QXmpp;

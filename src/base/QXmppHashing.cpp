@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHash.h"
 #include "QXmppHashing_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QCryptographicHash>

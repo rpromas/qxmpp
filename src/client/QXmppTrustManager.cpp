@@ -4,10 +4,11 @@
 
 #include "QXmppTrustManager.h"
 
-#include "QXmppFutureUtils_p.h"
 #include "QXmppPromise.h"
 #include "QXmppTask.h"
 #include "QXmppTrustStorage.h"
+
+#include "Async.h"
 
 using namespace QXmpp;
 using namespace QXmpp::Private;

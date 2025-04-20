@@ -6,10 +6,10 @@
 #include "QXmppHttpFileSharingProvider.h"
 
 #include "QXmppFileMetadata.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHttpUploadManager.h"
 #include "QXmppUtils.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QMimeDatabase>

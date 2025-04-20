@@ -8,11 +8,12 @@
 
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMessage.h"
 #include "QXmppPubSubIq_p.h"
 #include "QXmppPubSubPublishOptions.h"
 #include "QXmppResultSet.h"
+
+#include "Async.h"
 
 class QXmppPubSubPublishOptions;
 class QXmppPubSubSubscribeOptions;

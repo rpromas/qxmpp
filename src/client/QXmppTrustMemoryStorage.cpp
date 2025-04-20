@@ -4,7 +4,7 @@
 
 #include "QXmppTrustMemoryStorage.h"
 
-#include "QXmppFutureUtils_p.h"
+#include "Async.h"
 
 #include <QMultiHash>
 

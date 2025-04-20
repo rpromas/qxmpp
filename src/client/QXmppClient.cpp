@@ -13,7 +13,6 @@
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppEntityTimeManager.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageHandler.h"
@@ -26,6 +25,7 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"

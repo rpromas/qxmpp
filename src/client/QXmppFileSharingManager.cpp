@@ -9,13 +9,13 @@
 #include "QXmppBitsOfBinaryData.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppFileShare.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHashing_p.h"
 #include "QXmppThumbnail.h"
 #include "QXmppUploadRequestManager.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <any>

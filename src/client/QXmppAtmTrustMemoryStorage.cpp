@@ -4,8 +4,9 @@
 
 #include "QXmppAtmTrustMemoryStorage.h"
 
-#include "QXmppFutureUtils_p.h"
 #include "QXmppTrustMessageKeyOwner.h"
+
+#include "Async.h"
 
 #include <QMultiHash>
 

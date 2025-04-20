@@ -4,7 +4,7 @@
 
 #include "QXmppOmemoMemoryStorage.h"
 
-#include "QXmppFutureUtils_p.h"
+#include "Async.h"
 
 using namespace QXmpp::Private;
 

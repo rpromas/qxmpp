@@ -7,8 +7,9 @@
 #define QXMPPACCOUNTMIGRATIONMANAGER_H
 
 #include "QXmppClientExtension.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppTask.h"
+
+#include "Async.h"
 
 #include <any>
 #include <typeindex>

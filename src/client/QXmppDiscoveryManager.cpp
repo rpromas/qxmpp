@@ -8,9 +8,9 @@
 #include "QXmppClient_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppIqHandling.h"
 
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 

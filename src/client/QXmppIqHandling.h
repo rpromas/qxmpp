@@ -7,8 +7,9 @@
 
 #include "QXmppClient.h"
 #include "QXmppE2eeMetadata.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppIq.h"
+
+#include "Async.h"
 
 #include <QDomElement>
 

@@ -7,7 +7,6 @@
 #include "QXmppColorGeneration.h"
 #include "QXmppCredentials.h"
 #include "QXmppE2eeExtension.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppOutgoingClient.h"
@@ -19,6 +18,7 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
+#include "Async.h"
 #include "TestClient.h"
 #include "util.h"
 

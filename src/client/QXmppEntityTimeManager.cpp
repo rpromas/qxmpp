@@ -6,10 +6,10 @@
 
 #include "QXmppClient.h"
 #include "QXmppEntityTimeIq.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 

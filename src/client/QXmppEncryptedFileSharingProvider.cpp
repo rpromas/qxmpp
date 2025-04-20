@@ -8,9 +8,9 @@
 #include "QXmppFileEncryption.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppFileSharingManager.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppUtils.h"
 
+#include "Async.h"
 #include "QcaInitializer_p.h"
 #include "StringLiterals.h"
 

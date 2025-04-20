@@ -7,12 +7,12 @@
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
 #include "QXmppError.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 

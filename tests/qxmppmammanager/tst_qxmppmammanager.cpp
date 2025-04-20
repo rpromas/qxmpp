@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppE2eeExtension.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMamManager.h"
 #include "QXmppMessage.h"
 
+#include "Async.h"
 #include "TestClient.h"
 #include "util.h"
 
