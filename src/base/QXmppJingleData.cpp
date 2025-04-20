@@ -1476,37 +1476,22 @@ void QXmppJingleIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 
     writeOptional(writer, actionReason());
 
-    const auto writeStartElementWithNamespace = [=](const QString &tagName) {
-        writer->writeStartElement(tagName);
-        writer->writeDefaultNamespace(toString65(ns_jingle_rtp_info));
-    };
-
     if (d->rtpSessionState) {
         if (std::holds_alternative<RtpSessionStateActive>(*d->rtpSessionState)) {
-            writeStartElementWithNamespace(u"active"_s);
+            writeEmptyElement(writer, u"active", ns_jingle_rtp_info);
         } else if (std::holds_alternative<RtpSessionStateHold>(*d->rtpSessionState)) {
-            writeStartElementWithNamespace(u"hold"_s);
+            writeEmptyElement(writer, u"hold", ns_jingle_rtp_info);
         } else if (std::holds_alternative<RtpSessionStateUnhold>(*d->rtpSessionState)) {
-            writeStartElementWithNamespace(u"unhold"_s);
-        } else if (auto rtpSessionStateMuting = std::get_if<RtpSessionStateMuting>(&(*d->rtpSessionState))) {
-            if (rtpSessionStateMuting->isMute) {
-                writeStartElementWithNamespace(u"mute"_s);
-            } else {
-                writeStartElementWithNamespace(u"unmute"_s);
-            }
-
-            if (rtpSessionStateMuting->creator == Initiator) {
-                writeOptionalXmlAttribute(writer, u"creator", u"initiator"_s);
-            } else if (rtpSessionStateMuting->creator == Responder) {
-                writeOptionalXmlAttribute(writer, u"creator", u"responder"_s);
-            }
-
-            writeOptionalXmlAttribute(writer, u"name", rtpSessionStateMuting->name);
+            writeEmptyElement(writer, u"unhold", ns_jingle_rtp_info);
+        } else if (auto muting = std::get_if<RtpSessionStateMuting>(&(*d->rtpSessionState))) {
+            writer->writeStartElement(muting->isMute ? u"mute"_s : u"unmute"_s);
+            writer->writeDefaultNamespace(toString65(ns_jingle_rtp_info));
+            writer->writeAttribute(u"creator"_s, muting->creator == Initiator ? u"initiator"_s : u"responder"_s);
+            writeOptionalXmlAttribute(writer, u"name", muting->name);
+            writer->writeEndElement();
         } else {
-            writeStartElementWithNamespace(u"ringing"_s);
+            writeEmptyElement(writer, u"ringing", ns_jingle_rtp_info);
         }
-
-        writer->writeEndElement();
     }
 
     writer->writeEndElement();
