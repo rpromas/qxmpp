@@ -325,7 +325,6 @@ private:
 
     void setIgnoredStreamErrors(const QVector<QXmpp::StreamError> &);
 
-private Q_SLOTS:
     void _q_elementReceived(const QDomElement &element, bool &handled);
     void _q_reconnect();
     void onInternalSocketStateChanged();
