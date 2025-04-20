@@ -1437,19 +1437,16 @@ void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
             d->rtpSessionState = RtpSessionStateHold();
         } else if (elementTag == u"unhold") {
             d->rtpSessionState = RtpSessionStateUnhold();
-        } else if (const auto isMute = elementTag == u"mute"; isMute || elementTag == u"unmute") {
-            RtpSessionStateMuting muting;
-            muting.isMute = isMute;
-
-            if (const auto creator = childElement.attribute(u"creator"_s); creator == u"initiator") {
-                muting.creator = Initiator;
-            } else if (creator == u"responder") {
-                muting.creator = Responder;
+        } else if (elementTag == u"mute" || elementTag == u"unmute") {
+            auto creator = childElement.attribute(u"creator"_s);
+            if (creator == u"initiator" || creator == u"responder") {
+                d->rtpSessionState = RtpSessionStateMuting {
+                    elementTag == u"mute",
+                    creator == u"initiator" ? Initiator : Responder,
+                    childElement.attribute(u"name"_s),
+                };
             }
-
-            muting.name = childElement.attribute(u"name"_s);
-
-            d->rtpSessionState = muting;
+            // otherwise skip element (creator is mandatory)
         } else if (elementTag == u"ringing") {
             d->rtpSessionState = RtpSessionStateRinging();
         }
