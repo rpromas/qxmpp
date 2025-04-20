@@ -439,7 +439,7 @@ public:
     struct RtpSessionStateMuting {
         /// True when temporarily not sending media to the other party but continuing to accept
         /// media from it, false for ending mute state
-        bool isMute = true;
+        bool isMute;
         /// Creator of the corresponding session
         Creator creator;
         /// Session to be muted (e.g., only audio or video)
