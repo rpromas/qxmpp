@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <optional>
+#include <variant>
 
 namespace QXmpp::Private {
 
@@ -76,6 +77,18 @@ auto into(std::optional<From> &&value) -> std::optional<To>
         return To { *value };
     }
     return {};
+}
+
+template<typename GreaterVariant, typename... BaseTypes>
+auto into(std::variant<BaseTypes...> &&variant)
+{
+    return std::visit([](auto &&value) -> GreaterVariant { return value; }, std::move(variant));
+}
+
+template<typename GreaterVariant, typename... BaseTypes>
+auto into(std::variant<BaseTypes...> variant)
+{
+    return std::visit([](auto &&value) -> GreaterVariant { return value; }, std::move(variant));
 }
 
 }  // namespace QXmpp::Private
