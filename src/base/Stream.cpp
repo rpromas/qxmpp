@@ -292,6 +292,19 @@ DomReader::Result DomReader::process(QXmlStreamReader &r)
 XmppSocket::XmppSocket(QObject *parent)
     : QXmppLoggable(parent)
 {
+    setSocket(new QSslSocket(this));
+}
+
+XmppSocket::XmppSocket(QSslSocket *socket, QObject *parent)
+    : QXmppLoggable(parent)
+{
+    socket->setParent(this);
+    setSocket(socket);
+}
+
+void XmppSocket::resetInternalSocket()
+{
+    setSocket(new QSslSocket(this));
 }
 
 void XmppSocket::setSocket(QSslSocket *socket)
@@ -299,6 +312,7 @@ void XmppSocket::setSocket(QSslSocket *socket)
     if (m_socket) {
         // disconnect all signals from us
         QObject::disconnect(m_socket, nullptr, this, nullptr);
+        m_socket->deleteLater();
     }
 
     m_socket = socket;

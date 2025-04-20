@@ -170,8 +170,6 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingClientPrivate>(this))
 {
-    resetSocket();
-
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingClient::handleStart);
     connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingClient::handleSocketDisconnected);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
@@ -350,7 +348,7 @@ void QXmppOutgoingClient::handleSocketDisconnected()
     if (d->nextAddressState == QXmppOutgoingClientPrivate::TryNext) {
         // Last connection attempt failed and the socket was already in connected state.
         // To avoid race conditions with invalid socket states use new QSslSocket.
-        resetSocket();
+        d->socket.resetInternalSocket();
 
         d->connectToNextAddress();
     } else if (d->redirect) {
@@ -893,18 +891,6 @@ bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
         }
     }
     return false;
-}
-
-void QXmppOutgoingClient::resetSocket()
-{
-    const auto oldSocket = d->socket.socket();
-
-    auto *socket = new QSslSocket(this);
-    d->socket.setSocket(socket);
-
-    if (oldSocket) {
-        oldSocket->deleteLater();
-    }
 }
 
 void QXmppOutgoingClient::throwKeepAliveError()

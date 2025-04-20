@@ -60,10 +60,6 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingServerPrivate>(this))
 {
-    // socket initialisation
-    auto *socket = new QSslSocket(this);
-    d->socket.setSocket(socket);
-
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingServer::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingServer::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingServer::handleStream);

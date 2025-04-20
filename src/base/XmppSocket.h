@@ -68,11 +68,12 @@ class QXMPP_EXPORT XmppSocket : public QXmppLoggable, public SendDataInterface
 {
     Q_OBJECT
 public:
-    XmppSocket(QObject *parent);
+    explicit XmppSocket(QObject *parent);
+    XmppSocket(QSslSocket *socket, QObject *parent);
     ~XmppSocket() override = default;
 
     QSslSocket *socket() const { return m_socket; }
-    void setSocket(QSslSocket *socket);
+    void resetInternalSocket();
 
     bool isConnected() const;
     void connectToHost(const ServerAddress &);
@@ -92,6 +93,7 @@ public:
     Q_SIGNAL void internalSocketStateChanged();
 
 private:
+    void setSocket(QSslSocket *socket);
     void throwError(const QString &text, StreamError condition);
     void processData(const QString &data);
 

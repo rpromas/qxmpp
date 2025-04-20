@@ -29,7 +29,7 @@ constexpr uint RESOURCE_RANDOM_SUFFIX_LENGTH = 8;
 class QXmppIncomingClientPrivate
 {
 public:
-    QXmppIncomingClientPrivate(QXmppIncomingClient *qq);
+    QXmppIncomingClientPrivate(QSslSocket *socket, QXmppIncomingClient *qq);
 
     QTimer *idleTimer = nullptr;
     XmppSocket socket;
@@ -52,8 +52,8 @@ private:
     QXmppIncomingClient *q;
 };
 
-QXmppIncomingClientPrivate::QXmppIncomingClientPrivate(QXmppIncomingClient *qq)
-    : socket(qq),
+QXmppIncomingClientPrivate::QXmppIncomingClientPrivate(QSslSocket *socket, QXmppIncomingClient *qq)
+    : socket(socket, qq),
       q(qq)
 {
 }
@@ -100,7 +100,7 @@ QString QXmppIncomingClientPrivate::origin() const
 ///
 QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
-      d(std::make_unique<QXmppIncomingClientPrivate>(this))
+      d(std::make_unique<QXmppIncomingClientPrivate>(socket, this))
 {
     connect(&d->socket, &XmppSocket::started, this, &QXmppIncomingClient::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppIncomingClient::handleStanza);
@@ -109,10 +109,6 @@ QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &doma
     connect(&d->socket, &XmppSocket::disconnected, this, &QXmppIncomingClient::onSocketDisconnected);
 
     d->domain = domain;
-
-    if (socket) {
-        d->socket.setSocket(socket);
-    }
 
     info(u"Incoming client connection from %1"_s.arg(d->origin()));
 

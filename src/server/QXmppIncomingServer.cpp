@@ -25,7 +25,7 @@ using namespace QXmpp::Private;
 class QXmppIncomingServerPrivate
 {
 public:
-    QXmppIncomingServerPrivate(QXmppIncomingServer *qq);
+    QXmppIncomingServerPrivate(QSslSocket *socket, QXmppIncomingServer *qq);
     QString origin() const;
 
     XmppSocket socket;
@@ -37,7 +37,7 @@ private:
     QXmppIncomingServer *q;
 };
 
-QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QXmppIncomingServer *qq)
+QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QSslSocket *socket, QXmppIncomingServer *qq)
     : q(qq),
       socket(qq)
 {
@@ -62,7 +62,7 @@ QString QXmppIncomingServerPrivate::origin() const
 ///
 QXmppIncomingServer::QXmppIncomingServer(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
-      d(std::make_unique<QXmppIncomingServerPrivate>(this))
+      d(std::make_unique<QXmppIncomingServerPrivate>(socket, this))
 {
     connect(&d->socket, &XmppSocket::started, this, &QXmppIncomingServer::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppIncomingServer::handleStanza);
@@ -71,10 +71,6 @@ QXmppIncomingServer::QXmppIncomingServer(QSslSocket *socket, const QString &doma
     connect(&d->socket, &XmppSocket::disconnected, this, &QXmppIncomingServer::slotSocketDisconnected);
 
     d->domain = domain;
-
-    if (socket) {
-        d->socket.setSocket(socket);
-    }
 
     info(u"Incoming server connection from %1"_s.arg(d->origin()));
 }

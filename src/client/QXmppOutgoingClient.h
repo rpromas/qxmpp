@@ -142,7 +142,6 @@ private:
     bool handleStanza(const QDomElement &);
     bool handleStarttls(const QXmppStreamFeatures &features);
 
-    void resetSocket();
     void handleSocketDisconnected();
     void handleSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>);
     void handleSocketSslErrors(const QList<QSslError> &);
