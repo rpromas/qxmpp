@@ -199,7 +199,7 @@ void XmppSocket::setSocket(QSslSocket *socket)
         return;
     }
 
-    QObject::connect(socket, &QAbstractSocket::connected, this, [this]() {
+    connect(socket, &QAbstractSocket::connected, this, [this]() {
         info(u"Socket connected to %1 %2"_s
                  .arg(m_socket->peerAddress().toString(),
                       QString::number(m_socket->peerPort())));
@@ -211,17 +211,17 @@ void XmppSocket::setSocket(QSslSocket *socket)
             Q_EMIT started();
         }
     });
-    QObject::connect(socket, &QSslSocket::encrypted, this, [this]() {
+    connect(socket, &QSslSocket::encrypted, this, [this]() {
         debug(u"Socket encrypted"_s);
         // this happens with direct TLS or STARTTLS
         m_dataBuffer.clear();
         m_streamOpenElement.clear();
         Q_EMIT started();
     });
-    QObject::connect(socket, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+    connect(socket, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
         warning(u"Socket error: "_s + m_socket->errorString());
     });
-    QObject::connect(socket, &QSslSocket::readyRead, this, [this]() {
+    connect(socket, &QSslSocket::readyRead, this, [this]() {
         processData(QString::fromUtf8(m_socket->readAll()));
     });
 }
