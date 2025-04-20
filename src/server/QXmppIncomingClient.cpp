@@ -198,15 +198,13 @@ void QXmppIncomingClient::handleStream(const StreamOpen &stream)
 
     // start stream
     const QByteArray sessionId = QXmppUtils::generateStanzaHash().toLatin1();
-    QString response = u"<?xml version='1.0'?><stream:stream xmlns=\"%1\" "
-                       "xmlns:stream=\"%2\" id=\"%3\" from=\"%4\" "
-                       "version=\"1.0\" xml:lang=\"en\">"_s
-                           .arg(
-                               ns_client,
-                               ns_stream,
-                               QString::fromUtf8(sessionId),
-                               d->domain);
-    sendData(response.toUtf8());
+    sendData(serializeXml(StreamOpen {
+        stream.from,
+        d->domain,
+        QString::fromUtf8(sessionId),
+        u"1.0"_s,
+        ns_client.toString(),
+    }));
 
     // check requested domain
     if (stream.to != d->domain) {
