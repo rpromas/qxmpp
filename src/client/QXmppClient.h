@@ -225,8 +225,6 @@ public:
     QXmppVersionManager &versionManager();
 #endif
 
-Q_SIGNALS:
-
     /// This signal is emitted when the client connects successfully to the
     /// XMPP server i.e. when a successful XMPP connection is established.
     /// XMPP Connection involves following sequential steps:
@@ -247,17 +245,17 @@ Q_SIGNALS:
     /// QXmppRosterManager object gets populated and you can use
     /// \c findExtension<QXmppRosterManager>() to get the handle of
     /// QXmppRosterManager object.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// This signal is emitted when the XMPP connection disconnects.
-    void disconnected();
+    Q_SIGNAL void disconnected();
 
     /// This signal is emitted when the XMPP connection encounters any error.
     /// The QXmppClient::Error parameter specifies the type of error occurred.
     /// It could be due to TCP socket or the xml stream or the stanza.
     /// Depending upon the type of error occurred use the respective get function to
     /// know the error.
-    void error(QXmppClient::Error);
+    Q_SIGNAL void error(QXmppClient::Error);
 
     /// This signal is emitted when the XMPP connection encounters any fatal error.
     ///
@@ -272,19 +270,19 @@ Q_SIGNALS:
     Q_SIGNAL void errorOccurred(const QXmppError &error);
 
     /// This signal is emitted when the logger changes.
-    void loggerChanged(QXmppLogger *logger);
+    Q_SIGNAL void loggerChanged(QXmppLogger *logger);
 
     /// Notifies that an XMPP message stanza is received. The QXmppMessage
     /// parameter contains the details of the message sent to this client.
     /// In other words whenever someone sends you a message this signal is
     /// emitted.
-    void messageReceived(const QXmppMessage &message);
+    Q_SIGNAL void messageReceived(const QXmppMessage &message);
 
     /// Notifies that an XMPP presence stanza is received. The QXmppPresence
     /// parameter contains the details of the presence sent to this client.
     /// This signal is emitted when someone login/logout or when someone's status
     /// changes Busy, Idle, Invisible etc.
-    void presenceReceived(const QXmppPresence &presence);
+    Q_SIGNAL void presenceReceived(const QXmppPresence &presence);
 
     /// This signal is emitted when IQs of type result or error are received by
     /// the client and no registered QXmppClientExtension could handle it.
@@ -292,14 +290,14 @@ Q_SIGNALS:
     /// This is useful when it is only important to check whether the response
     /// of an IQ was successful. However, the recommended way is still to use an
     /// additional QXmppClientExtension for this kind of tasks.
-    void iqReceived(const QXmppIq &iq);
+    Q_SIGNAL void iqReceived(const QXmppIq &iq);
 
     /// This signal is emitted to indicate that one or more SSL errors were
     /// encountered while establishing the identity of the server.
-    void sslErrors(const QList<QSslError> &errors);
+    Q_SIGNAL void sslErrors(const QList<QSslError> &errors);
 
     /// This signal is emitted when the client state changes.
-    void stateChanged(QXmppClient::State state);
+    Q_SIGNAL void stateChanged(QXmppClient::State state);
 
     /// Emitted when the credentials, e.g. tokens have changed.
     ///
