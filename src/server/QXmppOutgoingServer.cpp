@@ -119,8 +119,7 @@ void QXmppOutgoingServer::onDnsLookupFinished()
     d->socket.internalSocket()->setPeerVerifyName(d->remoteDomain);
 
     // connect to server
-    info(u"Connecting to %1:%2"_s.arg(host, QString::number(port)));
-    d->socket.internalSocket()->connectToHost(host, port);
+    d->socket.connectToHost(ServerAddress { ServerAddress::Tcp, host, port });
 }
 
 void QXmppOutgoingServer::onSocketDisconnected()
