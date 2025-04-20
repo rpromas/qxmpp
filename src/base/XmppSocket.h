@@ -9,7 +9,9 @@
 
 #include "StreamError.h"
 
+#include <QAbstractSocket>
 #include <QDomDocument>
+#include <QSslError>
 #include <QXmlStreamReader>
 
 class QSslSocket;
@@ -80,10 +82,14 @@ public:
     bool isStreamReceived() const { return m_streamReceived; }
 
     Q_SIGNAL void started();
+    Q_SIGNAL void disconnected();
     Q_SIGNAL void stanzaReceived(const QDomElement &);
     Q_SIGNAL void streamReceived(const QXmpp::Private::StreamOpen &);
     Q_SIGNAL void streamClosed();
-    Q_SIGNAL void errorOccurred(const QString &text, StreamError condition);
+    Q_SIGNAL void errorOccurred(const QString &text, std::variant<StreamError, QAbstractSocket::SocketError> condition);
+    Q_SIGNAL void sslErrorsOccurred(const QList<QSslError> &errors);
+    // TODO: replace with own connection state
+    Q_SIGNAL void internalSocketStateChanged();
 
 private:
     void throwError(const QString &text, StreamError condition);

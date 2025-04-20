@@ -173,10 +173,12 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     resetSocket();
 
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingClient::handleStart);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingClient::handleSocketDisconnected);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingClient::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingClient::disconnectFromHost);
     connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingClient::handleSocketError);
+    connect(&d->socket, &XmppSocket::sslErrorsOccurred, this, &QXmppOutgoingClient::handleSocketSslErrors);
 }
 
 QXmppOutgoingClient::~QXmppOutgoingClient()
@@ -341,7 +343,7 @@ QSslSocket *QXmppOutgoingClient::socket() const
     return d->socket.socket();
 }
 
-void QXmppOutgoingClient::_q_socketDisconnected()
+void QXmppOutgoingClient::handleSocketDisconnected()
 {
     debug(u"Socket disconnected"_s);
     d->isAuthenticated = false;
@@ -359,7 +361,7 @@ void QXmppOutgoingClient::_q_socketDisconnected()
     }
 }
 
-void QXmppOutgoingClient::socketSslErrors(const QList<QSslError> &errors)
+void QXmppOutgoingClient::handleSocketSslErrors(const QList<QSslError> &errors)
 {
     // log errors
     warning(u"SSL errors"_s);
@@ -602,7 +604,7 @@ void QXmppOutgoingClient::setError(const QString &text, ConnectionError &&detail
     Q_EMIT errorOccurred(d->error->text, d->error->details, clientError);
 }
 
-void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError> error)
+void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<StreamError, QAbstractSocket::SocketError> error)
 {
     if (!d->sessionStarted &&
         (d->serverAddresses.size() > d->nextServerAddressIndex)) {
@@ -903,12 +905,6 @@ void QXmppOutgoingClient::resetSocket()
     if (oldSocket) {
         oldSocket->deleteLater();
     }
-
-    connect(socket, &QAbstractSocket::disconnected, this, &QXmppOutgoingClient::_q_socketDisconnected);
-    connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingClient::socketSslErrors);
-    connect(socket, &QSslSocket::errorOccurred, this, [this, socket](auto error) {
-        handleSocketError(socket->errorString(), error);
-    });
 }
 
 void QXmppOutgoingClient::throwKeepAliveError()

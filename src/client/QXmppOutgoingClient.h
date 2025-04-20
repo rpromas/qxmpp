@@ -143,9 +143,9 @@ private:
     bool handleStarttls(const QXmppStreamFeatures &features);
 
     void resetSocket();
-    void _q_socketDisconnected();
+    void handleSocketDisconnected();
     void handleSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>);
-    void socketSslErrors(const QList<QSslError> &);
+    void handleSocketSslErrors(const QList<QSslError> &);
 
     void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &sasl2Feature);
     void startNonSaslAuth();

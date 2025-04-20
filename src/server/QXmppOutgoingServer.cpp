@@ -25,6 +25,7 @@
 #include <QTimer>
 
 using namespace std::chrono_literals;
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppOutgoingServerPrivate
@@ -67,8 +68,9 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingServer::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingServer::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingServer::disconnectFromHost);
-    connect(socket, &QAbstractSocket::disconnected, this, &QXmppOutgoingServer::onSocketDisconnected);
-    connect(socket, &QSslSocket::errorOccurred, this, &QXmppOutgoingServer::socketError);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingServer::onSocketDisconnected);
+    connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingServer::onSocketError);
+    connect(&d->socket, &XmppSocket::sslErrorsOccurred, this, &QXmppOutgoingServer::slotSslErrors);
 
     // DNS lookups
     connect(&d->dns, &QDnsLookup::finished, this, &QXmppOutgoingServer::onDnsLookupFinished);
@@ -79,8 +81,6 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     connect(d->dialbackTimer, &QTimer::timeout, this, &QXmppOutgoingServer::sendDialback);
 
     d->localDomain = domain;
-
-    connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingServer::slotSslErrors);
 }
 
 QXmppOutgoingServer::~QXmppOutgoingServer() = default;
@@ -307,8 +307,7 @@ void QXmppOutgoingServer::slotSslErrors(const QList<QSslError> &errors)
     d->socket.socket()->ignoreSslErrors();
 }
 
-void QXmppOutgoingServer::socketError(QAbstractSocket::SocketError error)
+void QXmppOutgoingServer::onSocketError(const QString &, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>)
 {
-    Q_UNUSED(error);
     Q_EMIT disconnected();
 }

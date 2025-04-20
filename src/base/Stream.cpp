@@ -324,12 +324,16 @@ void XmppSocket::setSocket(QSslSocket *socket)
         resetStream();
         Q_EMIT started();
     });
-    connect(socket, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+    connect(socket, &QAbstractSocket::disconnected, this, &XmppSocket::disconnected);
+    connect(socket, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error) {
         warning(u"Socket error: "_s + m_socket->errorString());
+        Q_EMIT errorOccurred(m_socket->errorString(), error);
     });
+    connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &XmppSocket::sslErrorsOccurred);
     connect(socket, &QSslSocket::readyRead, this, [this]() {
         processData(QString::fromUtf8(m_socket->readAll()));
     });
+    connect(socket, &QSslSocket::stateChanged, this, &XmppSocket::internalSocketStateChanged);
 }
 
 bool XmppSocket::isConnected() const

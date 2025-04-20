@@ -316,9 +316,6 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     connect(d->stream, &QXmppOutgoingClient::sslErrors,
             this, &QXmppClient::sslErrors);
 
-    connect(d->stream->socket(), &QAbstractSocket::stateChanged,
-            this, &QXmppClient::_q_socketStateChanged);
-
     connect(d->stream, &QXmppOutgoingClient::connected,
             this, &QXmppClient::_q_streamConnected);
 
@@ -328,6 +325,8 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     connect(d->stream, &QXmppOutgoingClient::errorOccurred, this, [this](const auto &text, const auto &error, auto oldError) {
         d->onErrorOccurred(text, error, oldError);
     });
+
+    connect(&d->stream->xmppSocket(), &XmppSocket::internalSocketStateChanged, this, &QXmppClient::onInternalSocketStateChanged);
 
     // reconnection
     d->reconnectionTimer = new QTimer(this);
@@ -970,9 +969,9 @@ void QXmppClient::_q_reconnect()
     }
 }
 
-void QXmppClient::_q_socketStateChanged(QAbstractSocket::SocketState socketState)
+void QXmppClient::onInternalSocketStateChanged()
 {
-    Q_UNUSED(socketState);
+    // FIXME: only emit signal if state actually changed
     Q_EMIT stateChanged(state());
 }
 

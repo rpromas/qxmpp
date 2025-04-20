@@ -6,6 +6,7 @@
 #define QXMPPOUTGOINGSERVER_H
 
 #include "QXmppLogger.h"
+#include "QXmppStreamError.h"
 
 #include <QAbstractSocket>
 
@@ -63,7 +64,7 @@ private:
     void onSocketDisconnected();
     void sendDialback();
     void slotSslErrors(const QList<QSslError> &errors);
-    void socketError(QAbstractSocket::SocketError error);
+    void onSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError> error);
 
     const std::unique_ptr<QXmppOutgoingServerPrivate> d;
 };

@@ -106,13 +106,11 @@ QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &doma
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppIncomingClient::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppIncomingClient::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppIncomingClient::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppIncomingClient::onSocketDisconnected);
 
     d->domain = domain;
 
     if (socket) {
-        connect(socket, &QAbstractSocket::disconnected,
-                this, &QXmppIncomingClient::onSocketDisconnected);
-
         d->socket.setSocket(socket);
     }
 
