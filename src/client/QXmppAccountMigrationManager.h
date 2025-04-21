@@ -6,10 +6,10 @@
 #ifndef QXMPPACCOUNTMIGRATIONMANAGER_H
 #define QXMPPACCOUNTMIGRATIONMANAGER_H
 
+#include "QXmppAsync_p.h"
 #include "QXmppClientExtension.h"
+#include "QXmppError.h"
 #include "QXmppTask.h"
-
-#include "Async.h"
 
 #include <any>
 #include <typeindex>

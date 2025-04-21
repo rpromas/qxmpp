@@ -8,6 +8,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 

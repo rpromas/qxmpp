@@ -6,14 +6,13 @@
 #ifndef QXMPPPUBSUBMANAGER_H
 #define QXMPPPUBSUBMANAGER_H
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
 #include "QXmppMessage.h"
 #include "QXmppPubSubIq_p.h"
 #include "QXmppPubSubPublishOptions.h"
 #include "QXmppResultSet.h"
-
-#include "Async.h"
 
 class QXmppPubSubPublishOptions;
 class QXmppPubSubSubscribeOptions;

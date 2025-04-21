@@ -5,11 +5,10 @@
 #ifndef QXMPPIQHANDLING_H
 #define QXMPPIQHANDLING_H
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppIq.h"
-
-#include "Async.h"
 
 #include <QDomElement>
 

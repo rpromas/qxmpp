@@ -5,26 +5,15 @@
 #ifndef ASYNC_H
 #define ASYNC_H
 
-#include "QXmppIq.h"
-#include "QXmppPromise.h"
-#include "QXmppSendResult.h"
+#include "QXmppAsync_p.h"
+#include "QXmppGlobal.h"
 
 #include <memory>
 #include <variant>
 
 #include <QFutureWatcher>
-#include <QObject>
 
 namespace QXmpp::Private {
-
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-// explicit deduction guide (not needed as of C++20)
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 // Variation of std::visit allowing to forward unhandled types
 template<typename ReturnType, typename T, typename Visitor>
@@ -40,20 +29,6 @@ auto visitForward(T variant, Visitor visitor)
     },
                       std::forward<T>(variant));
 }
-
-template<typename F, typename Ret, typename A, typename... Rest>
-A lambda_helper(Ret (F::*)(A, Rest...));
-
-template<typename F, typename Ret, typename A, typename... Rest>
-A lambda_helper(Ret (F::*)(A, Rest...) const);
-
-template<typename F>
-struct first_argument {
-    using type = decltype(lambda_helper(&F::operator()));
-};
-
-template<typename F>
-using first_argument_t = typename first_argument<F>::type;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
 template<typename T>
@@ -77,21 +52,6 @@ inline QFuture<void> makeReadyFuture()
 }
 #endif
 
-template<typename T>
-QXmppTask<T> makeReadyTask(T &&value)
-{
-    QXmppPromise<T> promise;
-    promise.finish(std::move(value));
-    return promise.task();
-}
-
-inline QXmppTask<void> makeReadyTask()
-{
-    QXmppPromise<void> promise;
-    promise.finish();
-    return promise.task();
-}
-
 template<typename T, typename Handler>
 void await(const QFuture<T> &future, QObject *context, Handler handler)
 {
@@ -114,63 +74,6 @@ void await(const QFuture<void> &future, QObject *context, Handler handler)
                          watcher->deleteLater();
                      });
     watcher->setFuture(future);
-}
-
-template<typename Result, typename Input, typename Converter>
-auto chain(QXmppTask<Input> &&source, QObject *context, Converter task) -> QXmppTask<Result>
-{
-    QXmppPromise<Result> promise;
-
-    source.then(context, [=](Input &&input) mutable {
-        promise.finish(task(std::move(input)));
-    });
-    return promise.task();
-}
-
-template<typename IqType, typename Input, typename Converter>
-auto parseIq(Input &&sendResult, Converter convert) -> decltype(convert({}))
-{
-    using Result = decltype(convert({}));
-    return std::visit(overloaded {
-                          [convert = std::move(convert)](const QDomElement &element) -> Result {
-                              IqType iq;
-                              iq.parse(element);
-                              return convert(std::move(iq));
-                          },
-                          [](QXmppError &&error) -> Result {
-                              return error;
-                          },
-                      },
-                      std::move(sendResult));
-}
-
-template<typename IqType, typename Result, typename Input>
-auto parseIq(Input &&sendResult) -> Result
-{
-    return parseIq<IqType>(std::move(sendResult), [](IqType &&iq) -> Result {
-        // no conversion
-        return iq;
-    });
-}
-
-template<typename Input, typename Converter>
-auto chainIq(QXmppTask<Input> &&input, QObject *context, Converter convert) -> QXmppTask<decltype(convert({}))>
-{
-    using Result = decltype(convert({}));
-    using IqType = std::decay_t<first_argument_t<Converter>>;
-    return chain<Result>(std::move(input), context, [convert = std::move(convert)](Input &&input) -> Result {
-        return parseIq<IqType>(std::move(input), convert);
-    });
-}
-
-template<typename Result, typename Input>
-auto chainIq(QXmppTask<Input> &&input, QObject *context) -> QXmppTask<Result>
-{
-    // IQ type is first std::variant parameter
-    using IqType = std::decay_t<decltype(std::get<0>(Result {}))>;
-    return chain<Result>(std::move(input), context, [](Input &&sendResult) mutable {
-        return parseIq<IqType, Result>(sendResult);
-    });
 }
 
 template<typename T, typename Err, typename Function>

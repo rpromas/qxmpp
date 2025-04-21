@@ -20,6 +20,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "OmemoCryptoProvider.h"
 #include "StringLiterals.h"
 

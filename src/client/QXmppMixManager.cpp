@@ -21,6 +21,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 

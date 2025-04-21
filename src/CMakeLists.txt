@@ -34,7 +34,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppFallback.h
     base/QXmppFileMetadata.h
     base/QXmppFileShare.h
-    base/QXmppFutureUtils_p.h
+    base/QXmppAsync_p.h
     base/QXmppGeolocItem.h
     base/QXmppGlobal.h
     base/QXmppHash.h
