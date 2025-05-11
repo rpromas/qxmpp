@@ -32,13 +32,13 @@ endif()
 
 include(GNUInstallDirs)
 
-option(BUILD_SHARED "Build shared library" ON)
-option(BUILD_TESTS "Build tests." ON)
+option(BUILD_SHARED "Build shared library" OFF)
+option(BUILD_TESTS "Build tests." OFF)
 option(BUILD_INTERNAL_TESTS "Build internal tests." OFF)
 option(BUILD_DOCUMENTATION "Build API documentation." OFF)
-option(BUILD_EXAMPLES "Build examples." ON)
+option(BUILD_EXAMPLES "Build examples." OFF)
 option(BUILD_OMEMO "Build the OMEMO module" OFF)
-option(WITH_GSTREAMER "Build with GStreamer support for Jingle" OFF)
+option(WITH_GSTREAMER "Build with GStreamer support for Jingle" ON)
 option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing" ${Qca-qt${QT_VERSION_MAJOR}_FOUND})
 option(ENABLE_ASAN "Build with address sanitizer" OFF)
 
@@ -88,9 +88,9 @@ if(BUILD_DOCUMENTATION)
     add_subdirectory(doc)
 endif()
 
-if(BUILD_EXAMPLES)
-    add_subdirectory(examples)
-endif()
+#if(BUILD_EXAMPLES)
+#    add_subdirectory(examples)
+#endif()
 
 include(CMakePackageConfigHelpers)
 
