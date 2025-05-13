@@ -83,6 +83,7 @@ class QXMPP_EXPORT QXmppOutgoingClient : public QXmppLoggable
 public:
     using IqResult = std::variant<QDomElement, QXmppError>;
     using ConnectionError = std::variant<QAbstractSocket::SocketError, QXmpp::TimeoutError, QXmpp::StreamError, QXmpp::AuthenticationError, QXmpp::BindError>;
+    static constexpr QStringView TaskName = u"client session";
 
     explicit QXmppOutgoingClient(QObject *parent);
     ~QXmppOutgoingClient() override;
@@ -174,6 +175,7 @@ class C2sStreamManager
 {
 public:
     using Result = std::variant<Success, QXmppError>;
+    static constexpr QStringView TaskName = u"stream management";
 
     explicit C2sStreamManager(QXmppOutgoingClient *q);
 

@@ -27,6 +27,7 @@ class SaslManager
 public:
     using AuthError = std::pair<QString, AuthenticationError>;
     using AuthResult = std::variant<Success, AuthError>;
+    static constexpr QStringView TaskName = u"SASL 1 authentication";
 
     explicit SaslManager(SendDataInterface *socket) : m_socket(socket) { }
 
@@ -45,6 +46,7 @@ class Sasl2Manager
 public:
     using AuthError = std::pair<QString, AuthenticationError>;
     using AuthResult = std::variant<Sasl2::Success, AuthError>;
+    static constexpr QStringView TaskName = u"SASL 2 authentication";
 
     explicit Sasl2Manager(SendDataInterface *socket) : m_socket(socket) { }
 

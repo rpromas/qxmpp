@@ -675,10 +675,17 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
                   d->listener)) {
     case Accepted:
         return;
-    case Rejected:
-        setError(u"Unexpected element received."_s, StreamError::UndefinedCondition);
+    case Rejected: {
+        auto managerName = visit(
+            [](auto &&listener) {
+                using T = typename std::remove_reference_t<std::remove_pointer_t<std::decay_t<decltype(listener)>>>;
+                return T::TaskName;
+            },
+            d->listener);
+        setError(u"Unexpected element received while handling %1."_s.arg(managerName), StreamError::UndefinedCondition);
         disconnectFromHost();
         return;
+    }
     case Finished:
         // if the job is done, set OutgoingClient, but do not override a continuation job
         if (d->listener.index() == index) {
