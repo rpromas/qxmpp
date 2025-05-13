@@ -498,7 +498,9 @@ void QXmppOutgoingClient::startSmResume()
 
 void QXmppOutgoingClient::startSmEnable()
 {
-    d->listener = &d->c2sStreamManager;
+    // sending <enable/> may happen after session establishment (bind1 completed)
+    // allow receiving both stanzas and stream management responses by using `this` as listener
+    d->listener = this;
     d->c2sStreamManager.requestEnable().then(this, [this] {
         // enabling of stream management may or may not have succeeded
         // we are connected now
@@ -715,6 +717,10 @@ HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRe
         return Accepted;
     } else if (ns == ns_client) {
         return handleStanza(nodeRecv) ? Accepted : Rejected;
+    } else if (d->c2sStreamManager.hasOngoingRequest()) {
+        if (d->c2sStreamManager.handleElement(nodeRecv) != Rejected) {
+            return Accepted;
+        }
     }
     return Rejected;
 }

@@ -194,6 +194,7 @@ public:
     QXmppTask<void> requestResume();
     bool canRequestEnable() const { return m_smAvailable && !m_enabled; }
     QXmppTask<void> requestEnable();
+    bool hasOngoingRequest() const { return !std::holds_alternative<NoRequest>(m_request); }
 
 private:
     friend class ::TestClient;
