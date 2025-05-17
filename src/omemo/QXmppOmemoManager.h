@@ -81,7 +81,7 @@ public:
     ~QXmppOmemoManager() override;
 
     QXmppTask<bool> load();
-    QXmppTask<bool> setUp();
+    QXmppTask<bool> setUp(const QString &deviceLabel = {});
 
     QXmppTask<QByteArray> ownKey();
     QXmppTask<QHash<QXmpp::TrustLevel, QMultiHash<QString, QByteArray>>> keys(QXmpp::TrustLevels trustLevels = {});

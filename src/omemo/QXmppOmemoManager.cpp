@@ -405,9 +405,11 @@ QXmppTask<bool> Manager::load()
 ///
 /// The user must be logged in while calling this.
 ///
+/// \param deviceLabel human-readable string used to identify the own device
+///
 /// \return whether everything is set up successfully
 ///
-QXmppTask<bool> Manager::setUp()
+QXmppTask<bool> Manager::setUp(const QString &deviceLabel)
 {
     QXmppPromise<bool> interface;
 
@@ -422,8 +424,9 @@ QXmppTask<bool> Manager::setUp()
             if (d->setUpIdentityKeyPair(identityKeyPair.ptrRef()) &&
                 d->updateSignedPreKeyPair(identityKeyPair.get()) &&
                 d->updatePreKeyPairs(PRE_KEY_INITIAL_CREATION_COUNT)) {
-                auto future = d->omemoStorage->setOwnDevice(d->ownDevice);
-                future.then(this, [=, this]() mutable {
+                d->ownDevice.label = deviceLabel;
+
+                d->omemoStorage->setOwnDevice(d->ownDevice).then(this, [=, this]() mutable {
                     auto future = d->publishOmemoData();
                     future.then(this, [=, this](bool isPublished) mutable {
                         d->isStarted = isPublished;
