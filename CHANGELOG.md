@@ -4,6 +4,12 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.10.4 (May 17, 2025)
+---------------------------
+
+ - Client: Fix not accepting stanzas immediately after connecting if enabling of stream management
+   still runs (did not happen with SASL 2) (@lnjX, !703)
+
 QXmpp 1.10.3 (March 21, 2025)
 -----------------------------
 
