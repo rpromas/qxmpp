@@ -13,6 +13,12 @@ Breaking changes:
  - JingleIq::RtpSessionStateMuting: 'isMute' is not default initialized anymore like 'creator' is
    not initialized, too (@lnjX, !701)
 
+QXmpp 1.10.4 (May 17, 2025)
+---------------------------
+
+ - Client: Fix not accepting stanzas immediately after connecting if enabling of stream management
+   still runs (did not happen with SASL 2) (@lnjX, !703)
+
 QXmpp 1.10.3 (March 21, 2025)
 -----------------------------
 

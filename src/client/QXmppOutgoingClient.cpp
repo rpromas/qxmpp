@@ -492,7 +492,9 @@ void QXmppOutgoingClient::startSmResume()
 
 void QXmppOutgoingClient::startSmEnable()
 {
-    d->listener = &d->c2sStreamManager;
+    // sending <enable/> may happen after session establishment (bind1 completed)
+    // allow receiving both stanzas and stream management responses by using `this` as listener
+    d->listener = this;
     d->c2sStreamManager.requestEnable().then(this, [this] {
         // enabling of stream management may or may not have succeeded
         // we are connected now
@@ -680,10 +682,17 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
                   d->listener)) {
     case Accepted:
         return;
-    case Rejected:
-        setError(u"Unexpected element received."_s, StreamError::UndefinedCondition);
+    case Rejected: {
+        auto managerName = visit(
+            [](auto &&listener) {
+                using T = typename std::remove_reference_t<std::remove_pointer_t<std::decay_t<decltype(listener)>>>;
+                return T::TaskName;
+            },
+            d->listener);
+        setError(u"Unexpected element received while handling %1."_s.arg(managerName), StreamError::UndefinedCondition);
         disconnectFromHost();
         return;
+    }
     case Finished:
         // if the job is done, set OutgoingClient, but do not override a continuation job
         if (d->listener.index() == index) {
@@ -722,6 +731,10 @@ HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRe
         return Accepted;
     } else if (ns == ns_client) {
         return handleStanza(nodeRecv) ? Accepted : Rejected;
+    } else if (d->c2sStreamManager.hasOngoingRequest()) {
+        if (d->c2sStreamManager.handleElement(nodeRecv) != Rejected) {
+            return Accepted;
+        }
     }
     return Rejected;
 }

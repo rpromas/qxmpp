@@ -31,6 +31,7 @@ using LegacyError = std::variant<QAbstractSocket::SocketError, QXmpp::TimeoutErr
 class StarttlsManager
 {
 public:
+    static constexpr QStringView TaskName = u"STARTTLS";
     QXmppTask<void> task() { return m_promise.task(); }
     HandleElementResult handleElement(const QDomElement &el);
 
@@ -53,6 +54,7 @@ class BindManager
 {
 public:
     using Result = std::variant<BoundAddress, QXmppStanza::Error, ProtocolError>;
+    static constexpr QStringView TaskName = u"resource binding";
 
     explicit BindManager(SendDataInterface *socket) : m_socket(socket) { }
 
@@ -76,6 +78,7 @@ class NonSaslAuthManager
 public:
     using OptionsResult = std::variant<NonSaslAuthOptions, QXmppError>;
     using AuthResult = std::variant<Success, QXmppError>;
+    static constexpr QStringView TaskName = u"Non-SASL authentication";
 
     explicit NonSaslAuthManager(SendDataInterface *socket) : m_socket(socket) { }
 
