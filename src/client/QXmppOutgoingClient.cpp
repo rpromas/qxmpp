@@ -643,14 +643,8 @@ void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
     }
     // If we include a 'from' attribute, the server must respond with the same 'to' attribute.
     if (!d->config.user().isEmpty() && stream.to != d->config.jidBare()) {
-        setError(u"Server did not include our JID in the stream 'to' attribute."_s,
-                 StreamError::UndefinedCondition);
-        d->socket.sendData(serializeXml(StreamErrorElement {
-            StreamError::UndefinedCondition,
-            u"Missing reflection of client JID in 'to' attribute."_s,
-        }));
-        disconnectFromHost();
-        return;
+        warning(u"Server did not include our JID in the stream 'to' attribute (violating RFC6120, allowed in RFC3920)."_s);
+        // do not treat as fatal error
     }
     if (stream.id.isEmpty()) {
         setError(u"Server did not respond with a stream ID."_s, StreamError::UndefinedCondition);
