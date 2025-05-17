@@ -358,41 +358,44 @@ QXmppTask<bool> Manager::load()
 {
     QXmppPromise<bool> interface;
 
-    auto future = d->omemoStorage->allData();
-    future.then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
-        const auto &optionalOwnDevice = omemoData.ownDevice;
-        if (optionalOwnDevice) {
-            d->ownDevice = *optionalOwnDevice;
-        } else {
-            debug(u"Device could not be loaded because it is not stored"_s);
-            interface.finish(false);
-            return;
-        }
-
-        const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
-        if (signedPreKeyPairs.isEmpty()) {
-            warning(u"Signed Pre keys could not be loaded because none is stored"_s);
-            interface.finish(false);
-            return;
-        } else {
-            d->signedPreKeyPairs = signedPreKeyPairs;
-        }
-
-        const auto &preKeyPairs = omemoData.preKeyPairs;
-        if (preKeyPairs.isEmpty()) {
-            warning(u"Pre keys could not be loaded because none is stored"_s);
-            interface.finish(false);
-            return;
-        } else {
-            d->preKeyPairs = preKeyPairs;
-        }
-
-        d->devices = omemoData.devices;
-        d->removeDevicesRemovedFromServer();
-
-        d->isStarted = true;
+    if (d->isStarted) {
         interface.finish(true);
-    });
+    } else {
+        d->omemoStorage->allData().then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
+            const auto &optionalOwnDevice = omemoData.ownDevice;
+            if (optionalOwnDevice) {
+                d->ownDevice = *optionalOwnDevice;
+            } else {
+                debug(u"Device could not be loaded because it is not stored"_s);
+                interface.finish(false);
+                return;
+            }
+
+            const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
+            if (signedPreKeyPairs.isEmpty()) {
+                warning(u"Signed pre keys could not be loaded because none is stored"_s);
+                interface.finish(false);
+                return;
+            } else {
+                d->signedPreKeyPairs = signedPreKeyPairs;
+            }
+
+            const auto &preKeyPairs = omemoData.preKeyPairs;
+            if (preKeyPairs.isEmpty()) {
+                warning(u"Pre keys could not be loaded because none is stored"_s);
+                interface.finish(false);
+                return;
+            } else {
+                d->preKeyPairs = preKeyPairs;
+            }
+
+            d->devices = omemoData.devices;
+            d->removeDevicesRemovedFromServer();
+
+            d->isStarted = true;
+            interface.finish(true);
+        });
+    }
 
     return interface.task();
 }
