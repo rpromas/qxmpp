@@ -645,11 +645,19 @@ void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
     if (!d->config.user().isEmpty() && stream.to != d->config.jidBare()) {
         setError(u"Server did not include our JID in the stream 'to' attribute."_s,
                  StreamError::UndefinedCondition);
+        d->socket.sendData(serializeXml(StreamErrorElement {
+            StreamError::UndefinedCondition,
+            u"Missing reflection of client JID in 'to' attribute."_s,
+        }));
         disconnectFromHost();
         return;
     }
     if (stream.id.isEmpty()) {
         setError(u"Server did not respond with a stream ID."_s, StreamError::UndefinedCondition);
+        d->socket.sendData(serializeXml(StreamErrorElement {
+            StreamError::UndefinedCondition,
+            u"Stream ID missing."_s,
+        }));
         disconnectFromHost();
         return;
     }
