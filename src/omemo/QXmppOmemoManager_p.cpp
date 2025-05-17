@@ -2965,19 +2965,20 @@ void QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> futur
 // See QXmppOmemoManager for documentation
 QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 {
+    Q_ASSERT_X(isStarted, "Changing device label", "The device label could not be changed because the OMEMO manager must be started");
+
     QXmppPromise<bool> interface;
 
-    ownDevice.label = deviceLabel;
-
-    if (isStarted) {
-        auto future = omemoStorage->setOwnDevice(ownDevice);
-        future.then(q, [=, this]() mutable {
-            publishDeviceListItem(true, [=](bool isPublished) mutable {
+    if (q->client()->isAuthenticated()) {
+        omemoStorage->setOwnDevice(ownDevice).then(q, [=, this]() mutable {
+            publishDeviceListItem(true, [this, interface, deviceLabel](bool isPublished) mutable {
+                ownDevice.label = deviceLabel;
                 interface.finish(std::move(isPublished));
             });
         });
     } else {
-        interface.finish(true);
+        warning(QStringLiteral("Device label could not be changed because the user is not logged in"));
+        interface.finish(false);
     }
 
     return interface.task();

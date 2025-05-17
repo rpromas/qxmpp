@@ -499,11 +499,6 @@ QXmppTask<QHash<QString, QHash<QByteArray, QXmpp::TrustLevel>>> Manager::keys(co
 ///
 /// The label is a human-readable string used to identify the device by users.
 ///
-/// If the OMEMO manager is not started yet, the device label is only changed
-/// locally in memory.
-/// It is stored persistently in the OMEMO storage and updated on the
-/// server if the OMEMO manager is already started or once it is.
-///
 /// \param deviceLabel own device's label
 ///
 /// \return whether the action was successful
