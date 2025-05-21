@@ -12,6 +12,7 @@
 #include "QXmppTask.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <any>
 #include <memory>
@@ -158,10 +159,13 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
 template<typename T>
 static QByteArray packetToXml(const T &packet)
 {
+    using namespace QXmpp::Private;
+
     QBuffer buffer;
     buffer.open(QIODevice::ReadWrite);
     QXmlStreamWriter writer(&buffer);
-    packet.toXml(&writer);
+    XmlWriter xmlWriter(&writer);
+    packet.toXml(xmlWriter);
     auto data = buffer.data();
     data.replace(u'\'', "&apos;");
     return data;

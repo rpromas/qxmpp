@@ -24,6 +24,8 @@ class QXmppNonza;
 
 namespace QXmpp::Private {
 
+class XmlWriter;
+
 // std::array helper
 namespace detail {
 template<class T, std::size_t N, std::size_t... I>
@@ -49,14 +51,15 @@ inline auto toString60(QStringView s)
     return s.toString();
 #endif
 }
-inline auto toString65(QStringView s)
-{
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    return s;
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+inline auto toString65(QStringView s) { return s.toString(); }
+inline auto toString65(const QByteArray &s) { return QString::fromUtf8(s); }
+inline const QString &toString65(const QString &s) { return s; }
+inline QString toString65(QString &&s) { return std::move(s); }
 #else
-    return s.toString();
+#define toString65(x) x
 #endif
-}
 
 // QStringLiteral for Qt < 6.5, otherwise uses string view
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -134,6 +137,12 @@ void writeElements(QXmlStreamWriter *writer, const auto &elements)
     }
 }
 
+template<typename T>
+concept IsStdOptional = requires {
+    typename std::remove_cvref_t<T>::value_type;
+    requires std::same_as<std::remove_cvref_t<T>, std::optional<typename std::remove_cvref_t<T>::value_type>>;
+};
+
 // Base64
 std::optional<QByteArray> parseBase64(const QString &);
 inline QString serializeBase64(const QByteArray &data) { return QString::fromUtf8(data.toBase64()); }
@@ -143,6 +152,10 @@ template<typename Int = int>
 std::optional<Int> parseInt(QStringView str);
 template<typename Int>
 inline QString serializeInt(Int value) { return QString::number(value); }
+
+// Double parsing
+std::optional<double> parseDouble(QStringView str);
+std::optional<float> parseFloat(QStringView str);
 
 // Booleans
 std::optional<bool> parseBoolean(const QString &str);
@@ -154,6 +167,7 @@ QString serializeBoolean(bool);
 
 template<typename T>
 concept HasXmlTag = requires {
+    { !std::is_void_v<T> };
     { T::XmlTag };
     { std::get<0>(T::XmlTag) };
     { std::get<1>(T::XmlTag) };
@@ -339,13 +353,31 @@ auto parseSingleAttributeElements(const QDomElement &parent, QStringView tagName
     });
 }
 
-QByteArray serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *));
+QByteArray serializeXml(std::function<void(XmlWriter &)>);
+QByteArray serializeXml(std::function<void(QXmlStreamWriter *)>);
+
+template<typename T>
+concept XmlWriterSerializeable = requires(T packet, XmlWriter &writer) {
+    { packet.toXml(writer) } -> std::same_as<void>;
+};
+template<typename T>
+concept QXmlStreamSerializeable = requires(T packet, QXmlStreamWriter *writer) {
+    { packet.toXml(writer) } -> std::same_as<void>;
+};
+
 template<typename T>
 inline QByteArray serializeXml(const T &packet)
+    requires XmlWriterSerializeable<T> || QXmlStreamSerializeable<T>
 {
-    return serializeXml(&packet, [](const void *packet, QXmlStreamWriter *w) {
-        std::invoke(&T::toXml, reinterpret_cast<const T *>(packet), w);
-    });
+    if constexpr (XmlWriterSerializeable<T>) {
+        return serializeXml([&](XmlWriter &w) {
+            packet.toXml(w);
+        });
+    } else if constexpr (QXmlStreamSerializeable<T>) {
+        return serializeXml([&](QXmlStreamWriter *w) {
+            packet.toXml(w);
+        });
+    }
 }
 
 QXMPP_EXPORT QByteArray generateRandomBytes(size_t minimumByteCount, size_t maximumByteCount);

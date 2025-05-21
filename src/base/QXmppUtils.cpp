@@ -10,6 +10,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QBuffer>
 #include <QByteArray>
@@ -407,6 +408,12 @@ Int stringToInt(QStringView str, bool *ok)
         return str.toLongLong(ok);
     } else if constexpr (std::is_same_v<Int, uint64_t>) {
         return str.toULongLong(ok);
+    } else if constexpr (std::is_same_v<Int, double>) {
+        return str.toDouble(ok);
+    } else if constexpr (std::is_same_v<Int, float>) {
+        return str.toFloat(ok);
+    } else {
+        static_assert(false, "invalid integer type");
     }
 }
 
@@ -428,6 +435,16 @@ template std::optional<int32_t> QXmpp::Private::parseInt<int32_t>(QStringView);
 template std::optional<uint32_t> QXmpp::Private::parseInt<uint32_t>(QStringView);
 template std::optional<int64_t> QXmpp::Private::parseInt<int64_t>(QStringView);
 template std::optional<uint64_t> QXmpp::Private::parseInt<uint64_t>(QStringView);
+
+std::optional<double> QXmpp::Private::parseDouble(QStringView str)
+{
+    return parseInt<double>(str);
+}
+
+std::optional<float> QXmpp::Private::parseFloat(QStringView str)
+{
+    return parseInt<float>(str);
+}
 
 std::optional<bool> QXmpp::Private::parseBoolean(const QString &str)
 {
@@ -478,11 +495,20 @@ QDomElement QXmpp::Private::nextSiblingElement(const QDomElement &el, QStringVie
     return {};
 }
 
-QByteArray QXmpp::Private::serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *))
+QByteArray QXmpp::Private::serializeXml(std::function<void(XmlWriter &)> toXml)
 {
     QByteArray data;
     QXmlStreamWriter xmlStream(&data);
-    toXml(packet, &xmlStream);
+    XmlWriter writer(&xmlStream);
+    toXml(writer);
+    return data;
+}
+
+QByteArray QXmpp::Private::serializeXml(std::function<void(QXmlStreamWriter *)> toXml)
+{
+    QByteArray data;
+    QXmlStreamWriter xmlStream(&data);
+    toXml(&xmlStream);
     return data;
 }
 
