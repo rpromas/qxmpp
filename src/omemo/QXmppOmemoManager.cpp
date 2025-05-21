@@ -293,6 +293,9 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 /// Once the future is finished and the result is "true", the manager is ready for use.
 /// Otherwise, check the logging output for details.
 ///
+/// The OMEMO manager is initialized after a successful call (i.e., the result is "true") of load()
+/// or setUp().
+///
 /// By default, stanzas are only sent to devices having keys with the following trust levels:
 /// \code
 /// QXmpp::TrustLevel::AutomaticallyTrusted | QXmpp::TrustLevel::ManuallyTrusted
@@ -335,7 +338,7 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     : d(new ManagerPrivate(this, omemoStorage))
 {
     d->ownDevice.label = DEVICE_LABEL;
-    d->init();
+    d->initOmemoLibrary();
     d->schedulePeriodicTasks();
 }
 
@@ -358,7 +361,7 @@ QXmppTask<bool> Manager::load()
 {
     QXmppPromise<bool> interface;
 
-    if (d->isStarted) {
+    if (d->initialized) {
         interface.finish(true);
     } else {
         d->omemoStorage->allData().then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
@@ -392,7 +395,7 @@ QXmppTask<bool> Manager::load()
             d->devices = omemoData.devices;
             d->removeDevicesRemovedFromServer();
 
-            d->isStarted = true;
+            d->initialized = true;
             interface.finish(true);
         });
     }
@@ -429,7 +432,7 @@ QXmppTask<bool> Manager::setUp(const QString &deviceLabel)
                 d->omemoStorage->setOwnDevice(d->ownDevice).then(this, [=, this]() mutable {
                     auto future = d->publishOmemoData();
                     future.then(this, [=, this](bool isPublished) mutable {
-                        d->isStarted = isPublished;
+                        d->initialized = isPublished;
                         interface.finish(std::move(isPublished));
                     });
                 });
@@ -1042,9 +1045,9 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmp
 
 QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMessage(QXmppMessage &&message)
 {
-    if (!d->isStarted) {
+    if (!d->initialized) {
         return makeReadyTask<MessageDecryptResult>(QXmppError {
-            u"OMEMO manager must be started before decrypting"_s,
+            u"OMEMO manager must be initialized before decrypting"_s,
             SendError::EncryptionError });
     }
 
@@ -1067,9 +1070,9 @@ QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, 
 {
     QXmppPromise<QXmppE2eeExtension::IqEncryptResult> interface;
 
-    if (!d->isStarted) {
+    if (!d->initialized) {
         interface.finish(QXmppError {
-            u"OMEMO manager must be started before encrypting"_s,
+            u"OMEMO manager must be initialized before encrypting"_s,
             SendError::EncryptionError });
     } else {
         std::optional<TrustLevels> acceptedTrustLevels;
@@ -1108,10 +1111,10 @@ QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, 
 
 QXmppTask<QXmppE2eeExtension::IqDecryptResult> Manager::decryptIq(const QDomElement &element)
 {
-    if (!d->isStarted) {
+    if (!d->initialized) {
         // TODO: Add decryption queue to avoid this error
         return makeReadyTask<IqDecryptResult>(QXmppError {
-            u"OMEMO manager must be started before decrypting"_s,
+            u"OMEMO manager must be initialized before decrypting"_s,
             SendError::EncryptionError });
     }
 
@@ -1155,7 +1158,7 @@ bool Manager::handleStanza(const QDomElement &stanza)
     }
 
     // TODO: Queue incoming IQs until OMEMO is initialized
-    if (!d->isStarted) {
+    if (!d->initialized) {
         warning(u"Couldn't decrypt incoming IQ because the manager isn't initialized yet."_s);
         return false;
     }
@@ -1178,7 +1181,7 @@ bool Manager::handleStanza(const QDomElement &stanza)
 
 bool Manager::handleMessage(const QXmppMessage &message)
 {
-    if (d->isStarted && message.omemoElement()) {
+    if (d->initialized && message.omemoElement()) {
         auto future = d->decryptMessage(message);
         future.then(this, [this, message](std::optional<QXmppMessage> optionalDecryptedMessage) {
             if (optionalDecryptedMessage) {

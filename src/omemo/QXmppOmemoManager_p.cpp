@@ -192,7 +192,7 @@ QXmppOmemoManagerPrivate::QXmppOmemoManagerPrivate(Manager *parent, QXmppOmemoSt
 //
 // Initializes the OMEMO library.
 //
-void ManagerPrivate::init()
+void ManagerPrivate::initOmemoLibrary()
 {
     if (initGlobalContext() &&
         initLocking() &&
@@ -953,9 +953,9 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
 {
     QXmppPromise<QXmppE2eeExtension::MessageEncryptResult> interface;
 
-    if (!isStarted) {
+    if (!initialized) {
         QXmppError error {
-            u"OMEMO manager must be started before encrypting"_s,
+            u"OMEMO manager must be initialized before encrypting"_s,
             SendError::EncryptionError
         };
         interface.finish(std::move(error));
@@ -2965,7 +2965,7 @@ void QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> futur
 // See QXmppOmemoManager for documentation
 QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 {
-    Q_ASSERT_X(isStarted, "Changing device label", "The device label could not be changed because the OMEMO manager must be started");
+    Q_ASSERT_X(initialized, "Changing device label", "The device label could not be changed because the OMEMO manager must be initialized");
 
     QXmppPromise<bool> interface;
 
@@ -3139,7 +3139,7 @@ QXmppTask<bool> ManagerPrivate::resetOwnDevice()
 {
     QXmppPromise<bool> interface;
 
-    isStarted = false;
+    initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
         deleteDeviceElement([=, this](bool isDeviceElementDeleted) mutable {
@@ -3165,7 +3165,7 @@ QXmppTask<void> QXmppOmemoManagerPrivate::resetOwnDeviceLocally()
 {
     QXmppPromise<void> interface;
 
-    isStarted = false;
+    initialized = false;
 
     auto future = trustManager->resetAll(ns_omemo_2.toString());
     future.then(q, [this, interface]() mutable {
@@ -3184,7 +3184,7 @@ QXmppTask<bool> ManagerPrivate::resetAll()
 {
     QXmppPromise<bool> interface;
 
-    isStarted = false;
+    initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
         deleteNode(ns_omemo_2_devices.toString(), [this, interface](bool isDevicesNodeDeleted) mutable {
