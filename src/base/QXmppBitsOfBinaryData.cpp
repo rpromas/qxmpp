@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QMimeDatabase>
@@ -182,19 +183,15 @@ void QXmppBitsOfBinaryData::parseElementFromChild(const QDomElement &dataElement
 
 void QXmppBitsOfBinaryData::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("data"));
-    writer->writeDefaultNamespace(toString65(ns_bob));
-    writeOptionalXmlAttribute(writer, u"cid", d->cid.toContentId());
-    if (d->maxAge > -1) {
-        writeOptionalXmlAttribute(writer, u"max-age", QString::number(d->maxAge));
-    }
-    writeOptionalXmlAttribute(writer, u"type", d->contentType.name());
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(d->data.toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(d->data.toBase64()));
-#endif
-    writer->writeEndElement();
+    auto maxAge = d->maxAge > -1 ? std::make_optional(d->maxAge) : std::nullopt;
+
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"cid", d->cid.toContentId() },
+        OptionalAttribute { u"max-age", maxAge },
+        OptionalAttribute { u"type", d->contentType.name() },
+        Characters { Base64 { d->data } },
+    });
 }
 /// \endcond
 

@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCryptographicHash>
 #include <QDomElement>
@@ -161,12 +162,13 @@ std::optional<QXmppDiscoveryIq::Identity> QXmppDiscoveryIq::Identity::fromDom(co
 
 void QXmppDiscoveryIq::Identity::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65(u"identity"));
-    writeOptionalXmlAttribute(writer, u"xml:lang", d->language);
-    writeOptionalXmlAttribute(writer, u"category", d->category);
-    writeOptionalXmlAttribute(writer, u"name", d->name);
-    writeOptionalXmlAttribute(writer, u"type", d->type);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"identity",
+        OptionalAttribute { u"xml:lang", d->language },
+        Attribute { u"category", d->category },
+        OptionalAttribute { u"name", d->name },
+        Attribute { u"type", d->type },
+    });
 }
 /// \endcond
 
@@ -252,11 +254,12 @@ std::optional<QXmppDiscoveryIq::Item> QXmppDiscoveryIq::Item::fromDom(const QDom
 
 void QXmppDiscoveryIq::Item::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("item"));
-    writeOptionalXmlAttribute(writer, u"jid", d->jid);
-    writeOptionalXmlAttribute(writer, u"name", d->name);
-    writeOptionalXmlAttribute(writer, u"node", d->node);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"item",
+        Attribute { u"jid", d->jid },
+        OptionalAttribute { u"name", d->name },
+        OptionalAttribute { u"node", d->node },
+    });
 }
 /// \endcond
 
@@ -483,19 +486,21 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(d->queryType == InfoQuery ? ns_disco_info : ns_disco_items));
-    writeOptionalXmlAttribute(writer, u"node", d->queryNode);
-
-    if (d->queryType == InfoQuery) {
-        writeElements(writer, d->identities);
-        writeSingleAttributeElements(writer, u"feature", u"var", d->features);
-    } else {
-        writeElements(writer, d->items);
-    }
-
-    d->form.toXml(writer);
-
-    writer->writeEndElement();
+    XmlWriter w(writer);
+    w.write(Element {
+        u"query",
+        d->queryType == InfoQuery ? ns_disco_info : ns_disco_items,
+        OptionalAttribute { u"node", d->queryNode },
+        // InfoQuery
+        [&] {
+            if (d->queryType == InfoQuery) {
+                w.write(d->identities);
+                w.write(SingleAttributeElements { u"feature", u"var", d->features });
+            } else {
+                w.write(d->items);
+            }
+        },
+        d->form,
+    });
 }
 /// \endcond

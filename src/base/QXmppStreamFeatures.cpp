@@ -372,7 +372,8 @@ void QXmppStreamFeatures::toXml(QXmlStreamWriter *writer) const
     }
 
     if (d->sasl2Feature) {
-        d->sasl2Feature->toXml(writer);
+        XmlWriter w(writer);
+        d->sasl2Feature->toXml(w);
     }
 
     writer->writeEndElement();

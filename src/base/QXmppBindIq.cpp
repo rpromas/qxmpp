@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QTextStream>
@@ -64,14 +65,11 @@ void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("bind"));
-    writer->writeDefaultNamespace(toString65(ns_bind));
-    if (!m_jid.isEmpty()) {
-        writeXmlTextElement(writer, u"jid", m_jid);
-    }
-    if (!m_resource.isEmpty()) {
-        writeXmlTextElement(writer, u"resource", m_resource);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"bind",
+        ns_bind,
+        OptionalTextElement { u"jid", m_jid },
+        OptionalTextElement { u"resource", m_resource },
+    });
 }
 /// \endcond

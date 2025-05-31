@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -102,12 +103,13 @@ std::optional<QXmppByteStreamIq::StreamHost> QXmppByteStreamIq::StreamHost::from
 
 void QXmppByteStreamIq::StreamHost::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("streamhost"));
-    writeOptionalXmlAttribute(writer, u"host", m_host);
-    writeOptionalXmlAttribute(writer, u"jid", m_jid);
-    writeOptionalXmlAttribute(writer, u"port", QString::number(m_port));
-    writeOptionalXmlAttribute(writer, u"zeroconf", m_zeroconf);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"host", m_host },
+        OptionalAttribute { u"jid", m_jid },
+        Attribute { u"port", m_port },
+        OptionalAttribute { u"zeroconf", m_zeroconf },
+    });
 }
 /// \endcond
 
@@ -227,26 +229,15 @@ void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppByteStreamIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_bytestreams));
-    writeOptionalXmlAttribute(writer, u"sid", m_sid);
-    QString modeStr;
-    if (m_mode == Tcp) {
-        modeStr = u"tcp"_s;
-    } else if (m_mode == Udp) {
-        modeStr = u"udp"_s;
-    }
-    writeOptionalXmlAttribute(writer, u"mode", modeStr);
-    writeElements(writer, m_streamHosts);
-    if (!m_activate.isEmpty()) {
-        writeXmlTextElement(writer, u"activate", m_activate);
-    }
-    if (!m_streamHostUsed.isEmpty()) {
-        writer->writeStartElement(QSL65("streamhost-used"));
-        writeOptionalXmlAttribute(writer, u"jid", m_streamHostUsed);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"query",
+        ns_bytestreams,
+        OptionalAttribute { u"sid", m_sid },
+        OptionalAttribute { u"mode", m_mode == Tcp ? u"tcp"_s : m_mode == Udp ? u"udp"_s
+                                                                              : QString() },
+        m_streamHosts,
+        OptionalTextElement { u"activate", m_activate },
+        SingleAttributeElements { u"streamhost-used", u"jid", QList<QString> { m_streamHostUsed } },
+    });
 }
 /// \endcond

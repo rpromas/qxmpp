@@ -648,80 +648,71 @@ std::optional<QXmppDataForm::Field> QXmppDataForm::Field::fromDom(const QDomElem
     return field;
 }
 
-void QXmppDataForm::Field::toXml(QXmlStreamWriter *writer) const
+void QXmppDataForm::Field::toXml(QXmlStreamWriter *w) const
 {
-    writer->writeStartElement(QSL65("field"));
-
-    /* field type */
-    writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
-
-    /* field attributes */
-    writeOptionalXmlAttribute(writer, u"label", d->label);
-    writeOptionalXmlAttribute(writer, u"var", d->key);
-
-    /* field value(s) */
-    switch (d->type) {
-    case Field::BooleanField:
-        writeXmlTextElement(writer, u"value", d->value.toBool() ? u"1" : u"0");
-        break;
-    case Field::ListMultiField:
-    case Field::JidMultiField:
-    case Field::TextMultiField: {
-        writeTextElements(writer, u"value", d->value.toStringList());
-        break;
-    }
-    default:
-        if (const auto value = d->value.toString(); !value.isEmpty()) {
-            writeXmlTextElement(writer, u"value", value);
-        }
-    }
-
-    /* field media */
-    if (!d->mediaSources.isEmpty()) {
-        writer->writeStartElement(QSL65("media"));
-        writer->writeDefaultNamespace(toString65(ns_media_element));
-
-        // media width and height
-        if (d->mediaSize.width() > 0) {
-            writeOptionalXmlAttribute(writer, u"width", QString::number(d->mediaSize.width()));
-        }
-        if (d->mediaSize.height() > 0) {
-            writeOptionalXmlAttribute(writer, u"height", QString::number(d->mediaSize.height()));
-        }
-
-        for (const auto &source : d->mediaSources) {
-            writer->writeStartElement(QSL65("uri"));
-            writeOptionalXmlAttribute(writer, u"type", source.contentType().name());
-            writer->writeCharacters(source.uri().toString());
-            writer->writeEndElement();
-        }
-
-        writer->writeEndElement();
-    }
-
-    /* field options */
-    switch (d->type) {
-    case Field::ListMultiField:
-    case Field::ListSingleField: {
-        for (const auto &option : d->options) {
-            writer->writeStartElement(QSL65("option"));
-            writeOptionalXmlAttribute(writer, u"label", option.first);
-            writeXmlTextElement(writer, u"value", option.second);
-            writer->writeEndElement();
-        }
-        break;
-    }
-    default:
-        break;
-    }
-
-    /* other properties */
-    writeOptionalXmlTextElement(writer, u"description", d->description);
-    if (d->required) {
-        writer->writeEmptyElement(u"required"_s);
-    }
-
-    writer->writeEndElement();
+    XmlWriter writer(w);
+    writer.write(Element {
+        u"field",
+        Attribute { u"type", d->type },
+        OptionalAttribute { u"label", d->label },
+        OptionalAttribute { u"var", d->key },
+        /* field value(s) */
+        [&] {
+            switch (d->type) {
+            case Field::BooleanField:
+                writer.write(TextElement { u"value", d->value.toBool() });
+                break;
+            case Field::ListMultiField:
+            case Field::JidMultiField:
+            case Field::TextMultiField: {
+                writer.write(TextElements { u"value", d->value.toStringList() });
+                break;
+            }
+            default:
+                writer.write(OptionalTextElement { u"value", d->value.toString() });
+                break;
+            }
+        },
+        /* field media */
+        OptionalContent {
+            !d->mediaSources.isEmpty(),
+            Element {
+                u"media",
+                ns_media_element,
+                OptionalAttribute { u"width", d->mediaSize.width() > 0 ? std::make_optional(d->mediaSize.width()) : std::nullopt },
+                OptionalAttribute { u"height", d->mediaSize.height() > 0 ? std::make_optional(d->mediaSize.height()) : std::nullopt },
+                [&] {
+                    for (const auto &source : d->mediaSources) {
+                        writer.write(Element {
+                            u"uri",
+                            OptionalAttribute { u"type", source.contentType().name() },
+                            Characters { source.uri() },
+                        });
+                    }
+                },
+            },
+        },
+        /* field options */
+        [&] {
+            switch (d->type) {
+            case Field::ListMultiField:
+            case Field::ListSingleField: {
+                for (const auto &option : d->options) {
+                    writer.write(Element {
+                        u"option",
+                        OptionalAttribute { u"label", option.first },
+                        TextElement { u"value", option.second },
+                    });
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        },
+        OptionalTextElement { u"description", d->description },
+        OptionalContent { d->required, Element { u"required" } },
+    });
 }
 /// \endcond
 
@@ -916,21 +907,12 @@ void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(QSL65("x"));
-    writer->writeDefaultNamespace(toString65(ns_data));
-
-    /* form type */
-    writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
-
-    /* form properties */
-    if (!d->title.isEmpty()) {
-        writer->writeTextElement(QSL65("title"), d->title);
-    }
-    if (!d->instructions.isEmpty()) {
-        writer->writeTextElement(QSL65("instructions"), d->instructions);
-    }
-    writeElements(writer, d->fields);
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"type", d->type },
+        OptionalTextElement { u"title", d->title },
+        OptionalTextElement { u"instructions", d->instructions },
+        d->fields,
+    });
 }
 /// \endcond

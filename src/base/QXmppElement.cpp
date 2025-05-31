@@ -7,6 +7,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QTextStream>
@@ -292,24 +293,20 @@ void QXmppElement::setValue(const QString &value)
 ///
 void QXmppElement::toXml(QXmlStreamWriter *writer) const
 {
+    using std::ranges::transform_view;
     if (isNull()) {
         return;
     }
 
-    writer->writeStartElement(d->name);
-    if (d->attributes.contains(u"xmlns"_s)) {
-        writer->writeDefaultNamespace(d->attributes.value(u"xmlns"_s));
-    }
-    std::for_each(d->attributes.keyBegin(), d->attributes.keyEnd(), [this, writer](const QString &key) {
-        if (key != u"xmlns") {
-            writeOptionalXmlAttribute(writer, key, d->attributes.value(key));
-        }
+    XmlWriter w(writer);
+    w.write(Element {
+        d->name,
+        [&] {
+            std::for_each(d->attributes.keyValueBegin(), d->attributes.keyValueEnd(), [&](auto pair) {
+                w.write(Attribute { pair.first, pair.second });
+            });
+        },
+        OptionalCharacters { d->value },
+        transform_view(d->children, [](auto d) { return QXmppElement(d); }),
     });
-    if (!d->value.isEmpty()) {
-        writer->writeCharacters(d->value);
-    }
-    for (auto *childPrivate : std::as_const(d->children)) {
-        QXmppElement(childPrivate).toXml(writer);
-    }
-    writer->writeEndElement();
 }

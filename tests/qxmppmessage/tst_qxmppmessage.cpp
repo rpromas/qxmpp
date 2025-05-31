@@ -465,9 +465,9 @@ void tst_QXmppMessage::testSubextensions()
 {
     const QByteArray xml = QByteArrayLiteral(
         "<message id=\"aeb214\" to=\"juliet@capulet.lit/chamber\" type=\"normal\">"
-        "<result xmlns=\"urn:xmpp:mam:tmp\" id=\"5d398-28273-f7382\" queryid=\"f27\">"
+        "<result id=\"5d398-28273-f7382\" queryid=\"f27\" xmlns=\"urn:xmpp:mam:tmp\">"
         "<forwarded xmlns=\"urn:xmpp:forward:0\">"
-        "<delay xmlns=\"urn:xmpp:delay\" stamp=\"2010-07-10T23:09:32Z\"/>"
+        "<delay stamp=\"2010-07-10T23:09:32Z\" xmlns=\"urn:xmpp:delay\"/>"
         "<message from=\"juliet@capulet.lit/balcony\" "
         "id=\"8a54s\" "
         "to=\"romeo@montague.lit/orchard\" "

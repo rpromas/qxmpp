@@ -24,7 +24,7 @@ void tst_QXmppPubSubForms::subAuthorization()
 <field type="hidden" var="FORM_TYPE">
 <value>http://jabber.org/protocol/pubsub#subscribe_authorization</value>
 </field>
-<field type="boolean" var="pubsub#allow"><value>0</value></field>
+<field type="boolean" var="pubsub#allow"><value>false</value></field>
 <field type="text-single" var="pubsub#node"><value>princely_musings</value></field>
 <field type="text-single" var="pubsub#subid"><value>123-abc</value></field>
 <field type="jid-single" var="pubsub#subscriber_jid"><value>horatio@denmark.lit</value></field>

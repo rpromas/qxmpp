@@ -12,6 +12,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QMessageAuthenticationCode>
@@ -66,19 +67,13 @@ std::optional<Auth> Auth::fromDom(const QDomElement &el)
     return auth;
 }
 
-void Auth::toXml(QXmlStreamWriter *writer) const
+void Auth::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("auth"));
-    writer->writeDefaultNamespace(toString65(ns_sasl));
-    writer->writeAttribute(QSL65("mechanism"), mechanism);
-    if (!value.isEmpty()) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeCharacters(value.toBase64());
-#else
-        writer->writeCharacters(serializeBase64(value));
-#endif
-    }
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        Attribute { u"mechanism", mechanism },
+        OptionalCharacters { Base64 { value } },
+    });
 }
 
 std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
@@ -93,9 +88,9 @@ std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
     return {};
 }
 
-void Challenge::toXml(QXmlStreamWriter *writer) const
+void Challenge::toXml(XmlWriter &writer) const
 {
-    writeXmlTextElement(writer, u"challenge", ns_sasl, serializeBase64(value));
+    writer.write(TextElement { XmlTag, Base64 { value } });
 }
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
@@ -121,22 +116,16 @@ std::optional<Failure> Failure::fromDom(const QDomElement &el)
     return failure;
 }
 
-void Failure::toXml(QXmlStreamWriter *writer) const
+void Failure::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("failure"));
-    writer->writeDefaultNamespace(toString65(ns_sasl));
-    if (condition) {
-        writer->writeEmptyElement(toString65(Enums::toString(*condition)));
-    }
-
-    if (!text.isEmpty()) {
-        writer->writeStartElement(u"text"_s);
-        writer->writeAttribute(u"xml:lang"_s, u"en"_s);
-        writer->writeCharacters(text);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        OptionalEnumElement { condition },
+        OptionalContent {
+            !text.isEmpty(),
+            Element { u"text", Attribute { u"xml:lang", u"en" }, Characters { text } },
+        },
+    });
 }
 
 std::optional<Response> Response::fromDom(const QDomElement &el)
@@ -151,9 +140,9 @@ std::optional<Response> Response::fromDom(const QDomElement &el)
     return {};
 }
 
-void Response::toXml(QXmlStreamWriter *writer) const
+void Response::toXml(XmlWriter &writer) const
 {
-    writeXmlTextElement(writer, u"response", ns_sasl, serializeBase64(value));
+    writer.write(TextElement { XmlTag, Base64 { value } });
 }
 
 std::optional<Success> Success::fromDom(const QDomElement &el)
@@ -164,11 +153,9 @@ std::optional<Success> Success::fromDom(const QDomElement &el)
     return {};
 }
 
-void Success::toXml(QXmlStreamWriter *writer) const
+void Success::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("success"));
-    writer->writeDefaultNamespace(toString65(ns_sasl));
-    writer->writeEndElement();
+    writer.write(Element { XmlTag });
 }
 
 }  // namespace Sasl
@@ -187,20 +174,15 @@ std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el)
     return bind2;
 }
 
-void Bind2Feature::toXml(QXmlStreamWriter *writer) const
+void Bind2Feature::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("bind"));
-    writer->writeDefaultNamespace(toString65(ns_bind2));
-    if (!features.empty()) {
-        writer->writeStartElement(QSL65("inline"));
-        for (const auto &feature : features) {
-            writer->writeStartElement(QSL65("feature"));
-            writer->writeAttribute(QSL65("var"), feature);
-            writer->writeEndElement();
-        }
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        Element {
+            u"inline",
+            SingleAttributeElements { u"feature", u"var", features },
+        },
+    });
 }
 
 std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
@@ -217,19 +199,15 @@ std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
     };
 }
 
-void Bind2Request::toXml(QXmlStreamWriter *writer) const
+void Bind2Request::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("bind"));
-    writer->writeDefaultNamespace(toString65(ns_bind2));
-    writeOptionalXmlTextElement(writer, u"tag", tag);
-    if (csiInactive) {
-        writeEmptyElement(writer, u"inactive", ns_csi);
-    }
-    if (carbonsEnable) {
-        writeEmptyElement(writer, u"enable", ns_carbons);
-    }
-    writeOptional(writer, smEnable);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        OptionalTextElement { u"tag", tag },
+        OptionalContent { csiInactive, Element { u"inactive", ns_csi } },
+        OptionalContent { carbonsEnable, Element { u"enable", ns_carbons } },
+        smEnable,
+    });
 }
 
 std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el)
@@ -244,13 +222,9 @@ std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el)
     };
 }
 
-void Bind2Bound::toXml(QXmlStreamWriter *writer) const
+void Bind2Bound::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("bound"));
-    writer->writeDefaultNamespace(toString65(ns_bind2));
-    writeOptional(writer, smFailed);
-    writeOptional(writer, smEnabled);
-    writer->writeEndElement();
+    writer.write(Element { XmlTag, smFailed, smEnabled });
 }
 
 std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el)
@@ -265,12 +239,9 @@ std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el)
     };
 }
 
-void FastFeature::toXml(QXmlStreamWriter *writer) const
+void FastFeature::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("fast"));
-    writer->writeDefaultNamespace(toString65(ns_fast));
-    writeTextElements(writer, u"mechanism", mechanisms);
-    writer->writeEndElement();
+    writer.write(Element { XmlTag, TextElements { u"mechanism", mechanisms } });
 }
 
 std::optional<FastTokenRequest> FastTokenRequest::fromDom(const QDomElement &el)
@@ -281,12 +252,9 @@ std::optional<FastTokenRequest> FastTokenRequest::fromDom(const QDomElement &el)
     return FastTokenRequest { el.attribute(QStringLiteral("mechanism")) };
 }
 
-void FastTokenRequest::toXml(QXmlStreamWriter *writer) const
+void FastTokenRequest::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("request-token"));
-    writer->writeDefaultNamespace(toString65(ns_fast));
-    writer->writeAttribute(QSL65("mechanism"), mechanism);
-    writer->writeEndElement();
+    writer.write(Element { XmlTag, Attribute { u"mechanism", mechanism } });
 }
 
 std::optional<FastToken> FastToken::fromDom(const QDomElement &el)
@@ -301,13 +269,13 @@ std::optional<FastToken> FastToken::fromDom(const QDomElement &el)
     };
 }
 
-void FastToken::toXml(QXmlStreamWriter *writer) const
+void FastToken::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("token"));
-    writer->writeDefaultNamespace(toString65(ns_fast));
-    writer->writeAttribute(QSL65("expiry"), QXmppUtils::datetimeToString(expiry));
-    writer->writeAttribute(QSL65("token"), token);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        Attribute { u"expiry", expiry },
+        Attribute { u"token", token },
+    });
 }
 
 std::optional<FastRequest> FastRequest::fromDom(const QDomElement &el)
@@ -321,17 +289,13 @@ std::optional<FastRequest> FastRequest::fromDom(const QDomElement &el)
     };
 }
 
-void FastRequest::toXml(QXmlStreamWriter *writer) const
+void FastRequest::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("fast"));
-    writer->writeDefaultNamespace(toString65(ns_fast));
-    if (count) {
-        writer->writeAttribute(QSL65("count"), QString::number(*count));
-    }
-    if (invalidate) {
-        writer->writeAttribute(QSL65("invalidate"), QSL65("true"));
-    }
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        OptionalAttribute { u"count", count },
+        OptionalAttribute { u"invalidate", DefaultedBool { invalidate, false } },
+    });
 }
 
 namespace Sasl2 {
@@ -352,23 +316,21 @@ std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el)
     return feature;
 }
 
-void StreamFeature::toXml(QXmlStreamWriter *writer) const
+void StreamFeature::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("authentication"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    for (const auto &mechanism : mechanisms) {
-        writeXmlTextElement(writer, u"mechanism", mechanism);
-    }
-    if (bind2Feature || fast || streamResumptionAvailable) {
-        writer->writeStartElement(QSL65("inline"));
-        writeOptional(writer, bind2Feature);
-        writeOptional(writer, fast);
-        if (streamResumptionAvailable) {
-            writeEmptyElement(writer, u"sm", ns_stream_management);
-        }
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        TextElements { u"mechanism", mechanisms },
+        OptionalContent {
+            bind2Feature || fast || streamResumptionAvailable,
+            Element {
+                u"inline",
+                bind2Feature,
+                fast,
+                OptionalContent { streamResumptionAvailable, Element { u"sm", ns_stream_management } },
+            },
+        },
+    });
 }
 
 std::optional<UserAgent> UserAgent::fromDom(const QDomElement &el)
@@ -384,15 +346,14 @@ std::optional<UserAgent> UserAgent::fromDom(const QDomElement &el)
     };
 }
 
-void UserAgent::toXml(QXmlStreamWriter *writer) const
+void UserAgent::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("user-agent"));
-    if (!id.isNull()) {
-        writer->writeAttribute(QSL65("id"), id.toString(QUuid::WithoutBraces));
-    }
-    writeOptionalXmlTextElement(writer, u"software", software);
-    writeOptionalXmlTextElement(writer, u"device", device);
-    writer->writeEndElement();
+    writer.write(Element {
+        u"user-agent",
+        OptionalAttribute { u"id", id },
+        OptionalTextElement { u"software", software },
+        OptionalTextElement { u"device", device },
+    });
 }
 
 std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el)
@@ -411,18 +372,18 @@ std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el)
     };
 }
 
-void Authenticate::toXml(QXmlStreamWriter *writer) const
+void Authenticate::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("authenticate"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    writer->writeAttribute(QSL65("mechanism"), mechanism);
-    writeOptionalXmlTextElement(writer, u"initial-response", QString::fromUtf8(initialResponse.toBase64()));
-    writeOptional(writer, userAgent);
-    writeOptional(writer, bindRequest);
-    writeOptional(writer, smResume);
-    writeOptional(writer, tokenRequest);
-    writeOptional(writer, fast);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        Attribute { u"mechanism", mechanism },
+        OptionalTextElement { u"initial-response", Base64 { initialResponse } },
+        userAgent,
+        bindRequest,
+        smResume,
+        tokenRequest,
+        fast,
+    });
 }
 
 std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
@@ -437,9 +398,9 @@ std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
     return {};
 }
 
-void Challenge::toXml(QXmlStreamWriter *writer) const
+void Challenge::toXml(XmlWriter &writer) const
 {
-    writeXmlTextElement(writer, u"challenge", ns_sasl_2, serializeBase64(data));
+    writer.write(TextElement { XmlTag, Base64 { data } });
 }
 
 std::optional<Response> Response::fromDom(const QDomElement &el)
@@ -454,9 +415,9 @@ std::optional<Response> Response::fromDom(const QDomElement &el)
     return {};
 }
 
-void Response::toXml(QXmlStreamWriter *writer) const
+void Response::toXml(XmlWriter &writer) const
 {
-    writeXmlTextElement(writer, u"response", ns_sasl_2, serializeBase64(data));
+    writer.write(TextElement { XmlTag, Base64 { data } });
 }
 
 std::optional<Success> Success::fromDom(const QDomElement &el)
@@ -485,19 +446,17 @@ std::optional<Success> Success::fromDom(const QDomElement &el)
     return output;
 }
 
-void Success::toXml(QXmlStreamWriter *writer) const
+void Success::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("success"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    if (additionalData) {
-        writer->writeTextElement(QSL65("additional-data"), serializeBase64(*additionalData));
-    }
-    writeXmlTextElement(writer, u"authorization-identifier", authorizationIdentifier);
-    writeOptional(writer, bound);
-    writeOptional(writer, smResumed);
-    writeOptional(writer, smFailed);
-    writeOptional(writer, token);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        OptionalTextElement { u"additional-data", into<Base64>(additionalData) },
+        TextElement { u"authorization-identifier", authorizationIdentifier },
+        bound,
+        smResumed,
+        smFailed,
+        token,
+    });
 }
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
@@ -518,13 +477,13 @@ std::optional<Failure> Failure::fromDom(const QDomElement &el)
     };
 }
 
-void Failure::toXml(QXmlStreamWriter *writer) const
+void Failure::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("failure"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    writeEmptyElement(writer, Enums::toString(condition), ns_sasl);
-    writeOptionalXmlTextElement(writer, u"text", text);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        Element { condition, ns_sasl },
+        OptionalTextElement { u"text", text },
+    });
 }
 
 std::optional<Continue> Continue::fromDom(const QDomElement &el)
@@ -555,16 +514,17 @@ std::optional<Continue> Continue::fromDom(const QDomElement &el)
     return output;
 }
 
-void Continue::toXml(QXmlStreamWriter *writer) const
+void Continue::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("continue"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    writeOptionalXmlTextElement(writer, u"additional-data", serializeBase64(additionalData));
-    writer->writeStartElement(QSL65("tasks"));
-    writeTextElements(writer, u"task", tasks);
-    writer->writeEndElement();
-    writeOptionalXmlTextElement(writer, u"text", text);
-    writer->writeEndElement();
+    writer.write(Element {
+        XmlTag,
+        OptionalTextElement { u"additional-data", Base64 { additionalData } },
+        Element {
+            u"tasks",
+            TextElements { u"task", tasks },
+        },
+        OptionalTextElement { u"text", text },
+    });
 }
 
 std::optional<Abort> Abort::fromDom(const QDomElement &el)
@@ -575,12 +535,9 @@ std::optional<Abort> Abort::fromDom(const QDomElement &el)
     return Abort { firstChildElement(el, u"text", ns_sasl_2).text() };
 }
 
-void Abort::toXml(QXmlStreamWriter *writer) const
+void Abort::toXml(XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("abort"));
-    writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    writeOptionalXmlTextElement(writer, u"text", text);
-    writer->writeEndElement();
+    writer.write(Element { XmlTag, OptionalTextElement { u"text", text } });
 }
 
 }  // namespace Sasl2
@@ -777,11 +734,12 @@ std::optional<HtToken> HtToken::fromXml(QXmlStreamReader &r)
 
 void HtToken::toXml(QXmlStreamWriter &w) const
 {
-    w.writeStartElement(QSL65("ht-token"));
-    w.writeAttribute(QSL65("mechanism"), mechanism.toString());
-    w.writeAttribute(QSL65("secret"), secret);
-    w.writeAttribute(QSL65("expiry"), expiry.toString(Qt::ISODate));
-    w.writeEndElement();
+    XmlWriter(&w).write(Element {
+        u"ht-token",
+        Attribute { u"mechanism", mechanism.toString() },
+        Attribute { u"secret", secret },
+        Attribute { u"expiry", expiry },
+    });
 }
 
 }  // namespace QXmpp::Private

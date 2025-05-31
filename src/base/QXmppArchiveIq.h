@@ -33,9 +33,10 @@ private:
     bool m_received;
 };
 
+///
 /// \brief The QXmppArchiveChat class represents an archived conversation
-/// as defined by \xep{0136}: Message Archiving.
-
+/// as defined by \xep{0136, Message Archiving}.
+///
 class QXMPP_EXPORT QXmppArchiveChat
 {
 public:
