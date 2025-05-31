@@ -107,6 +107,15 @@ auto map(Function mapValue, std::optional<T> &&optValue) -> std::optional<std::i
     return {};
 }
 
+template<typename T, typename Function>
+auto map(Function mapValue, const std::optional<T> &optValue) -> std::optional<std::invoke_result_t<Function, T &&>>
+{
+    if (optValue) {
+        return mapValue(*optValue);
+    }
+    return {};
+}
+
 template<typename To, typename From>
 auto into(std::optional<From> &&value) -> std::optional<To>
 {
