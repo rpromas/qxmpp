@@ -110,17 +110,10 @@ void QXmppResultSetQuery::parse(const QDomElement &element)
 {
     QDomElement setElement = (element.tagName() == u"set") ? element : element.firstChildElement(u"set"_s);
     if (setElement.namespaceURI() == ns_rsm) {
-        bool ok = false;
-        m_max = setElement.firstChildElement(u"max"_s).text().toInt(&ok);
-        if (!ok) {
-            m_max = -1;
-        }
+        m_max = parseInt(setElement.firstChildElement(u"max"_s).text()).value_or(-1);
         m_after = setElement.firstChildElement(u"after"_s).text();
         m_before = setElement.firstChildElement(u"before"_s).text();
-        m_index = setElement.firstChildElement(u"index"_s).text().toInt(&ok);
-        if (!ok) {
-            m_index = -1;
-        }
+        m_index = parseInt(setElement.firstChildElement(u"index"_s).text()).value_or(-1);
     }
 }
 
@@ -231,14 +224,10 @@ void QXmppResultSetReply::parse(const QDomElement &element)
 {
     QDomElement setElement = (element.tagName() == u"set") ? element : firstChildElement(element, u"set");
     if (setElement.namespaceURI() == ns_rsm) {
-        m_count = firstChildElement(setElement, u"count").text().toInt();
+        m_count = parseInt(firstChildElement(setElement, u"count").text()).value_or(-1);
         QDomElement firstElem = firstChildElement(setElement, u"first");
         m_first = firstElem.text();
-        bool ok = false;
-        m_index = firstElem.attribute(u"index"_s).toInt(&ok);
-        if (!ok) {
-            m_index = -1;
-        }
+        m_index = parseInt(firstElem.attribute(u"index"_s)).value_or(-1);
         m_last = firstChildElement(setElement, u"last").text();
     }
 }
