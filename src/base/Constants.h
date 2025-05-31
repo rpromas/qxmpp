@@ -254,6 +254,6 @@ inline constexpr QStringView ns_reply = u"urn:xmpp:reply:0";
 // XEP-0482: Call Invites
 inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
-inline constexpr auto ns_fast = u"urn:xmpp:fast:0";
+inline constexpr QStringView ns_fast = u"urn:xmpp:fast:0";
 
 #endif  // CONSTANTS_H
