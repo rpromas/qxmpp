@@ -13,6 +13,7 @@
 #include "QXmppLogger.h"
 #include "QXmppNonza.h"
 #include "QXmppStreamManagement_p.h"
+#include "QXmppUtils_p.h"
 
 #include <optional>
 
@@ -59,9 +60,6 @@ enum class ErrorCondition {
     NotAuthorized,
     TemporaryAuthFailure,
 };
-
-QString errorConditionToString(ErrorCondition);
-std::optional<ErrorCondition> errorConditionFromString(QStringView);
 
 struct Auth {
     static constexpr std::tuple XmlTag = { u"auth", ns_sasl };
@@ -382,6 +380,27 @@ struct Credentials {
     // Windows Live
     QString windowsLiveAccessToken;
 };
+
+namespace Enums {
+
+template<>
+struct Values<Sasl::ErrorCondition> {
+    static inline constexpr auto STRINGS = to_array<QStringView>({
+        u"aborted",
+        u"account-disabled",
+        u"credentials-expired",
+        u"encryption-required",
+        u"incorrect-encoding",
+        u"invalid-authzid",
+        u"invalid-mechanism",
+        u"malformed-request",
+        u"mechanism-too-weak",
+        u"not-authorized",
+        u"temporary-auth-failure",
+    });
+};
+
+}  // namespace Enums
 
 }  // namespace QXmpp::Private
 

@@ -9,7 +9,6 @@
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils.h"
-#include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
@@ -28,25 +27,8 @@ template<class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
 };
-// explicit deduction guide
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 static QByteArray forcedNonce;
-
-constexpr auto SASL_ERROR_CONDITIONS = to_array<QStringView>({
-    u"aborted",
-    u"account-disabled",
-    u"credentials-expired",
-    u"encryption-required",
-    u"incorrect-encoding",
-    u"invalid-authzid",
-    u"invalid-mechanism",
-    u"malformed-request",
-    u"mechanism-too-weak",
-    u"not-authorized",
-    u"temporary-auth-failure",
-});
 
 // https://www.iana.org/assignments/named-information/named-information.xhtml#hash-alg
 constexpr auto ianaHashAlgorithms = to_array<QStringView>({
@@ -67,16 +49,6 @@ constexpr auto ianaHashAlgorithms = to_array<QStringView>({
 namespace QXmpp::Private {
 
 namespace Sasl {
-
-QString errorConditionToString(ErrorCondition c)
-{
-    return SASL_ERROR_CONDITIONS.at(size_t(c)).toString();
-}
-
-std::optional<ErrorCondition> errorConditionFromString(QStringView str)
-{
-    return enumFromString<ErrorCondition>(SASL_ERROR_CONDITIONS, str);
-}
 
 std::optional<Auth> Auth::fromDom(const QDomElement &el)
 {
@@ -135,7 +107,7 @@ std::optional<Failure> Failure::fromDom(const QDomElement &el)
     auto errorConditionString = el.firstChildElement().tagName();
 
     Failure failure {
-        errorConditionFromString(errorConditionString),
+        Enums::fromString<ErrorCondition>(errorConditionString),
         el.firstChildElement(u"text"_s).text(),
     };
 
@@ -154,7 +126,7 @@ void Failure::toXml(QXmlStreamWriter *writer) const
     writer->writeStartElement(QSL65("failure"));
     writer->writeDefaultNamespace(toString65(ns_sasl));
     if (condition) {
-        writer->writeEmptyElement(toString65(SASL_ERROR_CONDITIONS.at(size_t(*condition))));
+        writer->writeEmptyElement(toString65(Enums::toString(*condition)));
     }
 
     if (!text.isEmpty()) {
@@ -535,7 +507,7 @@ std::optional<Failure> Failure::fromDom(const QDomElement &el)
     }
 
     // SASL error condition
-    auto condition = Sasl::errorConditionFromString(firstChildElement(el, {}, ns_sasl).tagName());
+    auto condition = Enums::fromString<Sasl::ErrorCondition>(firstChildElement(el, {}, ns_sasl).tagName());
     if (!condition) {
         return {};
     }
@@ -550,7 +522,7 @@ void Failure::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("failure"));
     writer->writeDefaultNamespace(toString65(ns_sasl_2));
-    writeEmptyElement(writer, Sasl::errorConditionToString(condition), ns_sasl);
+    writeEmptyElement(writer, Enums::toString(condition), ns_sasl);
     writeOptionalXmlTextElement(writer, u"text", text);
     writer->writeEndElement();
 }

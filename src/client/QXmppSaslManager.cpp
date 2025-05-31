@@ -4,8 +4,6 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppConfiguration.h"
-#include "QXmppConstants_p.h"
-#include "QXmppCredentials.h"
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSaslManager_p.h"
 #include "QXmppSasl_p.h"
@@ -190,7 +188,7 @@ HandleElementResult SaslManager::handleElement(const QDomElement &el)
         }
     } else if (auto failure = Failure::fromDom(el)) {
         auto text = failure->text.isEmpty()
-            ? errorConditionToString(failure->condition.value_or(ErrorCondition::NotAuthorized))
+            ? Enums::toString(failure->condition.value_or(ErrorCondition::NotAuthorized))
             : failure->text;
 
         finish(AuthError {
@@ -279,7 +277,7 @@ HandleElementResult Sasl2Manager::handleElement(const QDomElement &el)
         return Finished;
     } else if (auto failure = Failure::fromDom(el)) {
         auto text = failure->text.isEmpty()
-            ? Sasl::errorConditionToString(failure->condition)
+            ? Enums::toString(failure->condition)
             : failure->text;
 
         if (failure->condition == Sasl::ErrorCondition::Aborted && m_state->unsupportedContinue) {
