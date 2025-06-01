@@ -11,32 +11,66 @@
 
 namespace QXmpp::Private::Enums {
 
+// std::array helper
+namespace detail {
+
+template<class T, std::size_t N, std::size_t... I>
+constexpr std::array<std::remove_cv_t<T>, N> to_array_impl(T (&&a)[N], std::index_sequence<I...>)
+{
+    return { { std::move(a[I])... } };
+}
+
+}  // namespace detail
+
+template<typename Enum, std::size_t N>
+consteval std::array<std::remove_cv_t<std::tuple<Enum, QStringView>>, N> makeValues(std::tuple<Enum, QStringView> (&&a)[N])
+{
+    return detail::to_array_impl(std::move(a), std::make_index_sequence<N> {});
+}
+
 template<typename Enum>
-struct Values;
+struct Data;
+
+// order check
+template<typename Enum, size_t N>
+consteval bool checkEnumOrder(const std::array<std::tuple<Enum, QStringView>, N> &values)
+{
+    for (size_t i = 0; i < N; ++i) {
+        if (i != size_t(std::get<0>(values[i]))) {
+            return false;
+        }
+    }
+    return true;
+}
 
 template<typename Enum>
 concept SerializableEnum = requires(Enum value) {
-    typename Values<Enum>;
+    typename Data<Enum>;
 
-    requires std::ranges::random_access_range<decltype(Values<Enum>::STRINGS)>;
+    requires std::ranges::random_access_range<decltype(Data<Enum>::Values)>;
     requires std::same_as<
-        std::ranges::range_value_t<decltype(Values<Enum>::STRINGS)>,
-        QStringView>;
+        std::ranges::range_value_t<decltype(Data<Enum>::Values)>,
+        std::tuple<Enum, QStringView>>;
+    requires checkEnumOrder<Enum>(Data<Enum>::Values);
 };
 
 template<typename Enum>
 concept NullableEnum = requires(Enum value) {
-    { Values<Enum>::NullValue } -> std::same_as<Enum>;
+    typename Data<Enum>;
+    { Data<Enum>::NullValue } -> std::convertible_to<Enum>;
 };
 
 template<typename Enum>
 std::optional<Enum> fromString(QStringView str)
     requires SerializableEnum<Enum>
 {
-    constexpr auto values = Values<Enum>::STRINGS;
+    constexpr auto values = Data<Enum>::Values;
 
-    if (auto itr = std::ranges::find(values, str); itr != values.end()) {
-        return Enum(std::distance(values.begin(), itr));
+    auto enumPart = [](const auto &v) { return std::get<0>(v); };
+    auto stringPart = [](const auto &v) { return std::get<1>(v); };
+
+    if (auto itr = std::ranges::find(values, str, stringPart); itr != values.end()) {
+        return enumPart(*itr);
     }
     return {};
 }
@@ -45,7 +79,8 @@ template<typename Enum>
 QStringView toString(Enum value)
     requires SerializableEnum<Enum>
 {
-    return Values<Enum>::STRINGS.at(size_t(value));
+    auto &[enumerator, string] = Data<Enum>::Values.at(size_t(value));
+    return string;
 };
 
 }  // namespace QXmpp::Private::Enums

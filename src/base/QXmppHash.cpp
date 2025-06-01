@@ -17,22 +17,23 @@ using namespace QXmpp;
 using namespace QXmpp::Private;
 
 template<>
-struct Enums::Values<HashAlgorithm> {
-    static inline constexpr auto STRINGS = to_array<QStringView>({
-        {},
-        u"md2",
-        u"md5",
-        u"shake128",
-        u"shake256",
-        u"sha-1",
-        u"sha-224",
-        u"sha-256",
-        u"sha-384",
-        u"sha-512",
-        u"sha3-256",
-        u"sha3-512",
-        u"blake2b-256",
-        u"blake2b-512",
+struct Enums::Data<HashAlgorithm> {
+    using enum HashAlgorithm;
+    static inline constexpr auto Values = makeValues<HashAlgorithm>({
+        { Unknown, {} },
+        { Md2, u"md2" },
+        { Md5, u"md5" },
+        { Shake128, u"shake128" },
+        { Shake256, u"shake256" },
+        { Sha1, u"sha-1" },
+        { Sha224, u"sha-224" },
+        { Sha256, u"sha-256" },
+        { Sha384, u"sha-384" },
+        { Sha512, u"sha-512" },
+        { Sha3_256, u"sha3-256" },
+        { Sha3_512, u"sha3-512" },
+        { Blake2b_256, u"blake2b-256" },
+        { Blake2b_512, u"blake2b-512" },
     });
 };
 

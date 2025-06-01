@@ -385,26 +385,23 @@ struct Credentials {
     QString windowsLiveAccessToken;
 };
 
-namespace Enums {
-
 template<>
-struct Values<Sasl::ErrorCondition> {
-    static inline constexpr auto STRINGS = to_array<QStringView>({
-        u"aborted",
-        u"account-disabled",
-        u"credentials-expired",
-        u"encryption-required",
-        u"incorrect-encoding",
-        u"invalid-authzid",
-        u"invalid-mechanism",
-        u"malformed-request",
-        u"mechanism-too-weak",
-        u"not-authorized",
-        u"temporary-auth-failure",
+struct Enums::Data<Sasl::ErrorCondition> {
+    using enum Sasl::ErrorCondition;
+    static inline constexpr auto Values = makeValues<Sasl::ErrorCondition>({
+        { Aborted, u"aborted" },
+        { AccountDisabled, u"account-disabled" },
+        { CredentialsExpired, u"credentials-expired" },
+        { EncryptionRequired, u"encryption-required" },
+        { IncorrectEncoding, u"incorrect-encoding" },
+        { InvalidAuthzid, u"invalid-authzid" },
+        { InvalidMechanism, u"invalid-mechanism" },
+        { MalformedRequest, u"malformed-request" },
+        { MechanismTooWeak, u"mechanism-too-weak" },
+        { NotAuthorized, u"not-authorized" },
+        { TemporaryAuthFailure, u"temporary-auth-failure" },
     });
 };
-
-}  // namespace Enums
 
 }  // namespace QXmpp::Private
 

@@ -25,29 +25,31 @@
 using namespace QXmpp::Private;
 
 template<>
-struct Enums::Values<QXmppDataForm::Field::Type> {
-    static constexpr auto STRINGS = to_array<QStringView>({
-        u"boolean",
-        u"fixed",
-        u"hidden",
-        u"jid-multi",
-        u"jid-single",
-        u"list-multi",
-        u"list-single",
-        u"text-multi",
-        u"text-private",
-        u"text-single",
+struct Enums::Data<QXmppDataForm::Field::Type> {
+    using enum QXmppDataForm::Field::Type;
+    static constexpr auto Values = makeValues<QXmppDataForm::Field::Type>({
+        { BooleanField, u"boolean" },
+        { FixedField, u"fixed" },
+        { HiddenField, u"hidden" },
+        { JidMultiField, u"jid-multi" },
+        { JidSingleField, u"jid-single" },
+        { ListMultiField, u"list-multi" },
+        { ListSingleField, u"list-single" },
+        { TextMultiField, u"text-multi" },
+        { TextPrivateField, u"text-private" },
+        { TextSingleField, u"text-single" },
     });
 };
 
 template<>
-struct Enums::Values<QXmppDataForm::Type> {
-    static constexpr auto STRINGS = to_array<QStringView>({
-        {},
-        u"form",
-        u"submit",
-        u"cancel",
-        u"result",
+struct Enums::Data<QXmppDataForm::Type> {
+    using enum QXmppDataForm::Type;
+    static constexpr auto Values = makeValues<QXmppDataForm::Type>({
+        { None, {} },
+        { Form, u"form" },
+        { Submit, u"submit" },
+        { Cancel, u"cancel" },
+        { Result, u"result" },
     });
 };
 
