@@ -7,18 +7,23 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
 
 using namespace QXmpp::Private;
 
-constexpr auto IQ_TYPES = to_array<QStringView>({
-    u"error",
-    u"get",
-    u"set",
-    u"result",
-});
+template<>
+struct Enums::Data<QXmppIq::Type> {
+    using enum QXmppIq::Type;
+    static constexpr auto Values = makeValues<QXmppIq::Type>({
+        { Error, u"error" },
+        { Get, u"get" },
+        { Set, u"set" },
+        { Result, u"result" },
+    });
+};
 
 class QXmppIqPrivate : public QSharedData
 {
@@ -83,8 +88,7 @@ void QXmppIq::parse(const QDomElement &element)
 {
     QXmppStanza::parse(element);
 
-    d->type = enumFromString<Type>(IQ_TYPES, element.attribute(u"type"_s))
-                  .value_or(Get);
+    d->type = Enums::fromString<Type>(element.attribute(u"type"_s)).value_or(Get);
 
     parseElementFromChild(element);
 }
@@ -106,7 +110,7 @@ void QXmppIq::toXml(QXmlStreamWriter *xmlWriter) const
     writeOptionalXmlAttribute(xmlWriter, u"id", id());
     writeOptionalXmlAttribute(xmlWriter, u"to", to());
     writeOptionalXmlAttribute(xmlWriter, u"from", from());
-    writeOptionalXmlAttribute(xmlWriter, u"type", IQ_TYPES.at(d->type));
+    writeOptionalXmlAttribute(xmlWriter, u"type", Enums::toString(d->type));
     toXmlElementFromChild(xmlWriter);
     error().toXml(xmlWriter);
     xmlWriter->writeEndElement();

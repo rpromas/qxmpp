@@ -33,8 +33,6 @@ public:
         /// The subscription requires configuration before it becomes active.
         Unconfigured,
     };
-    static QString stateToString(State);
-    static State stateFromString(const QString &);
 
     ///
     /// The SubscribeOptionsSupport enum describes whether the availability of a

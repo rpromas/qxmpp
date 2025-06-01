@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 #include <QDomElement>
@@ -18,54 +19,24 @@ using namespace QXmpp::Private;
 using Action = QXmppExternalService::Action;
 using Transport = QXmppExternalService::Transport;
 
-QString actionToString(Action action)
-{
-    switch (action) {
-    case Action::Add:
-        return u"add"_s;
-    case Action::Delete:
-        return u"delete"_s;
-    case Action::Modify:
-        return u"modify"_s;
-    }
-    return {};
-}
+template<>
+struct Enums::Data<Action> {
+    using enum Action;
+    static constexpr auto Values = makeValues<Action>({
+        { Add, u"add" },
+        { Delete, u"delete" },
+        { Modify, u"modify" },
+    });
+};
 
-std::optional<Action> actionFromString(const QString &string)
-{
-    if (string == u"add") {
-        return Action::Add;
-    } else if (string == u"delete") {
-        return Action::Delete;
-    } else if (string == u"modify") {
-        return Action::Modify;
-    }
-
-    return std::nullopt;
-}
-
-QString transportToString(Transport transport)
-{
-    switch (transport) {
-    case Transport::Tcp:
-        return u"tcp"_s;
-    case Transport::Udp:
-        return u"udp"_s;
-    }
-
-    return {};
-}
-
-std::optional<Transport> transportFromString(const QString &string)
-{
-    if (string == u"tcp") {
-        return Transport::Tcp;
-    } else if (string == u"udp") {
-        return Transport::Udp;
-    }
-
-    return std::nullopt;
-}
+template<>
+struct Enums::Data<Transport> {
+    using enum Transport;
+    static constexpr auto Values = makeValues<Transport>({
+        { Tcp, u"tcp" },
+        { Udp, u"udp" },
+    });
+};
 
 class QXmppExternalServicePrivate : public QSharedData
 {
@@ -286,7 +257,7 @@ void QXmppExternalService::parse(const QDomElement &el)
     setHost(el.attribute(u"host"_s));
     setType(el.attribute(u"type"_s));
 
-    d->action = actionFromString(el.attribute(u"action"_s));
+    d->action = Enums::fromString<Action>(el.attribute(u"action"_s));
 
     if (attributes.contains(u"expires"_s)) {
         setExpires(QXmppUtils::datetimeFromString(el.attribute(u"expires"_s)));
@@ -309,7 +280,7 @@ void QXmppExternalService::parse(const QDomElement &el)
         setRestricted(restrictedStr == u"true" || restrictedStr == u"1");
     }
 
-    d->transport = transportFromString(el.attribute(u"transport"_s));
+    d->transport = Enums::fromString<Transport>(el.attribute(u"transport"_s));
 
     if (attributes.contains(u"username"_s)) {
         setUsername(el.attribute(u"username"_s));
@@ -328,7 +299,7 @@ void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
     writeOptionalXmlAttribute(writer, u"type", d->type);
 
     if (d->action) {
-        writeOptionalXmlAttribute(writer, u"action", actionToString(d->action.value()));
+        writeOptionalXmlAttribute(writer, u"action", Enums::toString(d->action.value()));
     }
 
     if (d->expires) {
@@ -352,7 +323,7 @@ void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
     }
 
     if (d->transport) {
-        writeOptionalXmlAttribute(writer, u"transport", transportToString(d->transport.value()));
+        writeOptionalXmlAttribute(writer, u"transport", Enums::toString(d->transport.value()));
     }
 
     if (d->username) {

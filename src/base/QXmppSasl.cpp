@@ -32,20 +32,46 @@ struct overloaded : Ts... {
 static QByteArray forcedNonce;
 
 // https://www.iana.org/assignments/named-information/named-information.xhtml#hash-alg
-constexpr auto ianaHashAlgorithms = to_array<QStringView>({
-    u"SHA-256",
-    u"SHA-384",
-    u"SHA-512",
-    u"SHA3-224",
-    u"SHA3-256",
-    u"SHA3-384",
-    u"SHA3-512",
+template<>
+struct Enums::Data<IanaHashAlgorithm> {
+    using enum IanaHashAlgorithm;
+    static constexpr auto Values = makeValues<IanaHashAlgorithm>({
+        { Sha256, u"SHA-256" },
+        { Sha384, u"SHA-384" },
+        { Sha512, u"SHA-512" },
+        { Sha3_224, u"SHA3-224" },
+        { Sha3_256, u"SHA3-256" },
+        { Sha3_384, u"SHA3-384" },
+        { Sha3_512, u"SHA3-512" },
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    u"BLAKE2S-256",
-    u"BLAKE2B-256",
-    u"BLAKE2B-512",
+        { Blake2s_256, u"BLAKE2S-256" },
+        { Blake2b_256, u"BLAKE2B-256" },
+        { Blake2b_512, u"BLAKE2B-512" },
 #endif
-});
+    });
+};
+
+template<>
+struct Enums::Data<SaslScramMechanism::Algorithm> {
+    using enum SaslScramMechanism::Algorithm;
+    static constexpr auto Values = makeValues<SaslScramMechanism::Algorithm>({
+        { Sha1, u"SCRAM-SHA-1" },
+        { Sha256, u"SCRAM-SHA-256" },
+        { Sha512, u"SCRAM-SHA-512" },
+        { Sha3_512, u"SCRAM-SHA3-512" },
+    });
+};
+
+template<>
+struct Enums::Data<SaslHtMechanism::ChannelBindingType> {
+    using enum SaslHtMechanism::ChannelBindingType;
+    static constexpr auto Values = makeValues<SaslHtMechanism::ChannelBindingType>({
+        { TlsServerEndpoint, u"ENDP" },
+        { TlsUnique, u"UNIQ" },
+        { TlsExporter, u"EXPR" },
+        { None, u"NONE" },
+    });
+};
 
 namespace QXmpp::Private {
 
@@ -566,36 +592,14 @@ QCryptographicHash::Algorithm ianaHashAlgorithmToQt(IanaHashAlgorithm alg)
 #undef CASE
 }
 
-std::optional<SaslScramMechanism> SaslScramMechanism::fromString(QStringView str)
+std::optional<SaslScramMechanism> SaslScramMechanism::fromString(QStringView string)
 {
-    if (str == u"SCRAM-SHA-1") {
-        return { { Sha1 } };
-    }
-    if (str == u"SCRAM-SHA-256") {
-        return { { Sha256 } };
-    }
-    if (str == u"SCRAM-SHA-512") {
-        return { { Sha512 } };
-    }
-    if (str == u"SCRAM-SHA3-512") {
-        return { { Sha3_512 } };
-    }
-    return {};
+    return into<SaslScramMechanism>(Enums::fromString<Algorithm>(string));
 }
 
 QString SaslScramMechanism::toString() const
 {
-    switch (algorithm) {
-    case Sha1:
-        return u"SCRAM-SHA-1"_s;
-    case Sha256:
-        return u"SCRAM-SHA-256"_s;
-    case Sha512:
-        return u"SCRAM-SHA-512"_s;
-    case Sha3_512:
-        return u"SCRAM-SHA3-512"_s;
-    }
-    Q_UNREACHABLE();
+    return Enums::toString(algorithm).toString();
 }
 
 QCryptographicHash::Algorithm SaslScramMechanism::qtAlgorithm() const
@@ -624,51 +628,34 @@ std::optional<SaslHtMechanism> SaslHtMechanism::fromString(QStringView string)
 
     // hash algorithm
     // C++23: use enumerate view
+    using enum IanaHashAlgorithm;
     std::optional<IanaHashAlgorithm> algorithm;
-    for (size_t i = 0; i < ianaHashAlgorithms.size(); ++i) {
-        if (string.startsWith(ianaHashAlgorithms.at(i))) {
+    for (int i = int(Sha256); i <= int(_End); ++i) {
+        auto algorithmString = Enums::toString(IanaHashAlgorithm(i));
+        if (string.startsWith(algorithmString)) {
             algorithm = IanaHashAlgorithm(i);
-            string = string.mid(ianaHashAlgorithms.at(i).size());
+            string = string.mid(algorithmString.size());
         }
     }
     if (!algorithm) {
         return {};
     }
 
+    if (!string.startsWith(u'-')) {
+        return {};
+    }
+    string = string.mid(1);
+
     // channel-binding type
-    if (string == u"-ENDP") {
-        return SaslHtMechanism { *algorithm, TlsServerEndpoint };
-    }
-    if (string == u"-UNIQ") {
-        return SaslHtMechanism { *algorithm, TlsUnique };
-    }
-    if (string == u"-EXPR") {
-        return SaslHtMechanism { *algorithm, TlsExporter };
-    }
-    if (string == u"-NONE") {
-        return SaslHtMechanism { *algorithm, None };
+    if (auto cbType = Enums::fromString<ChannelBindingType>(string)) {
+        return SaslHtMechanism { *algorithm, *cbType };
     }
     return {};
 }
 
-static QStringView channelBindingTypeToString(SaslHtMechanism::ChannelBindingType t)
-{
-    switch (t) {
-    case SaslHtMechanism::TlsServerEndpoint:
-        return u"ENDP";
-    case SaslHtMechanism::TlsUnique:
-        return u"UNIQ";
-    case SaslHtMechanism::TlsExporter:
-        return u"EXPR";
-    case SaslHtMechanism::None:
-        return u"NONE";
-    }
-    Q_UNREACHABLE();
-}
-
 QString SaslHtMechanism::toString() const
 {
-    return u"HT-" + ianaHashAlgorithms.at(size_t(hashAlgorithm)) + u'-' + channelBindingTypeToString(channelBindingType);
+    return u"HT-" + Enums::toString(hashAlgorithm) + u'-' + Enums::toString(channelBindingType);
 }
 
 std::optional<SaslMechanism> SaslMechanism::fromString(QStringView str)

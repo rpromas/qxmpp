@@ -7,14 +7,16 @@
 #include "QXmppDataFormBase.h"
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInfoItem.h"
+#include "QXmppMixIq_p.h"
 #include "QXmppMixParticipantItem.h"
 #include "QXmppUtils_p.h"
 
+#include "Enums.h"
 #include "StringLiterals.h"
 
-using namespace QXmpp::Private;
-
 #include <QDateTime>
+
+using namespace QXmpp::Private;
 
 constexpr QStringView NAME = u"Name";
 constexpr QStringView DESCRIPTION = u"Description";
@@ -42,15 +44,6 @@ constexpr QStringView OWN_MESSAGE_RETRACTION_PERMITTED_KEY = u"User Message Retr
 constexpr QStringView INVITATIONS_PERMITTED_KEY = u"Participation Addition by Invitation from Participant";
 constexpr QStringView PRIVATE_MESSAGES_PERMITTED_KEY = u"Private Messages";
 
-static const QMap<QXmppMixConfigItem::Role, QStringView> ROLES = {
-    { QXmppMixConfigItem::Role::Owner, u"owners" },
-    { QXmppMixConfigItem::Role::Administrator, u"admins" },
-    { QXmppMixConfigItem::Role::Participant, u"participants" },
-    { QXmppMixConfigItem::Role::Allowed, u"allowed" },
-    { QXmppMixConfigItem::Role::Anyone, u"anyone" },
-    { QXmppMixConfigItem::Role::Nobody, u"nobody" },
-};
-
 static const QMap<QXmppMixConfigItem::Node, QStringView> NODES = {
     { QXmppMixConfigItem::Node::AllowedJids, u"allowed" },
     { QXmppMixConfigItem::Node::AvatarData, u"avatar" },
@@ -60,6 +53,19 @@ static const QMap<QXmppMixConfigItem::Node, QStringView> NODES = {
     { QXmppMixConfigItem::Node::JidMap, u"jidmap-visible" },
     { QXmppMixConfigItem::Node::Participants, u"participants" },
     { QXmppMixConfigItem::Node::Presence, u"presence" },
+};
+
+template<>
+struct Enums::Data<QXmppMixConfigItem::Role> {
+    using enum QXmppMixConfigItem::Role;
+    static constexpr auto Values = makeValues<QXmppMixConfigItem::Role>({
+        { Owner, u"owners" },
+        { Administrator, u"admins" },
+        { Participant, u"participants" },
+        { Allowed, u"allowed" },
+        { Anyone, u"anyone" },
+        { Nobody, u"nobody" },
+    });
 };
 
 class QXmppMixConfigItemPrivate : public QSharedData, public QXmppDataFormBase
@@ -121,6 +127,7 @@ public:
 
     void parseForm(const QXmppDataForm &form) override
     {
+        using Role = QXmppMixConfigItem::Role;
         dataFormType = form.type();
         const auto fields = form.fields();
 
@@ -139,25 +146,25 @@ public:
             } else if (key == NODES_KEY) {
                 nodes = listToNodes(value.toStringList());
             } else if (key == MESSAGES_SUBSCRIBE_ROLE_KEY) {
-                messagesSubscribeRole = stringToRole(value.toString());
+                messagesSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == MESSAGES_RETRACT_ROLE_KEY) {
-                messagesRetractRole = stringToRole(value.toString());
+                messagesRetractRole = Enums::fromString<Role>(value.toString());
             } else if (key == PRESENCE_SUBSCRIBE_ROLE_KEY) {
-                presenceSubscribeRole = stringToRole(value.toString());
+                presenceSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == PARTICIPANTS_SUBSCRIBE_ROLE_KEY) {
-                participantsSubscribeRole = stringToRole(value.toString());
+                participantsSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == INFORMATION_SUBSCRIBE_ROLE_KEY) {
-                informationSubscribeRole = stringToRole(value.toString());
+                informationSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == INFORMATION_UPDATE_ROLE_KEY) {
-                informationUpdateRole = stringToRole(value.toString());
+                informationUpdateRole = Enums::fromString<Role>(value.toString());
             } else if (key == ALLOWED_JIDS_SUBSCRIBE_ROLE_KEY) {
-                allowedJidsSubscribeRole = stringToRole(value.toString());
+                allowedJidsSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == BANNED_JIDS_SUBSCRIBE_ROLE_KEY) {
-                bannedJidsSubscribeRole = stringToRole(value.toString());
+                bannedJidsSubscribeRole = Enums::fromString<Role>(value.toString());
             } else if (key == CONFIGURATION_READ_ROLE_KEY) {
-                configurationReadRole = stringToRole(value.toString());
+                configurationReadRole = Enums::fromString<Role>(value.toString());
             } else if (key == AVATARS_UPDATE_ROLE_KEY) {
-                avatarUpdateRole = stringToRole(value.toString());
+                avatarUpdateRole = Enums::fromString<Role>(value.toString());
             } else if (key == NICKNAME_REQUIRED_KEY) {
                 nicknameRequired = value.toBool();
             } else if (key == PRESENCE_REQUIRED_KEY) {
@@ -212,40 +219,12 @@ public:
     ///
     static void serializeRole(QXmppDataForm &form, const QString &name, std::optional<QXmppMixConfigItem::Role> role)
     {
-        serializeNullable(form, QXmppDataForm::Field::Type::ListSingleField, name, roleToString(role).toString());
+        if (role) {
+            serializeValue(form, QXmppDataForm::Field::Type::ListSingleField, name, Enums::toString(*role).toString());
+        }
     }
 
-    ///
-    /// Converts a role to a string.
-    ///
-    /// \param role role to convert
-    ///
-    /// \return the string representation of the role
-    ///
-    static QStringView roleToString(std::optional<QXmppMixConfigItem::Role> role)
-    {
-        return role ? ROLES.value(*role) : QStringView();
-    }
-
-    ///
-    /// Converts a string to a role.
-    ///
-    /// \param roleString string to convert
-    ///
-    /// \return the role for its string representation
-    ///
-    static QXmppMixConfigItem::Role stringToRole(QStringView roleString)
-    {
-        return ROLES.key(roleString);
-    }
-
-    ///
     /// Converts a nodes flag to a list of nodes.
-    ///
-    /// \param nodes nodes to convert
-    ///
-    /// \return the list of nodes
-    ///
     static QStringList nodesToList(QXmppMixConfigItem::Nodes nodes)
     {
         QStringList nodeList;
@@ -259,13 +238,7 @@ public:
         return nodeList;
     }
 
-    ///
     /// Converts a list of nodes to a nodes flag
-    ///
-    /// \param nodeList list of nodes to convert
-    ///
-    /// \return the nodes flag
-    ///
     static QXmppMixConfigItem::Nodes listToNodes(const QStringList &nodeList)
     {
         QXmppMixConfigItem::Nodes nodes;

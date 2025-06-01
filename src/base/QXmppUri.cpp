@@ -6,11 +6,10 @@
 
 #include "QXmppUri.h"
 
+#include "QXmppMessage_p.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
-
-#include <array>
 
 #include <QUrlQuery>
 
@@ -20,15 +19,6 @@ using namespace QXmpp::Uri;
 constexpr QStringView SCHEME = u"xmpp";
 constexpr QChar QUERY_ITEM_DELIMITER = u';';
 constexpr QChar QUERY_ITEM_KEY_DELIMITER = u'=';
-
-// QXmppMessage types as strings
-constexpr std::array<QStringView, 5> MESSAGE_TYPES = {
-    u"error",
-    u"normal",
-    u"chat",
-    u"groupchat",
-    u"headline"
-};
 
 // Adds a key-value pair to a query if the value is not empty.
 static void addKeyValuePairToQuery(QUrlQuery &query, const QString &key, QStringView value)
@@ -201,7 +191,7 @@ static void serializeUrlQuery(const Message &message, QUrlQuery &query)
     addKeyValuePairToQuery(query, u"from"_s, message.from);
     addKeyValuePairToQuery(query, u"id"_s, message.id);
     if (message.type) {
-        addKeyValuePairToQuery(query, u"type"_s, MESSAGE_TYPES.at(size_t(*message.type)));
+        addKeyValuePairToQuery(query, u"type"_s, Enums::toString(*message.type));
     }
     addKeyValuePairToQuery(query, QStringLiteral("subject"), message.subject);
     addKeyValuePairToQuery(query, QStringLiteral("body"), message.body);
@@ -302,7 +292,7 @@ Message parseMessageQuery(const QUrlQuery &q)
         queryItemValue(q, u"thread"_s),
         queryItemValue(q, u"id"_s),
         queryItemValue(q, u"from"_s),
-        enumFromString<QXmppMessage::Type>(MESSAGE_TYPES, queryItemValue(q, u"type"_s)),
+        Enums::fromString<QXmppMessage::Type>(queryItemValue(q, u"type"_s)),
     };
 }
 

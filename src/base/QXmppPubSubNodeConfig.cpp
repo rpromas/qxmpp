@@ -4,7 +4,11 @@
 
 #include "QXmppPubSubNodeConfig.h"
 
+#include "QXmppPubSubNodeConfig_p.h"
+
 #include "StringLiterals.h"
+
+using namespace QXmpp::Private;
 
 static const auto NODE_CONFIG_FORM_TYPE = u"http://jabber.org/protocol/pubsub#node_config"_s;
 static const auto PUBLISH_OPTIONS_FORM_TYPE = u"http://jabber.org/protocol/pubsub#publish-options"_s;
@@ -48,9 +52,6 @@ template<class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
 };
-// explicit deduction guide (not needed as of C++20)
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 class QXmppPubSubNodeConfigPrivate : public QSharedData
 {
@@ -89,190 +90,6 @@ public:
     QString title;
     QString payloadType;
 };
-
-std::optional<QXmppPubSubNodeConfig::AccessModel> QXmppPubSubNodeConfig::accessModelFromString(const QString &string)
-{
-    if (string == u"open") {
-        return Open;
-    }
-    if (string == u"presence") {
-        return Presence;
-    }
-    if (string == u"roster") {
-        return Roster;
-    }
-    if (string == u"authorize") {
-        return Authorize;
-    }
-    if (string == u"whitelist") {
-        return Allowlist;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::accessModelToString(AccessModel model)
-{
-    switch (model) {
-    case Open:
-        return u"open"_s;
-    case Presence:
-        return u"presence"_s;
-    case Roster:
-        return u"roster"_s;
-    case Authorize:
-        return u"authorize"_s;
-    case Allowlist:
-        return u"whitelist"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::PublishModel> QXmppPubSubNodeConfig::publishModelFromString(const QString &string)
-{
-    if (string == u"publishers") {
-        return Publishers;
-    }
-    if (string == u"subscribers") {
-        return Subscribers;
-    }
-    if (string == u"open") {
-        return Anyone;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::publishModelToString(QXmppPubSubNodeConfig::PublishModel model)
-{
-    switch (model) {
-    case Publishers:
-        return u"publishers"_s;
-    case Subscribers:
-        return u"subscribers"_s;
-    case Anyone:
-        return u"open"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::ChildAssociationPolicy> QXmppPubSubNodeConfig::childAssociatationPolicyFromString(const QString &string)
-{
-    if (string == u"all") {
-        return ChildAssociationPolicy::All;
-    }
-    if (string == u"owners") {
-        return ChildAssociationPolicy::Owners;
-    }
-    if (string == u"whitelist") {
-        return ChildAssociationPolicy::Whitelist;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::childAssociationPolicyToString(QXmppPubSubNodeConfig::ChildAssociationPolicy policy)
-{
-    switch (policy) {
-    case ChildAssociationPolicy::All:
-        return u"all"_s;
-    case ChildAssociationPolicy::Owners:
-        return u"owners"_s;
-    case ChildAssociationPolicy::Whitelist:
-        return u"whitelist"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::ItemPublisher> QXmppPubSubNodeConfig::itemPublisherFromString(const QString &string)
-{
-    if (string == u"owner") {
-        return NodeOwner;
-    }
-    if (string == u"publisher") {
-        return Publisher;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::itemPublisherToString(ItemPublisher publisher)
-{
-    switch (publisher) {
-    case NodeOwner:
-        return u"owner"_s;
-    case Publisher:
-        return u"publisher"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::NodeType> QXmppPubSubNodeConfig::nodeTypeFromString(const QString &string)
-{
-    if (string == u"leaf") {
-        return Leaf;
-    }
-    if (string == u"collection") {
-        return Collection;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::nodeTypeToString(NodeType type)
-{
-    switch (type) {
-    case Leaf:
-        return u"leaf"_s;
-    case Collection:
-        return u"collection"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::NotificationType> QXmppPubSubNodeConfig::notificationTypeFromString(const QString &string)
-{
-    if (string == u"normal") {
-        return Normal;
-    }
-    if (string == u"headline") {
-        return Headline;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::notificationTypeToString(NotificationType type)
-{
-    switch (type) {
-    case Normal:
-        return u"normal"_s;
-    case Headline:
-        return u"headline"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppPubSubNodeConfig::SendLastItemType> QXmppPubSubNodeConfig::sendLastItemTypeFromString(const QString &string)
-{
-    if (string == u"never") {
-        return Never;
-    }
-    if (string == u"on_sub") {
-        return OnSubscription;
-    }
-    if (string == u"on_sub_and_presence") {
-        return OnSubscriptionAndPresence;
-    }
-    return std::nullopt;
-}
-
-QString QXmppPubSubNodeConfig::sendLastItemTypeToString(SendLastItemType type)
-{
-    switch (type) {
-    case Never:
-        return u"never"_s;
-    case OnSubscription:
-        return u"on_sub"_s;
-    case OnSubscriptionAndPresence:
-        return u"on_sub_and_presence"_s;
-    }
-    return {};
-}
 
 std::optional<QXmppPubSubNodeConfig> QXmppPubSubNodeConfig::fromDataForm(const QXmppDataForm &form)
 {
@@ -645,11 +462,11 @@ bool QXmppPubSubNodeConfig::parseField(const QXmppDataForm::Field &field)
     const auto value = field.value();
 
     if (key == ACCESS_MODEL) {
-        d->accessModel = accessModelFromString(field.value().toString());
+        d->accessModel = Enums::fromString<AccessModel>(field.value().toString());
     } else if (key == BODY_XSLT) {
         d->bodyXslt = value.toString();
     } else if (key == CHILD_ASSOCIATION_POLICY) {
-        d->childAssociationPolicy = childAssociatationPolicyFromString(value.toString());
+        d->childAssociationPolicy = Enums::fromString<ChildAssociationPolicy>(value.toString());
     } else if (key == CHILD_ASSOCIATION_ALLOWLIST) {
         d->childAssociationAllowlist = value.toStringList();
     } else if (key == CHILD_NODES) {
@@ -671,7 +488,7 @@ bool QXmppPubSubNodeConfig::parseField(const QXmppDataForm::Field &field)
     } else if (key == ITEM_EXPIRY) {
         d->itemExpiry = parseUInt(value);
     } else if (key == NOTIFICATION_ITEM_PUBLISHER) {
-        d->notificationItemPublisher = itemPublisherFromString(value.toString());
+        d->notificationItemPublisher = Enums::fromString<ItemPublisher>(value.toString());
     } else if (key == LANGUAGE) {
         d->language = value.toString();
     } else if (key == MAX_ITEMS) {
@@ -690,9 +507,9 @@ bool QXmppPubSubNodeConfig::parseField(const QXmppDataForm::Field &field)
     } else if (key == MAX_PAYLOAD_SIZE) {
         d->maxPayloadSize = parseUInt(value);
     } else if (key == NODE_TYPE) {
-        d->nodeType = nodeTypeFromString(value.toString());
+        d->nodeType = Enums::fromString<NodeType>(value.toString());
     } else if (key == NOTIFICATION_TYPE) {
-        d->notificationType = notificationTypeFromString(value.toString());
+        d->notificationType = Enums::fromString<NotificationType>(value.toString());
     } else if (key == CONFIG_NOTIFICATIONS_ENABLED) {
         d->configNotificationsEnabled = parseBool(value);
     } else if (key == NODE_DELETE_NOTIFICATIONS_ENABLED) {
@@ -706,13 +523,13 @@ bool QXmppPubSubNodeConfig::parseField(const QXmppDataForm::Field &field)
     } else if (key == PRESENCE_BASED_NOTIFICATIONS) {
         d->presenceBasedNotifications = parseBool(value);
     } else if (key == PUBLISH_MODEL) {
-        d->publishModel = publishModelFromString(value.toString());
+        d->publishModel = Enums::fromString<PublishModel>(value.toString());
     } else if (key == PURGE_WHEN_OFFLINE) {
         d->purgeWhenOffline = parseBool(value);
     } else if (key == ALLOWED_ROSTER_GROUPS) {
         d->allowedRosterGroups = value.toStringList();
     } else if (key == SEND_LAST_ITEM) {
-        d->sendLastItem = sendLastItemTypeFromString(value.toString());
+        d->sendLastItem = Enums::fromString<SendLastItemType>(value.toString());
     } else if (key == TEMPORARY_SUBSCRIPTIONS) {
         d->temporarySubscriptions = parseBool(value);
     } else if (key == ALLOW_SUBSCRIPTIONS) {
@@ -731,10 +548,14 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
 {
     using Type = QXmppDataForm::Field::Type;
 
+    auto enumToString = [](auto value) {
+        return Enums::toString(value).toString();
+    };
+
     serializeOptional(form,
                       Type::ListSingleField,
                       ACCESS_MODEL,
-                      d->accessModel, accessModelToString);
+                      d->accessModel, enumToString);
     serializeNullable(form,
                       Type::TextSingleField,
                       BODY_XSLT,
@@ -742,7 +563,7 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     serializeOptional(form,
                       Type::ListSingleField,
                       CHILD_ASSOCIATION_POLICY,
-                      d->childAssociationPolicy, childAssociationPolicyToString);
+                      d->childAssociationPolicy, enumToString);
     serializeEmptyable(form,
                        Type::TextMultiField,
                        CHILD_ASSOCIATION_ALLOWLIST,
@@ -785,7 +606,7 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     serializeOptional(form,
                       Type::ListSingleField,
                       NOTIFICATION_ITEM_PUBLISHER,
-                      d->notificationItemPublisher, itemPublisherToString);
+                      d->notificationItemPublisher, enumToString);
     serializeNullable(form,
                       Type::TextSingleField,
                       LANGUAGE,
@@ -806,11 +627,11 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     serializeOptional(form,
                       Type::ListSingleField,
                       NODE_TYPE,
-                      d->nodeType, nodeTypeToString);
+                      d->nodeType, enumToString);
     serializeOptional(form,
                       Type::ListSingleField,
                       NOTIFICATION_TYPE,
-                      d->notificationType, notificationTypeToString);
+                      d->notificationType, enumToString);
     serializeOptional(form,
                       Type::BooleanField,
                       CONFIG_NOTIFICATIONS_ENABLED,
@@ -838,7 +659,7 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     serializeOptional(form,
                       Type::ListSingleField,
                       PUBLISH_MODEL,
-                      d->publishModel, publishModelToString);
+                      d->publishModel, enumToString);
     serializeOptional(form,
                       Type::BooleanField,
                       PURGE_WHEN_OFFLINE,
@@ -850,7 +671,7 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     serializeOptional(form,
                       Type::ListSingleField,
                       SEND_LAST_ITEM,
-                      d->sendLastItem, sendLastItemTypeToString);
+                      d->sendLastItem, enumToString);
     serializeOptional(form,
                       Type::BooleanField,
                       TEMPORARY_SUBSCRIPTIONS,

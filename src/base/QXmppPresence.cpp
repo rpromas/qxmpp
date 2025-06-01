@@ -12,31 +12,40 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 #include <QDomElement>
 
 using namespace QXmpp::Private;
 
-constexpr auto PRESENCE_TYPES = to_array<QStringView>({
-    u"error",
-    {},
-    u"unavailable",
-    u"subscribe",
-    u"subscribed",
-    u"unsubscribe",
-    u"unsubscribed",
-    u"probe",
-});
+template<>
+struct Enums::Data<QXmppPresence::Type> {
+    using enum QXmppPresence::Type;
+    static constexpr auto Values = makeValues<QXmppPresence::Type>({
+        { Error, u"error" },
+        { Available, {} },
+        { Unavailable, u"unavailable" },
+        { Subscribe, u"subscribe" },
+        { Subscribed, u"subscribed" },
+        { Unsubscribe, u"unsubscribe" },
+        { Unsubscribed, u"unsubscribed" },
+        { Probe, u"probe" },
+    });
+};
 
-constexpr auto AVAILABLE_STATUS_TYPES = to_array<QStringView>({
-    {},
-    u"away",
-    u"xa",
-    u"dnd",
-    u"chat",
-    u"invisible",
-});
+template<>
+struct Enums::Data<QXmppPresence::AvailableStatusType> {
+    using enum QXmppPresence::AvailableStatusType;
+    static constexpr auto Values = makeValues<QXmppPresence::AvailableStatusType>({
+        { Online, {} },
+        { Away, u"away" },
+        { XA, u"xa" },
+        { DND, u"dnd" },
+        { Chat, u"chat" },
+        { Invisible, u"invisible" },
+    });
+};
 
 class QXmppPresencePrivate : public QSharedData
 {
@@ -440,14 +449,12 @@ void QXmppPresence::parse(const QDomElement &element)
     QXmppStanza::parse(element);
 
     // attributes
-    d->type = enumFromString<Type>(PRESENCE_TYPES, element.attribute(u"type"_s))
-                  .value_or(Available);
+    d->type = Enums::fromString<Type>(element.attribute(u"type"_s)).value_or(Available);
 
     QXmppElementList unknownElements;
     for (const auto &childElement : iterChildElements(element)) {
         if (childElement.tagName() == u"show") {
-            d->availableStatusType = enumFromString<AvailableStatusType>(AVAILABLE_STATUS_TYPES, childElement.text())
-                                         .value_or(Online);
+            d->availableStatusType = Enums::fromString<AvailableStatusType>(childElement.text()).value_or(Online);
         } else if (childElement.tagName() == u"status") {
             d->statusText = childElement.text();
         } else if (childElement.tagName() == u"priority") {
@@ -530,9 +537,9 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
     writeOptionalXmlAttribute(xmlWriter, u"id", id());
     writeOptionalXmlAttribute(xmlWriter, u"to", to());
     writeOptionalXmlAttribute(xmlWriter, u"from", from());
-    writeOptionalXmlAttribute(xmlWriter, u"type", PRESENCE_TYPES.at(d->type));
+    writeOptionalXmlAttribute(xmlWriter, u"type", Enums::toString(d->type));
 
-    writeOptionalXmlTextElement(xmlWriter, u"show", AVAILABLE_STATUS_TYPES.at(size_t(d->availableStatusType)));
+    writeOptionalXmlTextElement(xmlWriter, u"show", Enums::toString(d->availableStatusType));
     writeOptionalXmlTextElement(xmlWriter, u"status", d->statusText);
     if (d->priority != 0) {
         writeXmlTextElement(xmlWriter, u"priority", QString::number(d->priority));

@@ -7,11 +7,12 @@
 
 #include "QXmppIq.h"
 
+///
 /// \brief The QXmppVersionIq class represents an IQ for conveying a software
-/// version as defined by \xep{0092}: Software Version.
+/// version as defined by \xep{0092, Software Version}.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppVersionIq : public QXmppIq
 {
 public:

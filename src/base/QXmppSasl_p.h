@@ -281,6 +281,9 @@ enum class IanaHashAlgorithm {
     Blake2s_256,
     Blake2b_256,
     Blake2b_512,
+    _End = Blake2b_512,
+#else
+    _End = Sha3_512,
 #endif
 };
 

@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <optional>
 
@@ -22,6 +23,15 @@ using namespace QXmpp::Private;
 using Disposition = QXmppFileShare::Disposition;
 
 namespace QXmpp::Private {
+
+template<>
+struct Enums::Data<Disposition> {
+    using enum Disposition;
+    static constexpr auto Values = makeValues<Disposition>({
+        { Inline, u"inline" },
+        { Attachment, u"attachment" },
+    });
+};
 
 struct FileSources {
     static FileSources fromDom(const QDomElement &el);
@@ -46,28 +56,6 @@ void FileSources::innerToXml(QXmlStreamWriter *writer) const
 }
 
 }  // namespace QXmpp::Private
-
-static std::optional<Disposition> dispositionFromString(const QString &str)
-{
-    if (str == u"inline") {
-        return Disposition::Inline;
-    }
-    if (str == u"attachment") {
-        return Disposition::Attachment;
-    }
-    return {};
-}
-
-static QString dispositionToString(Disposition value)
-{
-    switch (value) {
-    case Disposition::Inline:
-        return u"inline"_s;
-    case Disposition::Attachment:
-        return u"attachment"_s;
-    }
-    Q_UNREACHABLE();
-}
 
 class QXmppFileSourcesAttachmentPrivate : public QSharedData
 {
@@ -304,7 +292,7 @@ bool QXmppFileShare::parse(const QDomElement &el)
 {
     if (el.tagName() == u"file-sharing" && el.namespaceURI() == ns_sfs) {
         // disposition
-        d->disposition = dispositionFromString(el.attribute(u"disposition"_s))
+        d->disposition = Enums::fromString<Disposition>(el.attribute(u"disposition"_s))
                              .value_or(Disposition::Inline);
         d->id = el.attribute(u"id"_s);
 
@@ -328,7 +316,7 @@ void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("file-sharing"));
     writer->writeDefaultNamespace(toString65(ns_sfs));
-    writer->writeAttribute(QSL65("disposition"), dispositionToString(d->disposition));
+    writer->writeAttribute(QSL65("disposition"), toString65(Enums::toString(d->disposition)));
     writeOptionalXmlAttribute(writer, u"id", d->id);
     d->metadata.toXml(writer);
 

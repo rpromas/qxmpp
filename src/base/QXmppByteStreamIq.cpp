@@ -14,6 +14,16 @@
 
 using namespace QXmpp::Private;
 
+template<>
+struct Enums::Data<QXmppByteStreamIq::Mode> {
+    static constexpr auto NullValue = QXmppByteStreamIq::None;
+    static constexpr auto Values = makeValues<QXmppByteStreamIq::Mode>({
+        { QXmppByteStreamIq::None, {} },
+        { QXmppByteStreamIq::Tcp, u"tcp" },
+        { QXmppByteStreamIq::Udp, u"udp" },
+    });
+};
+
 ///
 /// \enum QXmppByteStreamIq::Mode
 ///

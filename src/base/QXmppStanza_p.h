@@ -7,8 +7,9 @@
 
 #include "QXmppStanza.h"
 
-#include <optional>
+#include "Enums.h"
 
+//
 //  W A R N I N G
 //  -------------
 //
@@ -23,11 +24,52 @@
 
 namespace QXmpp::Private {
 
-// defined in QXmppStanza.cpp
-auto conditionToString(QXmppStanza::Error::Condition condition) -> QString;
-auto conditionFromString(const QString &string) -> std::optional<QXmppStanza::Error::Condition>;
-auto typeToString(QXmppStanza::Error::Type type) -> QString;
-auto typeFromString(const QString &string) -> std::optional<QXmppStanza::Error::Type>;
+template<>
+struct Enums::Data<QXmppStanza::Error::Condition> {
+    using enum QXmppStanza::Error::Condition;
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    static constexpr auto Values = makeValues<QXmppStanza::Error::Condition>({
+        { NoCondition, {} },
+        { BadRequest, u"bad-request" },
+        { Conflict, u"conflict" },
+        { FeatureNotImplemented, u"feature-not-implemented" },
+        { Forbidden, u"forbidden" },
+        { Gone, u"gone" },
+        { InternalServerError, u"internal-server-error" },
+        { ItemNotFound, u"item-not-found" },
+        { JidMalformed, u"jid-malformed" },
+        { NotAcceptable, u"not-acceptable" },
+        { NotAllowed, u"not-allowed" },
+        { NotAuthorized, u"not-authorized" },
+        { PaymentRequired, u"payment-required" },
+        { RecipientUnavailable, u"recipient-unavailable" },
+        { Redirect, u"redirect" },
+        { RegistrationRequired, u"registration-required" },
+        { RemoteServerNotFound, u"remote-server-not-found" },
+        { RemoteServerTimeout, u"remote-server-timeout" },
+        { ResourceConstraint, u"resource-constraint" },
+        { ServiceUnavailable, u"service-unavailable" },
+        { SubscriptionRequired, u"subscription-required" },
+        { UndefinedCondition, u"undefined-condition" },
+        { UnexpectedRequest, u"unexpected-request" },
+        { PolicyViolation, u"policy-violation" },
+    });
+    QT_WARNING_POP
+};
+
+template<>
+struct Enums::Data<QXmppStanza::Error::Type> {
+    using enum QXmppStanza::Error::Type;
+    static constexpr auto Values = makeValues<QXmppStanza::Error::Type>({
+        { NoType, {} },
+        { Cancel, u"cancel" },
+        { Continue, u"continue" },
+        { Modify, u"modify" },
+        { Auth, u"auth" },
+        { Wait, u"wait" },
+    });
+};
 
 }  // namespace QXmpp::Private
 

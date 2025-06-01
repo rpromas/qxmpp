@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -26,14 +27,18 @@ using namespace QXmpp::Private;
 /// \since QXmpp 1.5
 ///
 
-constexpr auto PUBSUB_AFFILIATIONS = to_array<QStringView>({
-    u"none",
-    u"member",
-    u"outcast",
-    u"owner",
-    u"publisher",
-    u"publish-only",
-});
+template<>
+struct Enums::Data<QXmppPubSubAffiliation::Affiliation> {
+    using enum QXmppPubSubAffiliation::Affiliation;
+    static constexpr auto Values = makeValues<QXmppPubSubAffiliation::Affiliation>({
+        { None, u"none" },
+        { Member, u"member" },
+        { Outcast, u"outcast" },
+        { Owner, u"owner" },
+        { Publisher, u"publisher" },
+        { PublishOnly, u"publish-only" },
+    });
+};
 
 class QXmppPubSubAffiliationPrivate : public QSharedData
 {
@@ -130,7 +135,7 @@ void QXmppPubSubAffiliation::setJid(const QString &jid)
 bool QXmppPubSubAffiliation::isAffiliation(const QDomElement &element)
 {
     if (element.tagName() != u"affiliation" ||
-        !enumFromString<Affiliation>(PUBSUB_AFFILIATIONS, element.attribute(u"affiliation"_s))) {
+        !Enums::fromString<Affiliation>(element.attribute(u"affiliation"_s))) {
         return false;
     }
 
@@ -146,7 +151,7 @@ bool QXmppPubSubAffiliation::isAffiliation(const QDomElement &element)
 /// \cond
 void QXmppPubSubAffiliation::parse(const QDomElement &element)
 {
-    d->type = enumFromString<Affiliation>(PUBSUB_AFFILIATIONS, element.attribute(u"affiliation"_s)).value_or(None);
+    d->type = Enums::fromString<Affiliation>(element.attribute(u"affiliation"_s)).value_or(None);
 
     d->node = element.attribute(u"node"_s);
     d->jid = element.attribute(u"jid"_s);
@@ -155,7 +160,7 @@ void QXmppPubSubAffiliation::parse(const QDomElement &element)
 void QXmppPubSubAffiliation::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("affiliation"));
-    writer->writeAttribute(QSL65("affiliation"), toString65(PUBSUB_AFFILIATIONS.at(size_t(d->type))));
+    writer->writeAttribute(QSL65("affiliation"), toString65(Enums::toString(d->type)));
     writeOptionalXmlAttribute(writer, u"node", d->node);
     writeOptionalXmlAttribute(writer, u"jid", d->jid);
     writer->writeEndElement();

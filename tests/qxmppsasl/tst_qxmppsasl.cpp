@@ -445,7 +445,10 @@ void tst_QXmppSasl::testClientAvailableMechanisms()
 
     for (const auto &mechanism : expectedMechanisms) {
         auto parsed = SaslMechanism::fromString(mechanism);
-        QVERIFY(parsed);
+        if (!parsed) {
+            qDebug() << "Parsing algorithm failed:" << mechanism;
+            QFAIL("Parsing algorithm failed");
+        }
         QVERIFY(QXmppSaslClient::create(*parsed, &context) != nullptr);
     }
 }

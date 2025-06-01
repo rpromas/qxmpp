@@ -9,6 +9,8 @@
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInvitation.h"
 
+#include "Enums.h"
+
 class QXMPP_EXPORT QXmppMixSubscriptionUpdateIq : public QXmppIq
 {
 public:
@@ -75,8 +77,23 @@ private:
 
 namespace QXmpp::Private {
 
-QXMPP_EXPORT QList<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes);
-QXMPP_EXPORT QXmppMixConfigItem::Nodes listToMixNodes(const QList<QString> &nodeList);
+template<>
+struct Enums::Data<QXmppMixConfigItem::Node> {
+    using enum QXmppMixConfigItem::Node;
+    static constexpr bool IsFlags = true;
+    static constexpr auto Values = makeValues<QXmppMixConfigItem::Node>({
+        { AllowedJids, ns_mix_node_allowed },
+        { AvatarData, ns_user_avatar_data },
+        { AvatarMetadata, ns_user_avatar_metadata },
+        { BannedJids, ns_mix_node_banned },
+        { Configuration, ns_mix_node_config },
+        { Information, ns_mix_node_info },
+        { JidMap, ns_mix_node_jidmap },
+        { Messages, ns_mix_node_messages },
+        { Participants, ns_mix_node_participants },
+        { Presence, ns_mix_node_presence },
+    });
+};
 
 }  // namespace QXmpp::Private
 

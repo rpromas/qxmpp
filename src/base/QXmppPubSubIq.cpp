@@ -12,6 +12,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QSharedData>
 
@@ -63,25 +64,29 @@ using namespace QXmpp::Private;
 /// &lt;item/&gt; is also checked.
 ///
 
-constexpr auto PUBSUB_QUERIES = to_array<QStringView>({
-    u"affiliations",
-    u"affiliations",
-    u"configure",
-    u"create",
-    u"default",
-    u"default",
-    u"delete",
-    u"items",
-    u"options",
-    u"publish",
-    u"purge",
-    u"retract",
-    u"subscribe",
-    u"subscription",
-    u"subscriptions",
-    u"subscriptions",
-    u"unsubscribe",
-});
+template<>
+struct Enums::Data<PubSubIqBase::QueryType> {
+    using enum PubSubIqBase::QueryType;
+    static constexpr auto Values = makeValues<PubSubIqBase::QueryType>({
+        { Affiliations, u"affiliations" },
+        { OwnerAffiliations, u"affiliations" },
+        { Configure, u"configure" },
+        { Create, u"create" },
+        { Default, u"default" },
+        { OwnerDefault, u"default" },
+        { Delete, u"delete" },
+        { Items, u"items" },
+        { Options, u"options" },
+        { Publish, u"publish" },
+        { Purge, u"purge" },
+        { Retract, u"retract" },
+        { Subscribe, u"subscribe" },
+        { Subscription, u"subscription" },
+        { Subscriptions, u"subscriptions" },
+        { OwnerSubscriptions, u"subscriptions" },
+        { Unsubscribe, u"unsubscribe" },
+    });
+};
 
 namespace QXmpp::Private {
 
@@ -529,7 +534,7 @@ void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
         subscription().value_or(QXmppPubSubSubscription()).toXml(writer);
     } else {
         // write query type
-        writer->writeStartElement(toString65(PUBSUB_QUERIES.at(size_t(d->queryType))));
+        writer->writeStartElement(toString65(Enums::toString(d->queryType)));
         writeOptionalXmlAttribute(writer, u"jid", d->queryJid);
         writeOptionalXmlAttribute(writer, u"node", d->queryNode);
 
@@ -634,7 +639,7 @@ void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
 std::optional<PubSubIqBase::QueryType> PubSubIqBase::queryTypeFromDomElement(const QDomElement &element)
 {
     QueryType type;
-    if (auto queryType = enumFromString<QueryType>(PUBSUB_QUERIES, element.tagName())) {
+    if (auto queryType = Enums::fromString<QueryType>(element.tagName())) {
         type = *queryType;
     } else {
         return std::nullopt;

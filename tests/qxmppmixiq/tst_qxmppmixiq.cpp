@@ -23,8 +23,6 @@ private:
     Q_SLOT void testSetters();
     Q_SLOT void testInvalidActionType();
     Q_SLOT void testIsMixIq();
-    Q_SLOT void testListToMixNodes();
-    Q_SLOT void testMixNodesToList();
     Q_SLOT void testIsMixInvitationResponseIq_data();
     Q_SLOT void testIsMixInvitationResponseIq();
     Q_SLOT void testMixInvitationResponseIq();
@@ -584,22 +582,6 @@ void tst_QXmppMixIq::testIsMixIq()
     QVERIFY(QXmppMixIq::isMixIq(xmlToDom(trueXml)));
     QVERIFY(QXmppMixIq::isMixIq(xmlToDom(truePamXml)));
     QVERIFY(!QXmppMixIq::isMixIq(xmlToDom(falseXml)));
-}
-
-void tst_QXmppMixIq::testListToMixNodes()
-{
-    QVERIFY(!listToMixNodes({}));
-    const QXmppMixConfigItem::Nodes nodes = { QXmppMixConfigItem::Node::AllowedJids | QXmppMixConfigItem::Node::BannedJids };
-    const QList<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
-    QCOMPARE(listToMixNodes(nodeList), nodes);
-}
-
-void tst_QXmppMixIq::testMixNodesToList()
-{
-    QVERIFY(mixNodesToList({}).isEmpty());
-    const QXmppMixConfigItem::Nodes nodes = { QXmppMixConfigItem::Node::AllowedJids | QXmppMixConfigItem::Node::BannedJids };
-    const QList<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
-    QCOMPARE(mixNodesToList(nodes), nodeList);
 }
 
 void tst_QXmppMixIq::testIsMixInvitationResponseIq_data()

@@ -4,9 +4,13 @@
 
 #include "QXmppPubSubSubscribeOptions.h"
 
+#include "Algorithms.h"
+#include "Enums.h"
 #include "StringLiterals.h"
 
 #include <QDateTime>
+
+using namespace QXmpp::Private;
 
 const auto SUBSCRIBE_OPTIONS_FORM_TYPE = u"http://jabber.org/protocol/pubsub#subscribe_options"_s;
 
@@ -18,6 +22,39 @@ const auto EXPIRE = u"pubsub#expire"_s;
 const auto NOTIFICATION_RULES = u"pubsub#show-values"_s;
 const auto SUBSCRIPTION_TYPE = u"pubsub#subscription_type"_s;
 const auto SUBSCRIPTION_DEPTH = u"pubsub#subscription_depth"_s;
+
+using PresenceState = QXmppPubSubSubscribeOptions::PresenceState;
+
+template<>
+struct Enums::Data<PresenceState> {
+    using enum PresenceState;
+    static constexpr bool IsFlags = true;
+    static constexpr auto Values = makeValues<PresenceState>({
+        { Away, u"away" },
+        { Chat, u"chat" },
+        { DoNotDisturb, u"dnd" },
+        { Online, u"online" },
+        { ExtendedAway, u"xa" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmppPubSubSubscribeOptions::SubscriptionType> {
+    using enum QXmppPubSubSubscribeOptions::SubscriptionType;
+    static constexpr auto Values = makeValues<QXmppPubSubSubscribeOptions::SubscriptionType>({
+        { Items, u"items" },
+        { Nodes, u"nodes" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmppPubSubSubscribeOptions::SubscriptionDepth> {
+    using enum QXmppPubSubSubscribeOptions::SubscriptionDepth;
+    static constexpr auto Values = makeValues<QXmppPubSubSubscribeOptions::SubscriptionDepth>({
+        { TopLevelOnly, u"1" },
+        { Recursive, u"all" },
+    });
+};
 
 class QXmppPubSubSubscribeOptionsPrivate : public QSharedData
 {
@@ -31,48 +68,6 @@ public:
     std::optional<QXmppPubSubSubscribeOptions::SubscriptionType> subscriptionType;
     std::optional<QXmppPubSubSubscribeOptions::SubscriptionDepth> subscriptionDepth;
 };
-
-QXmppPubSubSubscribeOptions::PresenceStates QXmppPubSubSubscribeOptions::presenceStatesFromStringList(const QStringList &values)
-{
-    PresenceStates states;
-    if (values.contains(u"away"_s)) {
-        states |= Away;
-    }
-    if (values.contains(u"chat"_s)) {
-        states |= Chat;
-    }
-    if (values.contains(u"dnd"_s)) {
-        states |= DoNotDisturb;
-    }
-    if (values.contains(u"online"_s)) {
-        states |= Online;
-    }
-    if (values.contains(u"xa"_s)) {
-        states |= ExtendedAway;
-    }
-    return states;
-}
-
-QStringList QXmppPubSubSubscribeOptions::presenceStatesToStringList(PresenceStates states)
-{
-    QStringList output;
-    if (states & Away) {
-        output << u"away"_s;
-    }
-    if (states & Chat) {
-        output << u"chat"_s;
-    }
-    if (states & DoNotDisturb) {
-        output << u"dnd"_s;
-    }
-    if (states & Online) {
-        output << u"online"_s;
-    }
-    if (states & ExtendedAway) {
-        output << u"xa"_s;
-    }
-    return output;
-}
 
 std::optional<QXmppPubSubSubscribeOptions> QXmppPubSubSubscribeOptions::fromDataForm(const QXmppDataForm &form)
 {
@@ -182,26 +177,6 @@ QString QXmppPubSubSubscribeOptions::formType() const
 
 bool QXmppPubSubSubscribeOptions::parseField(const QXmppDataForm::Field &field)
 {
-    const auto subscriptionTypeFromString = [](const QString &value) -> std::optional<SubscriptionType> {
-        if (value == u"items") {
-            return Items;
-        }
-        if (value == u"nodes") {
-            return Nodes;
-        }
-        return {};
-    };
-
-    const auto subscriptionDepthFromString = [](const QString &value) -> std::optional<SubscriptionDepth> {
-        if (value == QChar(u'1')) {
-            return TopLevelOnly;
-        }
-        if (value == u"all") {
-            return Recursive;
-        }
-        return {};
-    };
-
     // ignore hidden fields
     if (field.type() == QXmppDataForm::Field::Type::HiddenField) {
         return false;
@@ -221,11 +196,11 @@ bool QXmppPubSubSubscribeOptions::parseField(const QXmppDataForm::Field &field)
     } else if (key == EXPIRE) {
         d->expire = QDateTime::fromString(value.toString(), Qt::ISODate);
     } else if (key == NOTIFICATION_RULES) {
-        d->notificationRules = presenceStatesFromStringList(value.toStringList());
+        d->notificationRules = Enums::fromStringList<PresenceState>(value.toStringList());
     } else if (key == SUBSCRIPTION_TYPE) {
-        d->subscriptionType = subscriptionTypeFromString(value.toString());
+        d->subscriptionType = Enums::fromString<SubscriptionType>(value.toString());
     } else if (key == SUBSCRIPTION_DEPTH) {
-        d->subscriptionDepth = subscriptionDepthFromString(value.toString());
+        d->subscriptionDepth = Enums::fromString<SubscriptionDepth>(value.toString());
     } else {
         return false;
     }
@@ -239,25 +214,8 @@ void QXmppPubSubSubscribeOptions::serializeForm(QXmppDataForm &form) const
     const auto numberToString = [](quint32 value) {
         return QString::number(value);
     };
-
-    const auto subscriptionTypeToString = [](SubscriptionType type) -> QString {
-        switch (type) {
-        case Items:
-            return u"items"_s;
-        case Nodes:
-            return u"nodes"_s;
-        }
-        return {};
-    };
-
-    const auto subscriptionDepthToString = [](SubscriptionDepth depth) -> QString {
-        switch (depth) {
-        case TopLevelOnly:
-            return u"1"_s;
-        case Recursive:
-            return u"all"_s;
-        }
-        return {};
+    auto enumToString = [](auto value) {
+        return Enums::toString(value).toString();
     };
 
     serializeOptional(form, Type::BooleanField, NOTIFICATIONS_ENABLED, d->notificationsEnabled);
@@ -265,7 +223,7 @@ void QXmppPubSubSubscribeOptions::serializeForm(QXmppDataForm &form) const
     serializeOptional(form, Type::TextSingleField, DIGEST_FREQUENCY_MS, d->digestFrequencyMs, numberToString);
     serializeDatetime(form, EXPIRE, d->expire);
     serializeOptional(form, Type::BooleanField, BODY_INCLUDED, d->bodyIncluded);
-    serializeEmptyable(form, Type::ListMultiField, NOTIFICATION_RULES, presenceStatesToStringList(d->notificationRules));
-    serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_TYPE, d->subscriptionType, subscriptionTypeToString);
-    serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_DEPTH, d->subscriptionDepth, subscriptionDepthToString);
+    serializeEmptyable(form, Type::ListMultiField, NOTIFICATION_RULES, transform<QStringList>(Enums::toStringList(d->notificationRules), &QStringView::toString));
+    serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_TYPE, d->subscriptionType, enumToString);
+    serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_DEPTH, d->subscriptionDepth, enumToString);
 }

@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -50,14 +51,18 @@ using namespace QXmpp::Private;
 /// \since QXmpp 1.5
 ///
 
-constexpr auto PUBSUB_EVENTS = to_array<QStringView>({
-    u"configuration",
-    u"delete",
-    u"items",
-    u"items",  // virtual retract type
-    u"purge",
-    u"subscription",
-});
+template<>
+struct Enums::Data<QXmppPubSubEventBase::EventType> {
+    using enum QXmppPubSubEventBase::EventType;
+    static constexpr auto Values = makeValues<QXmppPubSubEventBase::EventType>({
+        { Configuration, u"configuration" },
+        { Delete, u"delete" },
+        { Items, u"items" },
+        { Retract, u"items" },  // virtual retract type
+        { Purge, u"purge" },
+        { Subscription, u"subscription" },
+    });
+};
 
 class QXmppPubSubEventPrivate : public QSharedData
 {
@@ -228,7 +233,7 @@ bool QXmppPubSubEventBase::isPubSubEvent(const QDomElement &stanza, std::functio
     auto eventTypeElement = event.firstChildElement();
 
     // check for validity of the event type
-    auto eventType = enumFromString<EventType>(PUBSUB_EVENTS, eventTypeElement.tagName());
+    auto eventType = Enums::fromString<EventType>(eventTypeElement.tagName());
     if (!eventType) {
         return false;
     }
@@ -287,7 +292,7 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
         eventElement.namespaceURI() == ns_pubsub_event) {
         // check that the query type is valid
         const auto eventTypeElement = eventElement.firstChildElement();
-        if (auto eventType = enumFromString<EventType>(PUBSUB_EVENTS, eventTypeElement.tagName())) {
+        if (auto eventType = Enums::fromString<EventType>(eventTypeElement.tagName())) {
             d->eventType = *eventType;
         } else {
             return false;
@@ -365,7 +370,7 @@ void QXmppPubSubEventBase::serializeExtensions(QXmlStreamWriter *writer, QXmpp::
     if (d->eventType == Subscription && d->subscription) {
         d->subscription->toXml(writer);
     } else {
-        writer->writeStartElement(toString65(PUBSUB_EVENTS.at(size_t(d->eventType))));
+        writer->writeStartElement(toString65(Enums::toString(d->eventType)));
 
         // write node attribute
         switch (d->eventType) {

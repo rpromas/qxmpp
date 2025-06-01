@@ -8,10 +8,36 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
 using namespace QXmpp::Private;
+
+template<>
+struct Enums::Data<QXmppMucItem::Affiliation> {
+    using enum QXmppMucItem::Affiliation;
+    static constexpr auto Values = makeValues<QXmppMucItem::Affiliation>({
+        { UnspecifiedAffiliation, {} },
+        { OutcastAffiliation, u"outcast" },
+        { NoAffiliation, u"none" },
+        { MemberAffiliation, u"member" },
+        { AdminAffiliation, u"admin" },
+        { OwnerAffiliation, u"owner" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmppMucItem::Role> {
+    using enum QXmppMucItem::Role;
+    static constexpr auto Values = makeValues<QXmppMucItem::Role>({
+        { UnspecifiedRole, {} },
+        { NoRole, u"none" },
+        { VisitorRole, u"visitor" },
+        { ParticipantRole, u"participant" },
+        { ModeratorRole, u"moderator" },
+    });
+};
 
 QXmppMucItem::QXmppMucItem()
     : m_affiliation(QXmppMucItem::UnspecifiedAffiliation),
@@ -49,43 +75,6 @@ QXmppMucItem::Affiliation QXmppMucItem::affiliation() const
 {
     return m_affiliation;
 }
-
-/// \cond
-QXmppMucItem::Affiliation QXmppMucItem::affiliationFromString(const QString &affiliationStr)
-{
-    if (affiliationStr == u"owner") {
-        return QXmppMucItem::OwnerAffiliation;
-    } else if (affiliationStr == u"admin") {
-        return QXmppMucItem::AdminAffiliation;
-    } else if (affiliationStr == u"member") {
-        return QXmppMucItem::MemberAffiliation;
-    } else if (affiliationStr == u"outcast") {
-        return QXmppMucItem::OutcastAffiliation;
-    } else if (affiliationStr == u"none") {
-        return QXmppMucItem::NoAffiliation;
-    } else {
-        return QXmppMucItem::UnspecifiedAffiliation;
-    }
-}
-
-QString QXmppMucItem::affiliationToString(Affiliation affiliation)
-{
-    switch (affiliation) {
-    case QXmppMucItem::OwnerAffiliation:
-        return u"owner"_s;
-    case QXmppMucItem::AdminAffiliation:
-        return u"admin"_s;
-    case QXmppMucItem::MemberAffiliation:
-        return u"member"_s;
-    case QXmppMucItem::OutcastAffiliation:
-        return u"outcast"_s;
-    case QXmppMucItem::NoAffiliation:
-        return u"none"_s;
-    default:
-        return QString();
-    }
-}
-/// \endcond
 
 /// Sets the user's affiliation, i.e. long-lived permissions.
 void QXmppMucItem::setAffiliation(Affiliation affiliation)
@@ -137,39 +126,6 @@ QXmppMucItem::Role QXmppMucItem::role() const
     return m_role;
 }
 
-/// \cond
-QXmppMucItem::Role QXmppMucItem::roleFromString(const QString &roleStr)
-{
-    if (roleStr == u"moderator") {
-        return QXmppMucItem::ModeratorRole;
-    } else if (roleStr == u"participant") {
-        return QXmppMucItem::ParticipantRole;
-    } else if (roleStr == u"visitor") {
-        return QXmppMucItem::VisitorRole;
-    } else if (roleStr == u"none") {
-        return QXmppMucItem::NoRole;
-    } else {
-        return QXmppMucItem::UnspecifiedRole;
-    }
-}
-
-QString QXmppMucItem::roleToString(Role role)
-{
-    switch (role) {
-    case QXmppMucItem::ModeratorRole:
-        return u"moderator"_s;
-    case QXmppMucItem::ParticipantRole:
-        return u"participant"_s;
-    case QXmppMucItem::VisitorRole:
-        return u"visitor"_s;
-    case QXmppMucItem::NoRole:
-        return u"none"_s;
-    default:
-        return QString();
-    }
-}
-/// \endcond
-
 /// Sets the user's role, i.e. short-lived permissions.
 void QXmppMucItem::setRole(Role role)
 {
@@ -179,10 +135,10 @@ void QXmppMucItem::setRole(Role role)
 /// \cond
 void QXmppMucItem::parse(const QDomElement &element)
 {
-    m_affiliation = QXmppMucItem::affiliationFromString(element.attribute(u"affiliation"_s).toLower());
+    m_affiliation = Enums::fromString<Affiliation>(element.attribute(u"affiliation"_s).toLower()).value_or(UnspecifiedAffiliation);
     m_jid = element.attribute(u"jid"_s);
     m_nick = element.attribute(u"nick"_s);
-    m_role = QXmppMucItem::roleFromString(element.attribute(u"role"_s).toLower());
+    m_role = Enums::fromString<Role>(element.attribute(u"role"_s).toLower()).value_or(UnspecifiedRole);
     m_actor = element.firstChildElement(u"actor"_s).attribute(u"jid"_s);
     m_reason = element.firstChildElement(u"reason"_s).text();
 }
@@ -190,10 +146,10 @@ void QXmppMucItem::parse(const QDomElement &element)
 void QXmppMucItem::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("item"));
-    writeOptionalXmlAttribute(writer, u"affiliation", affiliationToString(m_affiliation));
+    writeOptionalXmlAttribute(writer, u"affiliation", Enums::toString(m_affiliation));
     writeOptionalXmlAttribute(writer, u"jid", m_jid);
     writeOptionalXmlAttribute(writer, u"nick", m_nick);
-    writeOptionalXmlAttribute(writer, u"role", roleToString(m_role));
+    writeOptionalXmlAttribute(writer, u"role", Enums::toString(m_role));
     if (!m_actor.isEmpty()) {
         writer->writeStartElement(QSL65("actor"));
         writeOptionalXmlAttribute(writer, u"jid", m_actor);

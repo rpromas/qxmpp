@@ -119,7 +119,7 @@ std::optional<SmFailed> SmFailed::fromDom(const QDomElement &el)
     }
 
     return SmFailed {
-        conditionFromString(firstChildElement(el, {}, ns_stanza).tagName()),
+        Enums::fromString<QXmppStanza::Error::Condition>(firstChildElement(el, {}, ns_stanza).tagName()),
     };
 }
 
@@ -128,7 +128,7 @@ void SmFailed::toXml(QXmlStreamWriter *w) const
     w->writeStartElement(QSL65("failed"));
     w->writeDefaultNamespace(toString65(ns_stream_management));
     if (error) {
-        writeEmptyElement(w, conditionToString(*error), ns_stanza);
+        writeEmptyElement(w, Enums::toString(*error), ns_stanza);
     }
     w->writeEndElement();
 }

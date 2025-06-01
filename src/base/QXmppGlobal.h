@@ -111,7 +111,7 @@ enum EncryptionMethod {
     /// \xep{0384, OMEMO Encryption} since version 0.8
     Omemo2,
 
-// Keep in sync with namespaces and names in Global.cpp!
+// Keep in sync with namespaces and names in Global/Message.cpp!
 
 #if QXMPP_DEPRECATED_SINCE(1, 5)
     /// \xep{0364, Current Off-the-Record Messaging Usage}

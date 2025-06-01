@@ -62,12 +62,8 @@ public:
     static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_muc_admin };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-
-    static Affiliation affiliationFromString(const QString &affiliationStr);
-    static QString affiliationToString(Affiliation affiliation);
-    static Role roleFromString(const QString &roleStr);
-    static QString roleToString(Role role);
     /// \endcond
+
 private:
     QString m_actor;
     Affiliation m_affiliation;
@@ -77,13 +73,14 @@ private:
     Role m_role;
 };
 
+///
 /// \brief The QXmppMucAdminIq class represents a chat room administration IQ
-/// as defined by \xep{0045}: Multi-User Chat.
+/// as defined by \xep{0045, Multi-User Chat}.
 ///
 /// It is used to get or modify room memberships.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppMucAdminIq : public QXmppIq
 {
 public:
@@ -104,14 +101,14 @@ private:
     QList<QXmppMucItem> m_items;
 };
 
+///
 /// \brief The QXmppMucOwnerIq class represents a chat room configuration IQ as
-/// defined by \xep{0045}: Multi-User Chat.
+/// defined by \xep{0045, Multi-User Chat}.
 ///
 /// It is used to get or modify room configuration options.
 ///
 /// \sa QXmppDataForm
 ///
-
 class QXMPP_EXPORT QXmppMucOwnerIq : public QXmppIq
 {
 public:

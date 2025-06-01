@@ -5,16 +5,27 @@
 #ifndef QXMPPGLOBAL_P_H
 #define QXMPPGLOBAL_P_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
-#include <optional>
+#include "Enums.h"
 
 namespace QXmpp::Private {
 
-// Encryption enum
-std::optional<EncryptionMethod> encryptionFromString(QStringView str);
-QStringView encryptionToString(EncryptionMethod);
-QStringView encryptionToName(EncryptionMethod);
+template<>
+struct Enums::Data<EncryptionMethod> {
+    using enum EncryptionMethod;
+    static constexpr auto Values = makeValues<EncryptionMethod>({
+        { NoEncryption, {} },
+        { UnknownEncryption, {} },
+        { Otr, ns_otr },
+        { LegacyOpenPGP, ns_legacy_openpgp },
+        { Ox, ns_ox },
+        { Omemo0, ns_omemo },
+        { Omemo1, ns_omemo_1 },
+        { Omemo2, ns_omemo_2 },
+    });
+};
 
 }  // namespace QXmpp::Private
 

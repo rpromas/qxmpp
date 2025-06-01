@@ -12,9 +12,9 @@
 #include "QXmppConstants_p.h"
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
-#include "QXmppGlobal_p.h"
 #include "QXmppJingleData.h"
 #include "QXmppMessageReaction.h"
+#include "QXmppMessage_p.h"
 #include "QXmppMixInvitation.h"
 
 #include "Algorithms.h"
@@ -23,10 +23,13 @@
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
 #endif
+#include "QXmppGlobal_p.h"
 #include "QXmppOutOfBandUrl.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+
+#include "XmlWriter.h"
 
 #include <ranges>
 
@@ -40,36 +43,57 @@ using namespace QXmpp;
 using namespace QXmpp::Private;
 namespace views = std::views;
 
-constexpr auto CHAT_STATES = to_array<QStringView>({
-    {},
-    u"active",
-    u"inactive",
-    u"gone",
-    u"composing",
-    u"paused",
-});
-
-constexpr auto MESSAGE_TYPES = to_array<QStringView>({
-    u"error",
-    u"normal",
-    u"chat",
-    u"groupchat",
-    u"headline",
-});
-
-constexpr auto MARKER_TYPES = to_array<QStringView>({
-    {},
-    u"received",
-    u"displayed",
-    u"acknowledged",
-});
-
-static const QVector<QStringView> HINT_TYPES = {
-    u"no-permanent-store",
-    u"no-store",
-    u"no-copy",
-    u"store",
+template<>
+struct Enums::Data<QXmppMessage::State> {
+    using enum QXmppMessage::State;
+    static constexpr auto Values = makeValues<QXmppMessage::State>({
+        { None, {} },
+        { Active, u"active" },
+        { Inactive, u"inactive" },
+        { Gone, u"gone" },
+        { Composing, u"composing" },
+        { Paused, u"paused" },
+    });
 };
+
+template<>
+struct Enums::Data<QXmppMessage::Marker> {
+    using enum QXmppMessage::Marker;
+    static constexpr auto Values = makeValues<QXmppMessage::Marker>({
+        { NoMarker, {} },
+        { Received, u"received" },
+        { Displayed, u"displayed" },
+        { Acknowledged, u"acknowledged" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmppMessage::Hint> {
+    using enum QXmppMessage::Hint;
+    static constexpr bool IsFlags = true;
+    static constexpr auto Values = makeValues<QXmppMessage::Hint>({
+        { NoPermanentStore, u"no-permanent-store" },
+        { NoStore, u"no-store" },
+        { NoCopy, u"no-copy" },
+        { Store, u"store" },
+    });
+};
+
+constexpr auto ENCRYPTION_NAMES = to_array<QStringView>({
+    {},
+    {},
+    u"OTR",
+    u"Legacy OpenPGP",
+    u"OpenPGP for XMPP (OX)",
+    u"OMEMO",
+    u"OMEMO 1",
+    u"OMEMO 2",
+});
+
+static QStringView encryptionToName(EncryptionMethod encryption)
+{
+    return ENCRYPTION_NAMES[std::size_t(encryption)];
+}
 
 static bool checkElement(const QDomElement &element, QStringView tagName, QStringView xmlns)
 {
@@ -141,7 +165,7 @@ public:
     QString markedThread;
 
     // XEP-0334: Message Processing Hints
-    quint8 hints = 0;
+    QXmppMessage::Hints hints;
 
     // XEP-0353: Jingle Message Initiation
     std::optional<QXmppJingleMessageInitiationElement> jingleMessageInitiationElement;
@@ -866,7 +890,7 @@ void QXmppMessage::removeHint(const Hint hint)
 ///
 void QXmppMessage::removeAllHints()
 {
-    d->hints = 0;
+    d->hints = {};
 }
 
 ///
@@ -1071,7 +1095,7 @@ void QXmppMessage::setMixUserNick(const QString &mixUserNick)
 ///
 /// \note QXmppMessage::NoEncryption does not necesserily mean that the message
 /// is not encrypted; it may also be that the author of the message does not
-/// support \xep{0380}: Explicit Message Encryption.
+/// support \xep{0380, Explicit Message Encryption}.
 ///
 /// \note If this returns QXmppMessage::UnknownEncryption, you can still get
 /// the namespace of the encryption with \c encryptionMethodNs() and possibly
@@ -1084,23 +1108,23 @@ QXmpp::EncryptionMethod QXmppMessage::encryptionMethod() const
     if (d->encryptionMethod.isEmpty()) {
         return QXmpp::NoEncryption;
     }
-    return QXmpp::Private::encryptionFromString(d->encryptionMethod).value_or(QXmpp::UnknownEncryption);
+    return Enums::fromString<EncryptionMethod>(d->encryptionMethod).value_or(QXmpp::UnknownEncryption);
 }
 
 ///
 /// Advertises that this message is encrypted with the given encryption method.
-/// See \xep{0380}: Explicit Message Encryption for details.
+/// See \xep{0380, Explicit Message Encryption} for details.
 ///
 /// \since QXmpp 1.1
 ///
 void QXmppMessage::setEncryptionMethod(QXmpp::EncryptionMethod method)
 {
-    d->encryptionMethod = QXmpp::Private::encryptionToString(method).toString();
+    d->encryptionMethod = Enums::toString(method).toString();
 }
 
 ///
-/// Returns the namespace of the advertised encryption method via. \xep{0380}:
-/// Explicit Message Encryption.
+/// Returns the namespace of the advertised encryption method via. \xep{0380,
+/// Explicit Message Encryption}.
 ///
 /// \since QXmpp 1.1
 ///
@@ -1111,7 +1135,7 @@ QString QXmppMessage::encryptionMethodNs() const
 
 ///
 /// Sets the namespace of the encryption method this message advertises to be
-/// encrypted with. See \xep{0380}: Explicit Message Encryption for details.
+/// encrypted with. See \xep{0380, Explicit Message Encryption} for details.
 ///
 /// \since QXmpp 1.1
 ///
@@ -1122,7 +1146,7 @@ void QXmppMessage::setEncryptionMethodNs(const QString &encryptionMethod)
 
 ///
 /// Returns the associated name of the encryption method this message
-/// advertises to be encrypted with. See \xep{0380}: Explicit Message Encryption
+/// advertises to be encrypted with. See \xep{0380, Explicit Message Encryption}
 /// for details.
 ///
 /// \since QXmpp 1.1
@@ -1132,7 +1156,7 @@ QString QXmppMessage::encryptionName() const
     if (!d->encryptionName.isEmpty()) {
         return d->encryptionName;
     }
-    return QXmpp::Private::encryptionToName(encryptionMethod()).toString();
+    return encryptionToName(encryptionMethod()).toString();
 }
 
 ///
@@ -1563,10 +1587,7 @@ void QXmppMessage::parse(const QDomElement &element)
 void QXmppMessage::parse(const QDomElement &element, QXmpp::SceMode sceMode)
 {
     QXmppStanza::parse(element);
-
-    d->type = enumFromString<Type>(MESSAGE_TYPES, element.attribute(u"type"_s))
-                  .value_or(Normal);
-
+    d->type = Enums::fromString<Type>(element.attribute(u"type"_s)).value_or(Normal);
     parseExtensions(element, sceMode);
 }
 
@@ -1582,7 +1603,7 @@ void QXmppMessage::toXml(QXmlStreamWriter *writer, QXmpp::SceMode sceMode) const
     writeOptionalXmlAttribute(writer, u"id", id());
     writeOptionalXmlAttribute(writer, u"to", to());
     writeOptionalXmlAttribute(writer, u"from", from());
-    writeOptionalXmlAttribute(writer, u"type", MESSAGE_TYPES.at(size_t(d->type)));
+    writeOptionalXmlAttribute(writer, u"type", Enums::toString(d->type));
     error().toXml(writer);
 
     // extensions
@@ -1645,10 +1666,9 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             return true;
         }
         // XEP-0334: Message Processing Hints
-        if (element.namespaceURI() == ns_message_processing_hints &&
-            HINT_TYPES.contains(element.tagName())) {
-            if (const auto index = HINT_TYPES.indexOf(element.tagName()); index >= 0) {
-                addHint(Hint(1 << index));
+        if (element.namespaceURI() == ns_message_processing_hints) {
+            if (auto type = Enums::fromString<Hint>(element.tagName())) {
+                addHint(*type);
             }
             return true;
         }
@@ -1759,7 +1779,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         // XEP-0085: Chat State Notifications
         if (element.namespaceURI() == ns_chat_states) {
-            d->state = enumFromString<State>(CHAT_STATES, element.tagName()).value_or(None);
+            d->state = Enums::fromString<State>(element.tagName()).value_or(None);
             return true;
         }
         // XEP-0184: Message Delivery Receipts
@@ -1805,7 +1825,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             if (element.tagName() == u"markable") {
                 d->markable = true;
             } else {
-                if (auto marker = enumFromString<Marker>(MARKER_TYPES, element.tagName())) {
+                if (auto marker = Enums::fromString<Marker>(element.tagName())) {
                     d->marker = *marker;
                     d->markedId = element.attribute(u"id"_s);
                     d->markedThread = element.attribute(u"thread"_s);
@@ -1901,12 +1921,10 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         }
 
         // XEP-0334: Message Processing Hints
-        for (quint8 i = 0; i < HINT_TYPES.size(); i++) {
-            if (hasHint(Hint(1 << i))) {
-                writer->writeStartElement(toString65(HINT_TYPES.at(i)));
-                writer->writeDefaultNamespace(toString65(ns_message_processing_hints));
-                writer->writeEndElement();
-            }
+        for (auto hint : Enums::toStringList(d->hints)) {
+            writer->writeStartElement(toString65(hint));
+            writer->writeDefaultNamespace(toString65(ns_message_processing_hints));
+            writer->writeEndElement();
         }
 
         // XEP-0359: Unique and Stable Stanza IDs
@@ -1996,7 +2014,7 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
 
         // XEP-0085: Chat State Notifications
         if (d->state > None && d->state <= Paused) {
-            writer->writeStartElement(toString65(CHAT_STATES.at(d->state)));
+            writer->writeStartElement(toString65(Enums::toString(d->state)));
             writer->writeDefaultNamespace(toString65(ns_chat_states));
             writer->writeEndElement();
         }
@@ -2075,7 +2093,7 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
             writer->writeEndElement();
         }
         if (d->marker != NoMarker) {
-            writer->writeStartElement(toString65(MARKER_TYPES.at(d->marker)));
+            writer->writeStartElement(toString65(Enums::toString(d->marker)));
             writer->writeDefaultNamespace(toString65(ns_chat_markers));
             writer->writeAttribute(QSL65("id"), d->markedId);
             if (!d->markedThread.isNull() && !d->markedThread.isEmpty()) {

@@ -188,7 +188,6 @@ set(SOURCE_FILES
     base/QXmppFileMetadata.cpp
     base/QXmppFileShare.cpp
     base/QXmppGeolocItem.cpp
-    base/QXmppGlobal.cpp
     base/QXmppHash.cpp
     base/QXmppHashing.cpp
     base/QXmppHttpFileSource.cpp

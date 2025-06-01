@@ -16,6 +16,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 #include <QDomElement>
@@ -24,158 +25,6 @@
 using namespace QXmpp::Private;
 
 uint QXmppStanza::s_uniqeIdNo = 0;
-
-namespace QXmpp::Private {
-
-QString conditionToString(QXmppStanza::Error::Condition condition)
-{
-    switch (condition) {
-    case QXmppStanza::Error::NoCondition:
-        return {};
-    case QXmppStanza::Error::BadRequest:
-        return u"bad-request"_s;
-    case QXmppStanza::Error::Conflict:
-        return u"conflict"_s;
-    case QXmppStanza::Error::FeatureNotImplemented:
-        return u"feature-not-implemented"_s;
-    case QXmppStanza::Error::Forbidden:
-        return u"forbidden"_s;
-    case QXmppStanza::Error::Gone:
-        return u"gone"_s;
-    case QXmppStanza::Error::InternalServerError:
-        return u"internal-server-error"_s;
-    case QXmppStanza::Error::ItemNotFound:
-        return u"item-not-found"_s;
-    case QXmppStanza::Error::JidMalformed:
-        return u"jid-malformed"_s;
-    case QXmppStanza::Error::NotAcceptable:
-        return u"not-acceptable"_s;
-    case QXmppStanza::Error::NotAllowed:
-        return u"not-allowed"_s;
-    case QXmppStanza::Error::NotAuthorized:
-        return u"not-authorized"_s;
-        QT_WARNING_PUSH
-        QT_WARNING_DISABLE_DEPRECATED
-    case QXmppStanza::Error::PaymentRequired:
-        QT_WARNING_POP
-        return u"payment-required"_s;
-    case QXmppStanza::Error::PolicyViolation:
-        return u"policy-violation"_s;
-    case QXmppStanza::Error::RecipientUnavailable:
-        return u"recipient-unavailable"_s;
-    case QXmppStanza::Error::Redirect:
-        return u"redirect"_s;
-    case QXmppStanza::Error::RegistrationRequired:
-        return u"registration-required"_s;
-    case QXmppStanza::Error::RemoteServerNotFound:
-        return u"remote-server-not-found"_s;
-    case QXmppStanza::Error::RemoteServerTimeout:
-        return u"remote-server-timeout"_s;
-    case QXmppStanza::Error::ResourceConstraint:
-        return u"resource-constraint"_s;
-    case QXmppStanza::Error::ServiceUnavailable:
-        return u"service-unavailable"_s;
-    case QXmppStanza::Error::SubscriptionRequired:
-        return u"subscription-required"_s;
-    case QXmppStanza::Error::UndefinedCondition:
-        return u"undefined-condition"_s;
-    case QXmppStanza::Error::UnexpectedRequest:
-        return u"unexpected-request"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppStanza::Error::Condition> conditionFromString(const QString &string)
-{
-    if (string == u"bad-request") {
-        return QXmppStanza::Error::BadRequest;
-    } else if (string == u"conflict") {
-        return QXmppStanza::Error::Conflict;
-    } else if (string == u"feature-not-implemented") {
-        return QXmppStanza::Error::FeatureNotImplemented;
-    } else if (string == u"forbidden") {
-        return QXmppStanza::Error::Forbidden;
-    } else if (string == u"gone") {
-        return QXmppStanza::Error::Gone;
-    } else if (string == u"internal-server-error") {
-        return QXmppStanza::Error::InternalServerError;
-    } else if (string == u"item-not-found") {
-        return QXmppStanza::Error::ItemNotFound;
-    } else if (string == u"jid-malformed") {
-        return QXmppStanza::Error::JidMalformed;
-    } else if (string == u"not-acceptable") {
-        return QXmppStanza::Error::NotAcceptable;
-    } else if (string == u"not-allowed") {
-        return QXmppStanza::Error::NotAllowed;
-    } else if (string == u"not-authorized") {
-        return QXmppStanza::Error::NotAuthorized;
-    } else if (string == u"payment-required") {
-        QT_WARNING_PUSH
-        QT_WARNING_DISABLE_DEPRECATED
-        return QXmppStanza::Error::PaymentRequired;
-        QT_WARNING_POP
-    } else if (string == u"policy-violation") {
-        return QXmppStanza::Error::PolicyViolation;
-    } else if (string == u"recipient-unavailable") {
-        return QXmppStanza::Error::RecipientUnavailable;
-    } else if (string == u"redirect") {
-        return QXmppStanza::Error::Redirect;
-    } else if (string == u"registration-required") {
-        return QXmppStanza::Error::RegistrationRequired;
-    } else if (string == u"remote-server-not-found") {
-        return QXmppStanza::Error::RemoteServerNotFound;
-    } else if (string == u"remote-server-timeout") {
-        return QXmppStanza::Error::RemoteServerTimeout;
-    } else if (string == u"resource-constraint") {
-        return QXmppStanza::Error::ResourceConstraint;
-    } else if (string == u"service-unavailable") {
-        return QXmppStanza::Error::ServiceUnavailable;
-    } else if (string == u"subscription-required") {
-        return QXmppStanza::Error::SubscriptionRequired;
-    } else if (string == u"undefined-condition") {
-        return QXmppStanza::Error::UndefinedCondition;
-    } else if (string == u"unexpected-request") {
-        return QXmppStanza::Error::UnexpectedRequest;
-    }
-    return std::nullopt;
-}
-
-QString typeToString(QXmppStanza::Error::Type type)
-{
-    switch (type) {
-    case QXmppStanza::Error::NoType:
-        return {};
-    case QXmppStanza::Error::Cancel:
-        return u"cancel"_s;
-    case QXmppStanza::Error::Continue:
-        return u"continue"_s;
-    case QXmppStanza::Error::Modify:
-        return u"modify"_s;
-    case QXmppStanza::Error::Auth:
-        return u"auth"_s;
-    case QXmppStanza::Error::Wait:
-        return u"wait"_s;
-    }
-    return {};
-}
-
-std::optional<QXmppStanza::Error::Type> typeFromString(const QString &string)
-{
-    if (string == u"cancel") {
-        return QXmppStanza::Error::Cancel;
-    } else if (string == u"continue") {
-        return QXmppStanza::Error::Continue;
-    } else if (string == u"modify") {
-        return QXmppStanza::Error::Modify;
-    } else if (string == u"auth") {
-        return QXmppStanza::Error::Auth;
-    } else if (string == u"wait") {
-        return QXmppStanza::Error::Wait;
-    }
-    return std::nullopt;
-}
-
-}  // namespace QXmpp::Private
 
 class QXmppExtendedAddressPrivate : public QSharedData
 {
@@ -350,8 +199,8 @@ QXmppStanza::Error::Error(const QString &type, const QString &cond,
     : d(new QXmppStanzaErrorPrivate)
 {
     d->text = text;
-    d->type = typeFromString(type).value_or(NoType);
-    d->condition = conditionFromString(cond).value_or(NoCondition);
+    d->type = Enums::fromString<Type>(type).value_or(NoType);
+    d->condition = Enums::fromString<Condition>(cond).value_or(NoCondition);
 }
 
 /// \cond
@@ -558,7 +407,7 @@ void QXmppStanza::Error::setRetryDate(const QDateTime &retryDate)
 void QXmppStanza::Error::parse(const QDomElement &errorElement)
 {
     d->code = errorElement.attribute(u"code"_s).toInt();
-    d->type = typeFromString(errorElement.attribute(u"type"_s)).value_or(NoType);
+    d->type = Enums::fromString<Type>(errorElement.attribute(u"type"_s)).value_or(NoType);
     d->by = errorElement.attribute(u"by"_s);
 
     for (const auto &element : iterChildElements(errorElement)) {
@@ -566,7 +415,7 @@ void QXmppStanza::Error::parse(const QDomElement &errorElement)
             if (element.tagName() == u"text") {
                 d->text = element.text();
             } else {
-                d->condition = conditionFromString(element.tagName()).value_or(NoCondition);
+                d->condition = Enums::fromString<Condition>(element.tagName()).value_or(NoCondition);
 
                 // redirection URI
                 if (d->condition == Gone || d->condition == Redirect) {
@@ -604,7 +453,7 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
     writer->writeStartElement(QSL65("error"));
     writeOptionalXmlAttribute(writer, u"by", d->by);
     if (d->type != NoType) {
-        writer->writeAttribute(QSL65("type"), typeToString(d->type));
+        writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
     }
 
     if (d->code > 0) {
@@ -612,7 +461,7 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
     }
 
     if (d->condition != NoCondition) {
-        writer->writeStartElement(conditionToString(d->condition));
+        writer->writeStartElement(toString65(Enums::toString(d->condition)));
         writer->writeDefaultNamespace(toString65(ns_stanza));
 
         // redirection URI

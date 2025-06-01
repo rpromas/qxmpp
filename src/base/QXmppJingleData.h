@@ -340,9 +340,6 @@ public:
     static constexpr std::tuple XmlTag = { u"candidate", QXmpp::Private::ns_jingle_ice_udp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-
-    static QXmppJingleCandidate::Type typeFromString(const QString &typeStr, bool *ok = nullptr);
-    static QString typeToString(QXmppJingleCandidate::Type type);
     /// \endcond
 
 private:
@@ -655,8 +652,6 @@ public:
     /// \endcond
 
     static bool isJingleMessageInitiationElement(const QDomElement &);
-    static QString jmiElementTypeToString(Type type);
-    static std::optional<Type> stringToJmiElementType(const QString &typeStr);
 
 private:
     QSharedDataPointer<QXmppJingleMessageInitiationElementPrivate> d;
@@ -723,9 +718,6 @@ public:
     static bool isCallInviteElement(const QDomElement &);
 
 private:
-    static QString callInviteElementTypeToString(Type type);
-    static std::optional<Type> stringToCallInviteElementType(const QString &typeStr);
-
     QSharedDataPointer<QXmppCallInviteElementPrivate> d;
 };
 
