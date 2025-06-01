@@ -78,30 +78,6 @@ std::optional<Enum> enumFromString(const std::array<QStringView, N> &values, QSt
     return {};
 }
 
-namespace Enums {
-
-template<typename Enum>
-struct Values;
-
-template<typename Enum>
-std::optional<Enum> fromString(QStringView str)
-{
-    constexpr auto values = Values<Enum>::STRINGS;
-
-    if (auto itr = std::ranges::find(values, str); itr != values.end()) {
-        return Enum(std::distance(values.begin(), itr));
-    }
-    return {};
-}
-
-template<typename Enum>
-QStringView toString(Enum value)
-{
-    return Values<Enum>::STRINGS.at(size_t(value));
-};
-
-}  // namespace Enums
-
 // XML streams
 void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name, QStringView value);
 void writeXmlTextElement(QXmlStreamWriter *stream, QStringView name, QStringView value);

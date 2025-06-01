@@ -7,6 +7,7 @@
 
 #include "QXmppUtils_p.h"
 
+#include "Enums.h"
 #include "StringLiterals.h"
 
 #include <optional>
