@@ -37,7 +37,11 @@ struct Data;
 template<typename Enum, size_t N>
 consteval bool checkEnumOrder(const std::array<std::tuple<Enum, QStringView>, N> &values)
 {
-    for (size_t i = 0; i < N; ++i) {
+    size_t offset = 0;
+    if constexpr (N > 0) {
+        offset = size_t(std::get<0>(values[0]));
+    }
+    for (size_t i = offset; i < (N + offset); ++i) {
         if (i != size_t(std::get<0>(values[i]))) {
             return false;
         }
@@ -92,7 +96,10 @@ template<typename Enum>
 QStringView toString(Enum value)
     requires SerializableEnum<Enum>
 {
-    auto &[enumerator, string] = Data<Enum>::Values.at(size_t(value));
+    // offset for enums that do not start at 0
+    constexpr auto offset = size_t(std::get<0>(Data<Enum>::Values[0]));
+
+    auto &[enumerator, string] = Data<Enum>::Values.at(size_t(value) - offset);
     return string;
 };
 
