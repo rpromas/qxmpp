@@ -82,7 +82,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
         d->desc = descEl.text();
     }
 
-    d->hashes = parseChildElements<QVector<QXmppHash>>(el, u"hash", ns_hashes);
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
 
     if (auto heightEl = firstChildElement(el, u"height"); !heightEl.isNull()) {
         d->height = firstChildElement(el, u"height").text().toUInt();

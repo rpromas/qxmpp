@@ -8,12 +8,33 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+template<>
+struct Enums::Values<HashAlgorithm> {
+    static inline constexpr auto STRINGS = to_array<QStringView>({
+        {},
+        u"md2",
+        u"md5",
+        u"shake128",
+        u"shake256",
+        u"sha-1",
+        u"sha-224",
+        u"sha-256",
+        u"sha-384",
+        u"sha-512",
+        u"sha3-256",
+        u"sha3-512",
+        u"blake2b-256",
+        u"blake2b-512",
+    });
+};
 
 ///
 /// \enum QXmpp::HashAlgorithm
@@ -23,85 +44,6 @@ using namespace QXmpp::Private;
 ///
 /// \since QXmpp 1.5
 ///
-
-static QString algorithmToString(HashAlgorithm algorithm)
-{
-    switch (algorithm) {
-    case HashAlgorithm::Unknown:
-        return {};
-    case HashAlgorithm::Md2:
-        return u"md2"_s;
-    case HashAlgorithm::Md5:
-        return u"md5"_s;
-    case HashAlgorithm::Shake128:
-        return u"shake128"_s;
-    case HashAlgorithm::Shake256:
-        return u"shake256"_s;
-    case HashAlgorithm::Sha1:
-        return u"sha-1"_s;
-    case HashAlgorithm::Sha224:
-        return u"sha-224"_s;
-    case HashAlgorithm::Sha256:
-        return u"sha-256"_s;
-    case HashAlgorithm::Sha384:
-        return u"sha-384"_s;
-    case HashAlgorithm::Sha512:
-        return u"sha-512"_s;
-    case HashAlgorithm::Sha3_256:
-        return u"sha3-256"_s;
-    case HashAlgorithm::Sha3_512:
-        return u"sha3-512"_s;
-    case HashAlgorithm::Blake2b_256:
-        return u"blake2b-256"_s;
-    case HashAlgorithm::Blake2b_512:
-        return u"blake2b-512"_s;
-    }
-    Q_UNREACHABLE();
-}
-
-static HashAlgorithm hashAlgorithmFromString(const QString &str)
-{
-    if (str == u"md2") {
-        return HashAlgorithm::Md2;
-    }
-    if (str == u"md5") {
-        return HashAlgorithm::Md5;
-    }
-    if (str == u"shake128") {
-        return HashAlgorithm::Shake128;
-    }
-    if (str == u"shake256") {
-        return HashAlgorithm::Shake256;
-    }
-    if (str == u"sha-1") {
-        return HashAlgorithm::Sha1;
-    }
-    if (str == u"sha-224") {
-        return HashAlgorithm::Sha224;
-    }
-    if (str == u"sha-256") {
-        return HashAlgorithm::Sha256;
-    }
-    if (str == u"sha-384") {
-        return HashAlgorithm::Sha384;
-    }
-    if (str == u"sha-512") {
-        return HashAlgorithm::Sha512;
-    }
-    if (str == u"sha3-256") {
-        return HashAlgorithm::Sha3_256;
-    }
-    if (str == u"sha3-512") {
-        return HashAlgorithm::Sha3_512;
-    }
-    if (str == u"blake2b-256") {
-        return HashAlgorithm::Blake2b_256;
-    }
-    if (str == u"blake2b-512") {
-        return HashAlgorithm::Blake2b_512;
-    }
-    return HashAlgorithm::Unknown;
-}
 
 ///
 /// \class QXmppHash
@@ -117,8 +59,9 @@ QXmppHash::QXmppHash() = default;
 bool QXmppHash::parse(const QDomElement &el)
 {
     if (el.tagName() == u"hash" && el.namespaceURI() == ns_hashes) {
-        m_algorithm = hashAlgorithmFromString(el.attribute(u"algo"_s));
-        if (auto hashResult = QByteArray::fromBase64Encoding(el.text().toUtf8())) {
+        m_algorithm = Enums::fromString<HashAlgorithm>(el.attribute(u"algo"_s))
+                          .value_or(HashAlgorithm::Unknown);
+        if (auto hashResult = parseBase64(el.text())) {
             m_hash = std::move(*hashResult);
         } else {
             return false;
@@ -130,15 +73,11 @@ bool QXmppHash::parse(const QDomElement &el)
 
 void QXmppHash::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeDefaultNamespace(toString65(ns_hashes));
-    writer->writeStartElement(QSL65("hash"));
-    writer->writeAttribute(QSL65("algo"), algorithmToString(m_algorithm));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(m_hash.toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(m_hash.toBase64()));
-#endif
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"algo", m_algorithm },
+        Characters { Base64 { m_hash } },
+    });
 }
 /// \endcond
 
@@ -163,18 +102,17 @@ QXmppHashUsed::QXmppHashUsed(QXmpp::HashAlgorithm algorithm)
 /// \cond
 bool QXmppHashUsed::parse(const QDomElement &el)
 {
-    if (el.tagName() == u"hash-used" && el.namespaceURI() == ns_hashes) {
-        m_algorithm = hashAlgorithmFromString(el.attribute(u"algo"_s));
+    if (el.tagName() != u"hash-used" || el.namespaceURI() != ns_hashes) {
+        return false;
     }
-    return false;
+    m_algorithm = Enums::fromString<HashAlgorithm>(el.attribute(u"algo"_s))
+                      .value_or(HashAlgorithm::Unknown);
+    return true;
 }
 
 void QXmppHashUsed::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeDefaultNamespace(toString65(ns_hashes));
-    writer->writeStartElement(QSL65("hash-used"));
-    writer->writeAttribute(QSL65("algo"), algorithmToString(m_algorithm));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { XmlTag, Attribute { u"algo", m_algorithm } });
 }
 /// \endcond
 

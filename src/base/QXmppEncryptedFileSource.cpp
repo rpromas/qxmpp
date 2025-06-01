@@ -152,7 +152,7 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
         return false;
     }
     d->iv = QByteArray::fromBase64(ivEl.text().toUtf8());
-    d->hashes = parseChildElements<QVector<QXmppHash>>(el, u"hash", ns_hashes);
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
 
     auto sourcesEl = el.firstChildElement(u"sources"_s);
     if (sourcesEl.isNull()) {
