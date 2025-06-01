@@ -5,8 +5,10 @@
 #ifndef ENUMS_H
 #define ENUMS_H
 
+#include <array>
 #include <optional>
 
+#include <QList>
 #include <QString>
 
 namespace QXmpp::Private::Enums {
@@ -44,7 +46,7 @@ consteval bool checkEnumOrder(const std::array<std::tuple<Enum, QStringView>, N>
 }
 
 template<typename Enum>
-concept SerializableEnum = requires(Enum value) {
+concept SerializableEnum = requires {
     typename Data<Enum>;
 
     requires std::ranges::random_access_range<decltype(Data<Enum>::Values)>;
@@ -55,6 +57,17 @@ concept SerializableEnum = requires(Enum value) {
 };
 
 template<typename Enum>
+concept SerializableFlags = requires {
+    typename Data<Enum>;
+    requires Data<Enum>::IsFlags == true;
+
+    requires std::ranges::random_access_range<decltype(Data<Enum>::Values)>;
+    requires std::same_as<
+        std::ranges::range_value_t<decltype(Data<Enum>::Values)>,
+        std::tuple<Enum, QStringView>>;
+};
+
+template<typename Enum>
 concept NullableEnum = requires(Enum value) {
     typename Data<Enum>;
     { Data<Enum>::NullValue } -> std::convertible_to<Enum>;
@@ -62,7 +75,7 @@ concept NullableEnum = requires(Enum value) {
 
 template<typename Enum>
 std::optional<Enum> fromString(QStringView str)
-    requires SerializableEnum<Enum>
+    requires SerializableEnum<Enum> || SerializableFlags<Enum>
 {
     constexpr auto values = Data<Enum>::Values;
 
@@ -82,6 +95,32 @@ QStringView toString(Enum value)
     auto &[enumerator, string] = Data<Enum>::Values.at(size_t(value));
     return string;
 };
+
+template<typename Enum, typename Container>
+QFlags<Enum> fromStringList(const Container &container)
+    requires SerializableFlags<Enum>
+{
+    QFlags<Enum> result;
+    for (const auto &string : container) {
+        if (auto flag = fromString<Enum>(string)) {
+            result.setFlag(*flag);
+        }
+    }
+    return result;
+}
+
+template<typename Enum>
+QList<QStringView> toStringList(QFlags<Enum> value)
+    requires SerializableFlags<Enum>
+{
+    QList<QStringView> result;
+    for (const auto &[enumerator, string] : Data<Enum>::Values) {
+        if (value.testFlag(enumerator)) {
+            result.push_back(string);
+        }
+    }
+    return result;
+}
 
 }  // namespace QXmpp::Private::Enums
 
