@@ -158,7 +158,7 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
     if (sourcesEl.isNull()) {
         return false;
     }
-    d->httpSources = parseChildElements<QVector<QXmppHttpFileSource>>(sourcesEl, u"url-data", ns_url_data);
+    d->httpSources = parseChildElements<QVector<QXmppHttpFileSource>>(sourcesEl);
 
     return true;
 }

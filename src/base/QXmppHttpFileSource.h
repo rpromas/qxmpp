@@ -5,6 +5,7 @@
 #ifndef QXMPPHTTPFILESOURCE_H
 #define QXMPPHTTPFILESOURCE_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <QUrl>
@@ -23,6 +24,7 @@ public:
     void setUrl(QUrl url);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"url-data", QXmpp::Private::ns_url_data };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

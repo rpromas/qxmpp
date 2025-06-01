@@ -34,7 +34,7 @@ struct FileSources {
 FileSources FileSources::fromDom(const QDomElement &el)
 {
     return {
-        parseChildElements<QVector<QXmppHttpFileSource>>(el, u"url-data", ns_url_data),
+        parseChildElements<QVector<QXmppHttpFileSource>>(el),
         parseChildElements<QVector<QXmppEncryptedFileSource>>(el, u"encrypted", ns_esfs),
     };
 }
