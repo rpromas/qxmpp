@@ -25,6 +25,8 @@ constexpr quint16 XMPP_DEFAULT_PORT = 5222;
 constexpr quint16 XMPPS_DEFAULT_PORT = 5223;
 constexpr quint16 XMPP_SERVER_DEFAULT_PORT = 5269;
 
+// XML
+inline constexpr QStringView ns_xml = u"http://www.w3.org/XML/1998/namespace";
 // QXmpp
 inline constexpr QStringView ns_qxmpp_credentials = u"org.qxmpp.credentials";
 inline constexpr QStringView ns_qxmpp_export = u"org.qxmpp.export";

@@ -58,7 +58,7 @@ public:
 ///
 /// \brief Identity represents one of possibly multiple identities of an
 /// XMPP entity obtained from a service discovery request as defined in
-/// \xep{0030}: Service Discovery.
+/// \xep{0030, Service Discovery}.
 ///
 
 QXmppDiscoveryIq::Identity::Identity()
@@ -160,20 +160,10 @@ void QXmppDiscoveryIq::Identity::setType(const QString &type)
 std::optional<QXmppDiscoveryIq::Identity> QXmppDiscoveryIq::Identity::fromDom(const QDomElement &el)
 {
     QXmppDiscoveryIq::Identity identity;
-    identity.setLanguage(el.attribute(u"xml:lang"_s));
+    identity.setLanguage(el.attributeNS(ns_xml.toString(), u"lang"_s));
     identity.setCategory(el.attribute(u"category"_s));
     identity.setName(el.attribute(u"name"_s));
     identity.setType(el.attribute(u"type"_s));
-
-    // FIXME: for some reason the language does not found,
-    // so we are forced to use QDomNamedNodeMap
-    QDomNamedNodeMap m(el.attributes());
-    for (int i = 0; i < m.size(); ++i) {
-        if (m.item(i).nodeName() == u"xml:lang") {
-            identity.setLanguage(m.item(i).nodeValue());
-            break;
-        }
-    }
     return identity;
 }
 
