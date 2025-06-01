@@ -10,6 +10,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <optional>
 
@@ -23,80 +24,32 @@
 
 using namespace QXmpp::Private;
 
-struct field_type {
-    QXmppDataForm::Field::Type type;
-    const char *str;
+template<>
+struct Enums::Values<QXmppDataForm::Field::Type> {
+    static constexpr auto STRINGS = to_array<QStringView>({
+        u"boolean",
+        u"fixed",
+        u"hidden",
+        u"jid-multi",
+        u"jid-single",
+        u"list-multi",
+        u"list-single",
+        u"text-multi",
+        u"text-private",
+        u"text-single",
+    });
 };
 
-static field_type field_types[] = {
-    { QXmppDataForm::Field::BooleanField, "boolean" },
-    { QXmppDataForm::Field::FixedField, "fixed" },
-    { QXmppDataForm::Field::HiddenField, "hidden" },
-    { QXmppDataForm::Field::JidMultiField, "jid-multi" },
-    { QXmppDataForm::Field::JidSingleField, "jid-single" },
-    { QXmppDataForm::Field::ListMultiField, "list-multi" },
-    { QXmppDataForm::Field::ListSingleField, "list-single" },
-    { QXmppDataForm::Field::TextMultiField, "text-multi" },
-    { QXmppDataForm::Field::TextPrivateField, "text-private" },
-    { QXmppDataForm::Field::TextSingleField, "text-single" },
-    { static_cast<QXmppDataForm::Field::Type>(-1), nullptr },
+template<>
+struct Enums::Values<QXmppDataForm::Type> {
+    static constexpr auto STRINGS = to_array<QStringView>({
+        {},
+        u"form",
+        u"submit",
+        u"cancel",
+        u"result",
+    });
 };
-
-std::optional<QXmppDataForm::Field::Type> fieldTypeFromString(const QString &type)
-{
-    const auto typeStr = type.toStdString();
-    struct field_type *ptr;
-    for (ptr = field_types; ptr->str; ptr++) {
-        if (typeStr == ptr->str) {
-            return ptr->type;
-        }
-    }
-    return {};
-}
-
-QString fieldTypeToString(QXmppDataForm::Field::Type type)
-{
-    struct field_type *ptr;
-    for (ptr = field_types; ptr->str; ptr++) {
-        if (type == ptr->type) {
-            return QString::fromLocal8Bit(ptr->str);
-        }
-    }
-    return {};
-}
-
-std::optional<QXmppDataForm::Type> formTypeFromString(const QString &type)
-{
-    if (type == u"form") {
-        return QXmppDataForm::Form;
-    }
-    if (type == u"submit") {
-        return QXmppDataForm::Submit;
-    }
-    if (type == u"cancel") {
-        return QXmppDataForm::Cancel;
-    }
-    if (type == u"result") {
-        return QXmppDataForm::Result;
-    }
-    return {};
-}
-
-QString formTypeToString(QXmppDataForm::Type type)
-{
-    switch (type) {
-    case QXmppDataForm::Form:
-        return u"form"_s;
-    case QXmppDataForm::Submit:
-        return u"submit"_s;
-    case QXmppDataForm::Cancel:
-        return u"cancel"_s;
-    case QXmppDataForm::Result:
-        return u"result"_s;
-    default:
-        return {};
-    }
-}
 
 class QXmppDataFormMediaSourcePrivate : public QSharedData
 {
@@ -634,7 +587,7 @@ std::optional<QXmppDataForm::Field> QXmppDataForm::Field::fromDom(const QDomElem
     QXmppDataForm::Field field;
 
     /* field type */
-    field.setType(fieldTypeFromString(el.attribute(u"type"_s)).value_or(Field::TextSingleField));
+    field.setType(Enums::fromString<Type>(el.attribute(u"type"_s)).value_or(Field::TextSingleField));
 
     /* field attributes */
     field.setLabel(el.attribute(u"label"_s));
@@ -700,7 +653,7 @@ void QXmppDataForm::Field::toXml(QXmlStreamWriter *writer) const
     writer->writeStartElement(QSL65("field"));
 
     /* field type */
-    writer->writeAttribute(QSL65("type"), fieldTypeToString(d->type));
+    writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
 
     /* field attributes */
     writeOptionalXmlAttribute(writer, u"label", d->label);
@@ -944,7 +897,7 @@ void QXmppDataForm::parse(const QDomElement &element)
 
     /* form type */
     const auto typeStr = element.attribute(u"type"_s);
-    if (const auto type = formTypeFromString(typeStr)) {
+    if (const auto type = Enums::fromString<Type>(typeStr)) {
         d->type = *type;
     } else {
         qWarning() << "Unknown form type" << typeStr;
@@ -967,7 +920,7 @@ void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(toString65(ns_data));
 
     /* form type */
-    writer->writeAttribute(QSL65("type"), formTypeToString(d->type));
+    writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
 
     /* form properties */
     if (!d->title.isEmpty()) {
