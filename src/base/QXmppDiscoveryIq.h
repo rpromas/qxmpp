@@ -21,12 +21,7 @@ public:
     {
     public:
         Identity();
-        Identity(const Identity &other);
-        Identity(Identity &&);
-        ~Identity();
-
-        Identity &operator=(const Identity &other);
-        Identity &operator=(Identity &&);
+        QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(Identity)
 
         QString category() const;
         void setCategory(const QString &category);
@@ -54,12 +49,7 @@ public:
     {
     public:
         Item();
-        Item(const Item &);
-        Item(Item &&);
-        ~Item();
-
-        Item &operator=(const Item &);
-        Item &operator=(Item &&);
+        QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(Item)
 
         QString jid() const;
         void setJid(const QString &jid);
@@ -81,12 +71,7 @@ public:
     };
 
     QXmppDiscoveryIq();
-    QXmppDiscoveryIq(const QXmppDiscoveryIq &);
-    QXmppDiscoveryIq(QXmppDiscoveryIq &&);
-    ~QXmppDiscoveryIq() override;
-
-    QXmppDiscoveryIq &operator=(const QXmppDiscoveryIq &);
-    QXmppDiscoveryIq &operator=(QXmppDiscoveryIq &&);
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppDiscoveryIq)
 
     enum QueryType {
         InfoQuery,

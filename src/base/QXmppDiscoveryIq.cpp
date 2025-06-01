@@ -66,15 +66,7 @@ QXmppDiscoveryIq::Identity::Identity()
 {
 }
 
-/// Default copy-constructor
-QXmppDiscoveryIq::Identity::Identity(const QXmppDiscoveryIq::Identity &other) = default;
-/// Default move-constructor
-QXmppDiscoveryIq::Identity::Identity(QXmppDiscoveryIq::Identity &&) = default;
-QXmppDiscoveryIq::Identity::~Identity() = default;
-/// Default assignment operator
-QXmppDiscoveryIq::Identity &QXmppDiscoveryIq::Identity::operator=(const QXmppDiscoveryIq::Identity &) = default;
-/// Default move-assignment operator
-QXmppDiscoveryIq::Identity &QXmppDiscoveryIq::Identity::operator=(QXmppDiscoveryIq::Identity &&) = default;
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(QXmppDiscoveryIq, Identity)
 
 ///
 /// Returns the category (e.g. "account", "client", "conference", etc.) of the
@@ -198,15 +190,7 @@ QXmppDiscoveryIq::Item::Item()
 {
 }
 
-/// Default copy-constructor
-QXmppDiscoveryIq::Item::Item(const QXmppDiscoveryIq::Item &) = default;
-/// Default move-constructor
-QXmppDiscoveryIq::Item::Item(QXmppDiscoveryIq::Item &&) = default;
-QXmppDiscoveryIq::Item::~Item() = default;
-/// Default assignment operator
-QXmppDiscoveryIq::Item &QXmppDiscoveryIq::Item::operator=(const QXmppDiscoveryIq::Item &) = default;
-/// Default move-assignment operator
-QXmppDiscoveryIq::Item &QXmppDiscoveryIq::Item::operator=(QXmppDiscoveryIq::Item &&) = default;
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(QXmppDiscoveryIq, Item)
 
 ///
 /// Returns the jid of the item.
@@ -310,15 +294,7 @@ QXmppDiscoveryIq::QXmppDiscoveryIq()
 {
 }
 
-/// Default copy-constructor
-QXmppDiscoveryIq::QXmppDiscoveryIq(const QXmppDiscoveryIq &) = default;
-/// Default move-constructor
-QXmppDiscoveryIq::QXmppDiscoveryIq(QXmppDiscoveryIq &&) = default;
-QXmppDiscoveryIq::~QXmppDiscoveryIq() = default;
-/// Default assignment operator
-QXmppDiscoveryIq &QXmppDiscoveryIq::operator=(const QXmppDiscoveryIq &) = default;
-/// Default move-assignment operator
-QXmppDiscoveryIq &QXmppDiscoveryIq::operator=(QXmppDiscoveryIq &&) = default;
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppDiscoveryIq)
 
 ///
 /// Returns the features of the service.

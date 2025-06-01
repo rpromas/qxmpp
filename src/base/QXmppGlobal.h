@@ -69,6 +69,13 @@ inline QLatin1String QXmppVersion()
     name::~name() = default;                       \
     name &name::operator=(const name &) = default; \
     name &name::operator=(name &&) noexcept = default;
+// Same as QXMPP_PRIVATE_DEFINE_RULE_OF_SIX but for an inner class.
+#define QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(outer, name)             \
+    outer::name::name(const outer::name &) = default;                   \
+    outer::name::name(outer::name &&) noexcept = default;               \
+    outer::name::~name() = default;                                     \
+    outer::name &outer::name::operator=(const outer::name &) = default; \
+    outer::name &outer::name::operator=(outer::name &&) noexcept = default;
 
 ///
 /// \namespace QXmpp
