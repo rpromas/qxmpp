@@ -1030,7 +1030,7 @@ void QXmppStanza::parse(const QDomElement &element)
     auto error = parseOptionalChildElement<Error>(element, u"error", element.namespaceURI());
     d->error = error ? error->d : decltype(d->error) {};
 
-    d->extendedAddresses = parseChildElements<QList<QXmppExtendedAddress>>(firstChildElement(element, u"addresses", ns_extended_addressing), u"address", ns_extended_addressing);
+    d->extendedAddresses = parseChildElements<QList<QXmppExtendedAddress>>(firstChildElement(element, u"addresses", ns_extended_addressing));
     removeIf(d->extendedAddresses, [](const auto &address) { return !address.isValid(); });
 }
 

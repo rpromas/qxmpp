@@ -228,7 +228,7 @@ bool QXmppMucAdminIq::isMucAdminIq(const QDomElement &element)
 void QXmppMucAdminIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
-    m_items = parseChildElements<QList<QXmppMucItem>>(queryElement, u"item", ns_muc_admin);
+    m_items = parseChildElements<QList<QXmppMucItem>>(queryElement);
 }
 
 void QXmppMucAdminIq::toXmlElementFromChild(QXmlStreamWriter *writer) const

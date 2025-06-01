@@ -337,6 +337,7 @@ public:
     bool isNull() const;
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"candidate", QXmpp::Private::ns_jingle_ice_udp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
 
@@ -688,6 +689,7 @@ public:
 
         bool operator==(const External &other) const { return other.uri == uri; }
 
+        static constexpr std::tuple XmlTag = { u"external", QXmpp::Private::ns_call_invites };
         void parse(const QDomElement &el);
         void toXml(QXmlStreamWriter *writer) const;
     };

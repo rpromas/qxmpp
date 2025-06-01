@@ -5,6 +5,7 @@
 #ifndef QXMPPTHUMBNAIL_H
 #define QXMPPTHUMBNAIL_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <optional>
@@ -40,6 +41,7 @@ public:
     void setHeight(std::optional<uint32_t>);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"thumbnail", QXmpp::Private::ns_thumbs };
     bool parse(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

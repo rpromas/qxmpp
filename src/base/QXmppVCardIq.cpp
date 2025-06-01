@@ -891,9 +891,9 @@ void QXmppVCardIq::parseElementFromChild(const QDomElement &nodeRecv)
     QByteArray base64data = photoElement.firstChildElement(u"BINVAL"_s).text().toLatin1();
     d->photo = QByteArray::fromBase64(base64data);
     d->photoType = photoElement.firstChildElement(u"TYPE"_s).text();
-    d->addresses = parseChildElements<QList<QXmppVCardAddress>>(cardElement, u"ADR", ns_vcard);
-    d->emails = parseChildElements<QList<QXmppVCardEmail>>(cardElement, u"EMAIL", ns_vcard);
-    d->phones = parseChildElements<QList<QXmppVCardPhone>>(cardElement, u"TEL", ns_vcard);
+    d->addresses = parseChildElements<QList<QXmppVCardAddress>>(cardElement);
+    d->emails = parseChildElements<QList<QXmppVCardEmail>>(cardElement);
+    d->phones = parseChildElements<QList<QXmppVCardPhone>>(cardElement);
     d->organization.parse(cardElement);
 }
 

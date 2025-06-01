@@ -641,7 +641,7 @@ void QXmppJingleIq::Content::parse(const QDomElement &element)
     d->transportType = transportElement.namespaceURI();
     d->transportUser = transportElement.attribute(u"ufrag"_s);
     d->transportPassword = transportElement.attribute(u"pwd"_s);
-    d->transportCandidates = parseChildElements<QList<QXmppJingleCandidate>>(transportElement, u"candidate", ns_jingle_ice_udp);
+    d->transportCandidates = parseChildElements<QList<QXmppJingleCandidate>>(transportElement);
 
     // XEP-0320
     auto child = firstChildElement(transportElement, u"fingerprint");
@@ -3154,7 +3154,7 @@ void QXmppCallInviteElement::parse(const QDomElement &element)
             d->jingle->parse(jingleElement);
         }
 
-        d->external = parseChildElements<QVector<External>>(element, u"external", ns_call_invites);
+        d->external = parseChildElements<QVector<External>>(element);
         if (d->external->isEmpty()) {
             d->external.reset();
         }

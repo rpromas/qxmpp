@@ -127,7 +127,7 @@ bool QXmppOmemoDeviceElement::isOmemoDeviceElement(const QDomElement &element)
 
 void QXmppOmemoDeviceList::parse(const QDomElement &element)
 {
-    *this = parseChildElements<QXmppOmemoDeviceList>(element, u"device", ns_omemo_2);
+    *this = parseChildElements<QXmppOmemoDeviceList>(element);
 }
 
 void QXmppOmemoDeviceList::toXml(QXmlStreamWriter *writer) const

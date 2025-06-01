@@ -35,7 +35,7 @@ FileSources FileSources::fromDom(const QDomElement &el)
 {
     return {
         parseChildElements<QVector<QXmppHttpFileSource>>(el),
-        parseChildElements<QVector<QXmppEncryptedFileSource>>(el, u"encrypted", ns_esfs),
+        parseChildElements<QVector<QXmppEncryptedFileSource>>(el),
     };
 }
 

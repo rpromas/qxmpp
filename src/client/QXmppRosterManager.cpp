@@ -39,7 +39,7 @@ struct RosterData {
         }
 
         return RosterData {
-            parseChildElements<QList<QXmppRosterIq::Item>>(el, u"item", ns_roster),
+            parseChildElements<QList<QXmppRosterIq::Item>>(el),
         };
     }
 

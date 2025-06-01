@@ -127,7 +127,7 @@ void QXmppTrustMessageElement::parse(const QDomElement &element)
 {
     d->usage = element.attribute(u"usage"_s);
     d->encryption = element.attribute(u"encryption"_s);
-    d->keyOwners = parseChildElements<QList<QXmppTrustMessageKeyOwner>>(element, u"key-owner", ns_tm);
+    d->keyOwners = parseChildElements<QList<QXmppTrustMessageKeyOwner>>(element);
 }
 
 void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const

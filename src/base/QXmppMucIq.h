@@ -8,12 +8,13 @@
 #include "QXmppDataForm.h"
 #include "QXmppIq.h"
 
+///
 /// \brief The QXmppMucItem class represents a chat room "item".
 ///
 /// It is used to convey information such as permissions.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppMucItem
 {
 public:
@@ -58,6 +59,7 @@ public:
     void setRole(Role role);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_muc_admin };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
 

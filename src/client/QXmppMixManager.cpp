@@ -47,6 +47,8 @@ struct MixData {
         QString jid;
         QString nick;
 
+        static constexpr std::tuple XmlTag = { u"item", ns_qxmpp_export };
+
         void parse(const QDomElement &element)
         {
             jid = element.attribute(u"jid"_s);
@@ -73,7 +75,7 @@ struct MixData {
         }
 
         return MixData {
-            parseChildElements<QList<Item>>(el, u"item", ns_qxmpp_export),
+            parseChildElements<QList<Item>>(el),
         };
     }
 

@@ -10,9 +10,10 @@
 
 #include <QDateTime>
 
+///
 /// \brief The QXmppArchiveMessage class represents an archived message
-/// as defined by \xep{0136}: Message Archiving.
-
+/// as defined by \xep{0136, Message Archiving}.
+///
 class QXMPP_EXPORT QXmppArchiveMessage
 {
 public:
@@ -61,6 +62,7 @@ public:
     void setWith(const QString &with);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"chat", QXmpp::Private::ns_archive };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer, const QXmppResultSetReply &rsm = QXmppResultSetReply()) const;
     /// \endcond
@@ -74,12 +76,13 @@ private:
     QString m_with;
 };
 
-/// \brief Represents an archive chat as defined by \xep{0136}: Message Archiving.
+///
+/// \brief Represents an archive chat as defined by \xep{0136, Message Archiving}.
 ///
 /// It is used to get chat as a QXmppArchiveChat.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppArchiveChatIq : public QXmppIq
 {
 public:
@@ -102,10 +105,11 @@ private:
     QXmppResultSetReply m_rsmReply;
 };
 
-/// \brief Represents an archive list as defined by \xep{0136}: Message Archiving.
+///
+/// \brief Represents an archive list as defined by \xep{0136, Message Archiving}.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppArchiveListIq : public QXmppIq
 {
 public:
@@ -148,10 +152,11 @@ private:
     QXmppResultSetReply m_rsmReply;
 };
 
-/// \brief Represents an archive remove IQ as defined by \xep{0136}: Message Archiving.
+///
+/// \brief Represents an archive remove IQ as defined by \xep{0136, Message Archiving}.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppArchiveRemoveIq : public QXmppIq
 {
 public:
@@ -178,10 +183,11 @@ private:
     QDateTime m_end;
 };
 
-/// \brief Represents an archive retrieve IQ as defined by \xep{0136}: Message Archiving.
+///
+/// \brief Represents an archive retrieve IQ as defined by \xep{0136, Message Archiving}.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppArchiveRetrieveIq : public QXmppIq
 {
 public:
@@ -210,10 +216,11 @@ private:
     QXmppResultSetQuery m_rsmQuery;
 };
 
-/// \brief Represents an archive preference IQ as defined by \xep{0136}: Message Archiving.
+///
+/// \brief Represents an archive preference IQ as defined by \xep{0136, Message Archiving}.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppArchivePrefIq : public QXmppIq
 {
 public:

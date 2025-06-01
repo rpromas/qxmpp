@@ -347,7 +347,7 @@ void QXmppArchiveListIq::parseElementFromChild(const QDomElement &element)
     m_rsmQuery.parse(listElement);
     m_rsmReply.parse(listElement);
 
-    m_chats = parseChildElements<QList<QXmppArchiveChat>>(listElement, u"chat", ns_archive);
+    m_chats = parseChildElements<QList<QXmppArchiveChat>>(listElement);
 }
 
 void QXmppArchiveListIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
