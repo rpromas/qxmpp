@@ -125,6 +125,15 @@ auto into(std::optional<From> &&value) -> std::optional<To>
     return {};
 }
 
+template<typename To, typename From>
+auto into(const std::optional<From> &value) -> std::optional<To>
+{
+    if (value) {
+        return To { *value };
+    }
+    return {};
+}
+
 template<typename GreaterVariant, typename... BaseTypes>
 auto into(std::variant<BaseTypes...> &&variant)
 {
