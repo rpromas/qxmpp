@@ -96,6 +96,8 @@ static quint32 crctable[256] = {
     0xB40BBE37L, 0xC30C8EA1L, 0x5A05DF1BL, 0x2D02EF8DL
 };
 
+QAtomicInt QXmpp::Private::globalStanzaIdCounter = 0;
+
 ///
 /// Parses a date-time from a string according to \xep{0082, XMPP Date and Time Profiles}.
 ///
@@ -332,6 +334,20 @@ std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &
         return elementXmlTag(el.firstChildElement());
     }
     return { {}, {} };
+}
+
+///
+/// Generates a new sequential stanza id. The ID is locally unique, not globally unique (see
+/// QXmppUtils::generateStanzaUuid()).
+///
+/// This is used for all QXmppStanzas automatically.
+///
+/// \since QXmpp 1.11
+///
+QString QXmpp::generateSequentialStanzaId()
+{
+    ++globalStanzaIdCounter;
+    return u"qxmpp" + QString::number(globalStanzaIdCounter);
 }
 
 /// \cond
