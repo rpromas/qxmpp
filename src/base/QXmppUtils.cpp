@@ -347,7 +347,7 @@ std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &
 QString QXmpp::generateSequentialStanzaId()
 {
     ++globalStanzaIdCounter;
-    return u"qxmpp" + QString::number(globalStanzaIdCounter);
+    return u"qx" + QString::number(globalStanzaIdCounter);
 }
 
 /// \cond
