@@ -137,11 +137,6 @@ template<typename T>
 concept XmlSerializeableRange =
     std::ranges::range<T> && XmlSerializeable<std::ranges::range_value_t<T>>;
 
-enum XmlnsPresence {
-    WithXmlns,
-    WithoutXmlns,
-};
-
 class XmlWriter
 {
 public:
@@ -191,65 +186,50 @@ private:
     void writeTextOrEmptyElement(String name, String xmlns, String value);
     void writeSingleAttributeElement(String name, String attribute, String value);
 
-    template<XmlnsPresence, typename NameType, typename... Values>
-    friend class Element;
+    template<typename Tag, typename... Values>
+    friend struct Element;
 
     template<IsOptionalStringSerializable Enum>
-    friend class OptionalEnumElement;
+    friend struct OptionalEnumElement;
 
-    template<typename T, XmlnsPresence>
-    friend class TextElement;
+    template<typename Tag, typename Value>
+    friend struct TextElement;
 
-    template<typename T, XmlnsPresence>
-    friend class OptionalTextElement;
-
-    template<typename Enum, XmlnsPresence>
-    friend class EnumElement;
+    template<typename Tag, IsOptionalStringSerializable Value>
+    friend struct OptionalTextElement;
 
     template<std::ranges::range Container>
-    friend class SingleAttributeElements;
+    friend struct SingleAttributeElements;
 
     QXmlStreamWriter *w;
 };
 
-template<XmlnsPresence Xmlns, typename NameType, typename... Values>
+template<typename Tag, typename... Values>
 struct Element {
-    NameType name;
-    std::conditional_t<Xmlns == WithXmlns, QStringView, std::monostate> xmlns;
+    Tag tag;
     std::tuple<Values...> values;
 
-    Element(NameType name, Values... values)
-        requires(Xmlns == WithoutXmlns)
-        : name(name), values(std::forward<Values>(values)...)
-    {
-    }
-
-    Element(NameType name, QStringView xmlns, Values... values)
-        requires(Xmlns == WithXmlns)
-        : name(name), xmlns(xmlns), values(std::forward<Values>(values)...)
-    {
-    }
-
-    template<IsXmlTag XmlTag>
-    Element(XmlTag xmlTag, Values... values)
-        requires(Xmlns == WithXmlns)
-        : name(std::get<0>(xmlTag)), xmlns(std::get<1>(xmlTag)), values(std::forward<Values>(values)...)
+    template<typename... V>
+    Element(Tag tag, V &&...values)
+        : tag(std::forward<Tag>(tag)), values(std::forward<V>(values)...)
     {
     }
 
     void toXml(XmlWriter &w)
     {
         if constexpr (sizeof...(Values) == 0) {
-            if constexpr (Xmlns == WithXmlns) {
+            if constexpr (IsXmlTag<Tag>) {
+                auto &[name, xmlns] = tag;
                 w.writeEmptyElement(xmlS(name), xmlS(xmlns));
             } else {
-                w.writeEmptyElement(xmlS(name));
+                w.writeEmptyElement(xmlS(tag));
             }
         } else {
-            if constexpr (Xmlns == WithXmlns) {
+            if constexpr (IsXmlTag<Tag>) {
+                auto &[name, xmlns] = tag;
                 w.writeStartElement(xmlS(name), xmlS(xmlns));
             } else {
-                w.writeStartElement(xmlS(name));
+                w.writeStartElement(xmlS(tag));
             }
             std::apply([&w](auto &&...value) { (w.write(value), ...); }, values);
             w.writeEndElement();
@@ -258,18 +238,16 @@ struct Element {
 };
 
 template<typename Name, typename... Values>
-Element(Name, Values &&...) -> Element<WithoutXmlns, Name, Values...>;
+    requires(!IsXmlTag<Name>)
+Element(Name &&, Values &&...) -> Element<Name, Values...>;
 
-template<IsXmlTag XmlTag, typename... Values>
-Element(XmlTag, Values &&...) -> Element<WithXmlns, QStringView, Values...>;
+template<IsXmlTag Tag = Tag<QStringView, QStringView>, typename... Values>
+Element(Tag &&, Values &&...) -> Element<Tag, Values...>;
 
-template<typename Name, std::convertible_to<QStringView> S, typename... Values>
-Element(Name, S, Values &&...) -> Element<WithXmlns, Name, Values...>;
-
-template<typename T>
+template<typename Value>
 struct Attribute {
     QStringView name;
-    T value;
+    Value value;
 
     void toXml(XmlWriter &w) const
     {
@@ -277,28 +255,31 @@ struct Attribute {
     }
 };
 
-template<typename T>
-Attribute(QStringView, T &&) -> Attribute<T>;
+template<typename Value>
+Attribute(QStringView, Value &&) -> Attribute<Value>;
 
-template<IsOptionalStringSerializable T>
+template<IsOptionalStringSerializable Value>
 struct OptionalAttribute {
     QStringView name;
-    T value;
+    Value value;
 
     void toXml(QXmlStreamWriter *w) const
     {
-        if (StringSerializer<std::decay_t<T>>::hasValue(value)) {
+        if (StringSerializer<std::decay_t<Value>>::hasValue(value)) {
             w->writeAttribute(xmlS(name), xmlS(value));
         }
     }
 };
 
-template<typename T>
-OptionalAttribute(QStringView, T &&) -> OptionalAttribute<T>;
+template<typename Value>
+OptionalAttribute(QStringView, Value &&) -> OptionalAttribute<Value>;
 
-template<typename T>
+template<typename Value>
 struct Characters {
-    T value;
+    Value value;
+
+    template<typename V>
+    Characters(V &&value) : value(std::forward<V>(value)) { }
 
     void toXml(QXmlStreamWriter *w) const
     {
@@ -306,16 +287,19 @@ struct Characters {
     }
 };
 
-template<typename T>
-Characters(T &&) -> Characters<T>;
+template<typename Value>
+Characters(Value &&) -> Characters<Value>;
 
-template<IsOptionalStringSerializable T>
+template<IsOptionalStringSerializable Value>
 struct OptionalCharacters {
-    T value;
+    Value value;
+
+    template<typename V>
+    OptionalCharacters(V &&value) : value(std::forward<V>(value)) { }
 
     void toXml(QXmlStreamWriter *w) const
     {
-        if (StringSerializer<std::decay_t<T>>::hasValue(value)) {
+        if (StringSerializer<std::decay_t<Value>>::hasValue(value)) {
             w->writeCharacters(xmlS(value));
         }
     }
@@ -343,14 +327,14 @@ struct Namespace {
     }
 };
 
-template<IsOptionalStringSerializable T>
+template<IsOptionalStringSerializable Enum>
 struct OptionalEnumElement {
-    T enumeration;
+    Enum enumeration;
     QStringView xmlns = {};
 
     void toXml(XmlWriter &w) const
     {
-        if (StringSerializer<T>::hasValue(enumeration)) {
+        if (StringSerializer<Enum>::hasValue(enumeration)) {
             if (xmlns.isNull()) {
                 w.writeEmptyElement(xmlS(enumeration));
             } else {
@@ -360,117 +344,82 @@ struct OptionalEnumElement {
     }
 };
 
-template<typename T, XmlnsPresence>
-struct TextElement;
+template<typename Tag, typename Value>
+struct TextElement {
+    Tag tag;
+    Value value;
 
-template<typename T>
-struct TextElement<T, WithXmlns> {
-    QStringView name;
-    QStringView xmlns;
-    T value;
-
-    TextElement(QStringView name, QStringView xmlns, T value)
-        : name(name), xmlns(xmlns), value(std::forward<T>(value)) { }
-
-    template<IsXmlTag XmlTag>
-    TextElement(XmlTag xmlTag, T value)
-        : name(std::get<0>(xmlTag)), xmlns(std::get<1>(xmlTag)), value(std::forward<T>(value))
-    {
-    }
+    template<typename V>
+    TextElement(Tag tag, V &&value) : tag(tag), value(std::forward<V>(value)) { }
 
     void toXml(XmlWriter &w)
     {
-        w.writeTextOrEmptyElement(xmlS(name), xmlS(xmlns), xmlS(value));
+        if constexpr (IsXmlTag<Tag>) {
+            auto &[name, xmlns] = tag;
+            w.writeTextOrEmptyElement(xmlS(name), xmlS(xmlns), xmlS(value));
+        } else {
+            w.writeTextOrEmptyElement(xmlS(tag), xmlS(value));
+        }
     }
 };
 
-template<typename T>
-struct TextElement<T, WithoutXmlns> {
-    QStringView name;
-    T value;
+template<typename Name, typename Value>
+    requires(!IsXmlTag<Name>)
+TextElement(Name &&, Value &&) -> TextElement<Name, Value>;
 
-    TextElement(QStringView name, T value)
-        : name(name), value(std::forward<T>(value)) { }
+template<IsXmlTag Tag = Tag<QStringView, QStringView>, typename Value>
+TextElement(Tag &&, Value &&) -> TextElement<Tag, Value>;
 
-    void toXml(XmlWriter &w)
-    {
-        w.writeTextOrEmptyElement(xmlS(name), xmlS(value));
-    }
-};
-
-template<typename T>
-TextElement(QStringView, T &&) -> TextElement<T, WithoutXmlns>;
-
-template<IsXmlTag XmlTag, typename T>
-TextElement(XmlTag, T &&) -> TextElement<T, WithXmlns>;
-
-template<typename T>
-TextElement(QStringView, QStringView, T &&) -> TextElement<T, WithXmlns>;
-
-template<std::ranges::range Range>
+template<typename Tag, std::ranges::range Range>
 struct TextElements {
-    QStringView name;
+    Tag tag;
     Range values;
 
-    TextElements(QStringView name, Range values) : name(name), values(std::forward<Range>(values)) { }
+    template<typename R>
+    TextElements(Tag tag, R &&values) : tag(tag), values(std::forward<R>(values)) { }
 
     void toXml(XmlWriter &w)
     {
         for (const auto &value : values) {
-            w.write(TextElement { name, value });
+            w.write(TextElement { tag, value });
         }
     }
 };
 
-template<typename Range>
-TextElements(QStringView, Range &&) -> TextElements<Range>;
+template<typename Name, typename Range>
+    requires(!IsXmlTag<Name>)
+TextElements(Name &&, Range &&) -> TextElements<Name, Range>;
 
-template<typename T, XmlnsPresence>
-struct OptionalTextElement;
+template<IsXmlTag Tag = Tag<QStringView, QStringView>, typename Range>
+TextElements(Tag &&, Range &&) -> TextElements<Tag, Range>;
 
-template<IsOptionalStringSerializable T>
-struct OptionalTextElement<T, WithXmlns> {
-    QStringView name;
-    QStringView xmlns;
-    T value;
+template<typename Tag, IsOptionalStringSerializable Value>
+struct OptionalTextElement {
+    Tag tag;
+    Value value;
 
-    OptionalTextElement(QStringView name, QStringView xmlns, T value) : name(name), xmlns(xmlns), value(std::forward<T>(value)) { }
-
-    template<IsXmlTag XmlTag>
-    OptionalTextElement(XmlTag xmlTag, T value)
-        : name(std::get<0>(xmlTag)), xmlns(std::get<1>(xmlTag)), value(std::forward<T>(value))
-    {
-    }
+    template<typename V>
+    OptionalTextElement(Tag tag, V &&value) : tag(tag), value(std::forward<V>(value)) { }
 
     void toXml(XmlWriter &w)
     {
-        if (StringSerializer<std::decay_t<T>>::hasValue(value)) {
-            w.writeTextOrEmptyElement(xmlS(name), xmlS(xmlns), xmlS(value));
+        if (StringSerializer<std::decay_t<Value>>::hasValue(value)) {
+            if constexpr (IsXmlTag<Tag>) {
+                auto &[name, xmlns] = tag;
+                w.writeTextOrEmptyElement(xmlS(name), xmlS(xmlns), xmlS(value));
+            } else {
+                w.writeTextOrEmptyElement(xmlS(tag), xmlS(value));
+            }
         }
     }
 };
 
-template<IsOptionalStringSerializable T>
-struct OptionalTextElement<T, WithoutXmlns> {
-    QStringView name;
-    T value;
+template<typename Name, typename Value>
+    requires(!IsXmlTag<Name>)
+OptionalTextElement(Name &&, Value &&) -> OptionalTextElement<Name, Value>;
 
-    void toXml(XmlWriter &w)
-    {
-        if (StringSerializer<std::decay_t<T>>::hasValue(value)) {
-            w.writeTextOrEmptyElement(xmlS(name), xmlS(value));
-        }
-    }
-};
-
-template<typename T>
-OptionalTextElement(QStringView, T &&) -> OptionalTextElement<T, WithoutXmlns>;
-
-template<IsXmlTag XmlTag, typename T>
-OptionalTextElement(XmlTag, T &&) -> OptionalTextElement<T, WithXmlns>;
-
-template<typename T>
-OptionalTextElement(QStringView, QStringView, T &&) -> OptionalTextElement<T, WithXmlns>;
+template<IsXmlTag Tag = Tag<QStringView, QStringView>, typename Value>
+OptionalTextElement(Tag, Value &&) -> OptionalTextElement<Tag, Value>;
 
 template<std::ranges::range Range>
 struct SingleAttributeElements {
