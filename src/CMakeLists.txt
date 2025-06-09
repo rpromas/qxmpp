@@ -414,11 +414,27 @@ if(WITH_QCA)
     target_sources(${QXMPP_TARGET} PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
     set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
 
+    if (IOS)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../prebuilt-dependencies/ios/libqca-qt6.a"
+        )
+        #TODO normal includes
+        include_directories("/usr/local/include/omemo")
+        include_directories("/Library/Frameworks/qca-qt6.framework/Version/2.0/Headers")
+    elseif (APPLE)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE
+            "-framework qca-qt6"
+        )
+        include_directories("/usr/local/include/omemo")
+        include_directories("/Library/Frameworks/qca-qt6.framework/Version/2.0/Headers")
+    else ()
+        target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt6)# qca-cyrus-sasl qca-gnupg qca-logger qca-ossl qca-softstore)
+    endif()
+
     # target_include_directories(${QXMPP_TARGET} PRIVATE
     #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     #     $<INSTALL_INTERFACE:include>
     # )
-    target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt6)# qca-cyrus-sasl qca-gnupg qca-logger qca-ossl qca-softstore)
 endif()
 
 # qxmpp_export.h generation
@@ -448,13 +464,13 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-# install(
-#     EXPORT QXmppTarget
-#     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${QXMPP_TARGET}"
-#     FILE QXmpp.cmake
-#     NAMESPACE QXmpp::
-#     COMPONENT Devel
-# )
+install(
+    EXPORT QXmppTarget
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${QXMPP_TARGET}"
+    FILE QXmpp.cmake
+    NAMESPACE QXmpp::
+    COMPONENT Devel
+)
 
 # export(
 #     TARGETS ${QXMPP_TARGET}

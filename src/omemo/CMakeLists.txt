@@ -4,8 +4,8 @@
 
 include(CMakePackageConfigHelpers)
 
-add_subdirectory(../../../libomemo-c libomemo-c)
-add_subdirectory(../../../qca qca)
+#add_subdirectory(../../../libomemo-c libomemo-c)
+#add_subdirectory(../../../qca qca)
 
 set(OMEMO_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${QXMPPOMEMO_TARGET}")
 set(OMEMO_HEADER_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${QXMPP_TARGET}/Omemo")
@@ -29,14 +29,26 @@ else()
     add_library(${QXMPPOMEMO_TARGET} STATIC ${OMEMO_SOURCE_FILES})
 endif()
 
+
 target_link_libraries(${QXMPPOMEMO_TARGET}
     PUBLIC
     ${QXMPP_TARGET}
     Qt${QT_VERSION_MAJOR}::Core
     PRIVATE
-    omemo-c
-    qca-qt${QT_VERSION_MAJOR}
 )
+
+if (IOS)
+elseif (APPLE)
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE
+        "-framework qca-qt6"
+        /Users/romas/dev/QT/Rysys/external/libomemo-c/build/src/libomemo-c.a
+    )
+    include_directories("/usr/local/include/omemo")
+    include_directories("/Library/Frameworks/qca-qt6.framework/Version/2.0/Headers")
+else ()
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE qca-qt6)# qca-cyrus-sasl qca-gnupg qca-logger qca-ossl qca-softstore)
+endif()
+
 target_include_directories(${QXMPPOMEMO_TARGET}
     INTERFACE
     ${OMEMO_HEADER_DIR}
@@ -75,10 +87,10 @@ install(
     COMPONENT Devel
 )
 
-export(
-    TARGETS ${QXMPPOMEMO_TARGET}
-    FILE QXmppOmemo.cmake
-)
+# export(
+#     TARGETS ${QXMPPOMEMO_TARGET}
+#     FILE QXmppOmemo.cmake
+# )
 
 configure_package_config_file(
     QXmppOmemoConfig.cmake.in
