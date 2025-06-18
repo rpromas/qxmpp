@@ -1080,7 +1080,7 @@ void tst_QXmppMessage::testFallbackIndication()
             "urn:xmpp:reply:0",
             { Fallback::Reference { Fallback::Body, Fallback::Range { 0, 33 } },
               Fallback::Reference { Fallback::Subject, Fallback::Range { 5, 10 } },
-              Fallback::Reference { Fallback::Body, {} } },
+              Fallback::Reference { Fallback::Body, std::nullopt } },
         },
     });
     serializePacket(message, xml);

@@ -2235,10 +2235,11 @@ void QXmppFallback::toXml(QXmlStreamWriter *writer) const
             for (const auto &reference : d->references) {
                 w.write(::Element {
                     QStringView(reference.element == Body ? u"body" : u"subject"),
-                    OptionalContent {
-                        reference.range.has_value(),
-                        Attribute { u"start", reference.range->start },
-                        Attribute { u"end", reference.range->end },
+                    [&] {
+                        if (reference.range) {
+                            w.write(Attribute { u"start", reference.range->start });
+                            w.write(Attribute { u"end", reference.range->end });
+                        }
                     },
                 });
             }
