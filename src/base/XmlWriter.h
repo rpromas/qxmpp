@@ -179,13 +179,13 @@ private:
 #endif
 
     void writeStartElement(String name) { w->writeStartElement(name); }
-    void writeStartElement(String name, String xmlns);
+    QXMPP_PRIVATE_EXPORT void writeStartElement(String name, String xmlns);
     void writeEndElement() { w->writeEndElement(); }
     void writeEmptyElement(String name) { w->writeEmptyElement(name); }
-    void writeEmptyElement(String name, String xmlns);
-    void writeTextOrEmptyElement(String name, String value);
-    void writeTextOrEmptyElement(String name, String xmlns, String value);
-    void writeSingleAttributeElement(String name, String attribute, String value);
+    QXMPP_PRIVATE_EXPORT void writeEmptyElement(String name, String xmlns);
+    QXMPP_PRIVATE_EXPORT void writeTextOrEmptyElement(String name, String value);
+    QXMPP_PRIVATE_EXPORT void writeTextOrEmptyElement(String name, String xmlns, String value);
+    QXMPP_PRIVATE_EXPORT void writeSingleAttributeElement(String name, String attribute, String value);
 
     template<typename Tag, typename... Values>
     friend struct Element;

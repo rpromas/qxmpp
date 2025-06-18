@@ -13,6 +13,7 @@
 #include <QString>
 
 #define QXMPP_AUTOTEST_EXPORT
+#define QXMPP_PRIVATE_EXPORT QXMPP_EXPORT
 
 ///
 /// This macro expands a numeric value of the form 0xMMNNPP (MM =
