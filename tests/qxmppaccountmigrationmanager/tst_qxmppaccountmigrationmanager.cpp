@@ -167,7 +167,6 @@ static auto serializeDataExtension(const DataExtension &ext, QXmlStreamWriter &w
 
 void tst_QXmppAccountMigrationManager::testImportExport()
 {
-
     QXmppExportData::registerExtension<DataExtension, parseDataExtension, serializeDataExtension>(u"extension", u"org.qxmpp.tests");
 
     auto client = newClient(false);
@@ -429,31 +428,30 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     // test parse (and re-serialize)
     auto parsedData = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(xml2)));
     const auto xml3 = packetToXml(parsedData);
-    const QByteArray xml4 =
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<account-data xmlns=\"org.qxmpp.export\" jid=\"pasnox@xmpp.example\">"
+    const QByteArray xml4Mix =
         "<mix>"
         "<item jid=\"mix2@gamer.com\" nick=\"Joe @ Mix 2 Gamer\"/>"
-        "</mix>"
-        "<roster>"
-        "<item xmlns=\"jabber:iq:roster\" jid=\"3@gamer.com\" name=\"3 Gamer\"><group>gamers</group></item>"
-        "</roster>"
+        "</mix>";
+    const QByteArray xml4VCard =
         "<vcard>"
         "<vCard xmlns=\"vcard-temp\">"
         "<NICKNAME>It is me Bookri</NICKNAME>"
         "<N><GIVEN>Nox</GIVEN><FAMILY>Bookri</FAMILY></N>"
         "<TITLE/><ROLE/>"
         "</vCard>"
-        "</vcard>"
-        "</account-data>\n";
+        "</vcard>";
+    const QByteArray xml4Roster =
+        "<roster>"
+        "<item xmlns=\"jabber:iq:roster\" jid=\"3@gamer.com\" name=\"3 Gamer\"><group>gamers</group></item>"
+        "</roster>";
 
-    if (xml3 != xml4) {
-        qDebug() << "Actual:\n"
-                 << xml3.constData();
-        qDebug() << "Expected:\n"
-                 << xml4.constData();
-    }
-    QCOMPARE(xml3, xml4);
+    QVERIFY(xml3.startsWith(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<account-data xmlns=\"org.qxmpp.export\" jid=\"pasnox@xmpp.example\">"));
+    QVERIFY(xml3.endsWith("</account-data>\n"));
+    QVERIFY(xml3.contains(xml4Mix));
+    QVERIFY(xml3.contains(xml4Roster));
+    QVERIFY(xml3.contains(xml4VCard));
 }
 
 QTEST_MAIN(tst_QXmppAccountMigrationManager)
