@@ -466,8 +466,7 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
                 await(upload->d->hashesFuture, this, [upload](auto hashResult) mutable {
                     auto &hashValue = hashResult->result;
                     if (std::holds_alternative<std::vector<QXmppHash>>(hashValue)) {
-                        const auto &hashesVector = std::get<std::vector<QXmppHash>>(hashValue);
-                        auto hashes = transform<QVector<QXmppHash>>(hashesVector, [](auto &&hash) {
+                        auto hashes = transform<QVector<QXmppHash>>(std::get<std::vector<QXmppHash>>(std::move(hashValue)), [](auto &&hash) {
                             return hash;
                         });
                         upload->d->metadata.setHashes(hashes);

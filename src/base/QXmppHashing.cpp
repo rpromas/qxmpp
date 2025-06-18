@@ -385,7 +385,7 @@ public:
 
     void finish()
     {
-        auto hashes = transform<std::vector<QXmppHash>>(m_hashProcessors, [](auto &processor) {
+        auto hashes = transform<std::vector<QXmppHash>>(m_hashProcessors, [](const auto &processor) {
             QXmppHash hash;
             hash.setAlgorithm(toHashAlgorithm(processor.algorithm));
             hash.setHash(processor.hash->result());

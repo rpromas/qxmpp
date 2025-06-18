@@ -53,6 +53,25 @@ auto transform(const InputVector &input, Converter convert)
 }
 
 template<typename OutputVector, typename InputVector, typename Converter>
+auto transform(InputVector &&input, Converter convert)
+{
+    OutputVector output;
+    if constexpr (std::ranges::sized_range<InputVector>) {
+        output.reserve(input.size());
+    }
+    for (auto it = input.begin(); it != input.end(); ++it) {
+        if constexpr (HasPushBack<OutputVector>) {
+            output.push_back(std::invoke(convert, std::move(*it)));
+        } else if constexpr (HasInsert<OutputVector>) {
+            output.insert(std::invoke(convert, std::move(*it)));
+        } else {
+            static_assert(false, "OutputVector must support push_back() or insert()");
+        }
+    }
+    return output;
+}
+
+template<typename OutputVector, typename InputVector, typename Converter>
 auto transformFilter(const InputVector &input, Converter convert)
 {
     using OutputValue = typename OutputVector::value_type;
