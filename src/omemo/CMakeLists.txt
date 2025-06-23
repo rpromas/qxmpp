@@ -38,13 +38,26 @@ target_link_libraries(${QXMPPOMEMO_TARGET}
 )
 
 if (IOS)
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../prebuilt-dependencies/ios/qca-qt6.framework"
+        "-framework qca-qt6"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../prebuilt-dependencies/ios/libomemo-c.a"
+    )
 elseif (APPLE)
+    if(MACO_TIPAS MATCHES "M1")
+        target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../../prebuilt-dependencies/macos_arm/libomemo-c.a"
+        )
+    elseif(MACO_TIPAS MATCHES "INTELINIS")
+        target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../../prebuilt-dependencies/macos_x86/libomemo-c.a"
+        )
+    endif()
     target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE
         "-framework qca-qt6"
-        /Users/romas/dev/QT/Rysys/external/libomemo-c/build/src/libomemo-c.a
     )
+    include_directories("/Library/Frameworks/qca-qt6.framework/Versions/2/Headers")
     include_directories("/usr/local/include/omemo")
-    include_directories("/Library/Frameworks/qca-qt6.framework/Version/2.0/Headers")
 else ()
     target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE qca-qt6)# qca-cyrus-sasl qca-gnupg qca-logger qca-ossl qca-softstore)
 endif()
