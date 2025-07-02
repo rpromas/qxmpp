@@ -1187,7 +1187,7 @@ bool Manager::handleMessage(const QXmppMessage &message)
             if (optionalDecryptedMessage) {
                 injectMessage(std::move(*optionalDecryptedMessage));
             } else {
-                Q_EMIT client() -> messageReceived(message);
+                Q_EMIT client()->messageReceived(message);
             }
         });
 
