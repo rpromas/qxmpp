@@ -1001,7 +1001,7 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
                     QXmppFallback fallback { ns_omemo_2.toString(), { { QXmppFallback::Body, {} } } };
 
                     message.setEncryptionMethod(QXmpp::Omemo2);
-                    message.setE2eeFallbackBody(u"This message is encrypted with %1 but could not be decrypted"_s.arg(message.encryptionName()));
+                    message.setE2eeFallbackBody(u"Failed to decrypt message"_s);
                     message.setFallbackMarkers({ fallback });
                 }
 
