@@ -46,14 +46,30 @@ inline QXmppTask<void> makeReadyTask()
 
 // creates new task which converts the result of the first
 template<typename Result, typename Input, typename Converter>
-auto chain(QXmppTask<Input> &&source, QObject *context, Converter task) -> QXmppTask<Result>
+auto chain(QXmppTask<Input> &&source, QObject *context, Converter convert) -> QXmppTask<Result>
 {
     QXmppPromise<Result> promise;
-
-    source.then(context, [=](Input &&input) mutable {
-        promise.finish(task(std::move(input)));
-    });
-    return promise.task();
+    auto task = promise.task();
+    if constexpr (std::is_void_v<Input>) {
+        source.then(context, [p = std::move(promise), convert = std::move(convert)]() mutable {
+            if constexpr (std::is_void_v<Result>) {
+                convert();
+                p.finish();
+            } else {
+                p.finish(convert());
+            }
+        });
+    } else {
+        source.then(context, [p = std::move(promise), convert = std::move(convert)](Input &&input) mutable {
+            if constexpr (std::is_void_v<Result>) {
+                convert(std::move(input));
+                p.finish();
+            } else {
+                p.finish(convert(std::move(input)));
+            }
+        });
+    }
+    return task;
 }
 
 // parse Iq type from QDomElement or pass error
