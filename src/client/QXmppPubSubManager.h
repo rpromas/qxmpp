@@ -92,8 +92,8 @@ public:
     QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items);
     template<typename T>
     QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
-    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, const QString &itemId);
-    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId);
+    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify = false);
+    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify = false);
     QXmppTask<Result> purgeItems(const QString &jid, const QString &nodeName);
     QXmppTask<SubscriptionsResult> requestSubscriptions(const QString &jid);
     QXmppTask<SubscriptionsResult> requestSubscriptions(const QString &jid, const QString &nodeName);

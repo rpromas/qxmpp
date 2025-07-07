@@ -431,15 +431,18 @@ QXmppTask<QXmppPubSubManager::ItemIdsResult> QXmppPubSubManager::requestItemIds(
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to delete the item from
 /// \param itemId the ID of the item to delete
-/// \return
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.11,
+/// default: false)
 ///
-auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, const QString &itemId) -> QXmppTask<Result>
+auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify)
+    -> QXmppTask<Result>
 {
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setQueryType(PubSubIq<>::Retract);
     request.setQueryNode(nodeName);
     request.setItems({ QXmppPubSubBaseItem(itemId) });
+    request.setRetractNotify(notify);
     request.setTo(jid);
 
     return client()->sendGenericIq(std::move(request));
@@ -451,10 +454,13 @@ auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.11,
+/// default: false)
 ///
-auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId) -> QXmppTask<Result>
+auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify)
+    -> QXmppTask<Result>
 {
-    return retractItem(jid, nodeName, standardItemIdToString(itemId));
+    return retractItem(jid, nodeName, standardItemIdToString(itemId), notify);
 }
 
 ///
