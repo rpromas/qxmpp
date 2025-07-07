@@ -100,6 +100,7 @@ public:
     QVector<QXmppPubSubSubscription> subscriptions;
     QVector<QXmppPubSubAffiliation> affiliations;
     uint32_t maxItems = 0;
+    bool retractNotify = false;
     std::optional<QXmppDataForm> dataForm;
     std::optional<QXmppResultSetReply> itemsContinuation;
 };
@@ -282,6 +283,20 @@ void PubSubIqBase::setMaxItems(std::optional<uint32_t> maxItems)
 }
 
 ///
+/// Returns whether to send notifications on retraction (default: false).
+///
+/// \since QXmpp 1.11
+///
+bool PubSubIqBase::retractNotify() const { return d->retractNotify; }
+
+///
+/// Sets whether to send notifications on retraction.
+///
+///  \since QXmpp 1.11
+///
+void PubSubIqBase::setRetractNotify(bool notify) { d->retractNotify = notify; }
+
+///
 /// Returns a data form if the IQ contains one.
 ///
 std::optional<QXmppDataForm> PubSubIqBase::dataForm() const
@@ -451,6 +466,11 @@ void PubSubIqBase::parseElementFromChild(const QDomElement &element)
     d->queryJid = queryElement.attribute(u"jid"_s);
     d->queryNode = queryElement.attribute(u"node"_s);
 
+    // retract notify
+    if (d->queryType == Retract) {
+        d->retractNotify = parseBoolean(queryElement.attribute(u"notify"_s)).value_or(false);
+    }
+
     // parse subid
     switch (d->queryType) {
     case Items:
@@ -537,6 +557,10 @@ void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
                 d->queryType,
                 OptionalAttribute { u"jid", d->queryJid },
                 OptionalAttribute { u"node", d->queryNode },
+                OptionalContent {
+                    d->queryType == Retract && d->retractNotify,
+                    Attribute { u"notify", true },
+                },
                 // subid
                 [&] {
                     switch (d->queryType) {

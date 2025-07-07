@@ -211,7 +211,7 @@ void tst_QXmppPubSubIq::testPublish()
 
 void tst_QXmppPubSubIq::testRetractItem()
 {
-    const QByteArray xml(
+    QByteArray xml(
         "<iq"
         " id=\"retract1\""
         " to=\"pubsub.shakespeare.lit\""
@@ -233,6 +233,7 @@ void tst_QXmppPubSubIq::testRetractItem()
     QCOMPARE(iq.queryType(), PubSubIq<>::Retract);
     QCOMPARE(iq.queryJid(), QString());
     QCOMPARE(iq.queryNode(), QLatin1String("princely_musings"));
+    QCOMPARE(iq.retractNotify(), false);
     QCOMPARE(iq.items().size(), 1);
     QCOMPARE(iq.items().first().id(), u"ae890ac52d0df67ed7cfdf51b644e901"_s);
     serializePacket(iq, xml);
@@ -250,6 +251,21 @@ void tst_QXmppPubSubIq::testRetractItem()
     item.setId(u"ae890ac52d0df67ed7cfdf51b644e901"_s);
     iq.setItems({ item });
 
+    serializePacket(iq, xml);
+
+    xml = "<iq"
+          " id=\"retract1\""
+          " type=\"set\">"
+          "<pubsub xmlns=\"http://jabber.org/protocol/pubsub\">"
+          "<retract node=\"princely_musings\" notify='true'>"
+          "<item id=\"ae890ac52d0df67ed7cfdf51b644e901\"/>"
+          "</retract>"
+          "</pubsub>"
+          "</iq>";
+
+    iq = PubSubIq<>();
+    parsePacket(iq, xml);
+    QCOMPARE(iq.retractNotify(), true);
     serializePacket(iq, xml);
 }
 
