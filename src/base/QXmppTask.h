@@ -91,9 +91,6 @@ public:
         using namespace QXmpp::Private;
         if constexpr (std::is_void_v<T>) {
             static_assert(std::is_invocable_v<Continuation>, "Function needs to be invocable without arguments.");
-        } else if constexpr (std::is_copy_constructible_v<T>) {
-            static_assert(std::is_invocable_v<Continuation, T &&> || std::is_invocable_v<Continuation, const T &>,
-                          "Function needs to be invocable with const T & or T &&.");
         } else {
             static_assert(std::is_invocable_v<Continuation, T &&>, "Function needs to be invocable with T &&.");
         }
@@ -102,74 +99,26 @@ public:
             if constexpr (std::is_void_v<T>) {
                 continuation();
             } else {
-                if constexpr (std::is_copy_constructible_v<T>) {
-                    if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                        continuation(*d->result);
-                    } else {
-                        continuation(T { d->result.value() });
-                    }
-                } else {
-                    // for move-only types, the result may not exist anymore
-                    if (hasResult()) {
-                        auto value = std::move(*d->result);
-                        d->result.reset();
-                        continuation(std::move(value));
-                    }
+                if (hasResult()) {
+                    auto value = std::move(*d->result);
+                    d->result.reset();
+                    continuation(std::move(value));
                 }
             }
         } else {
-            if constexpr (std::is_copy_constructible_v<T>) {
-                if (d->continuation != nullptr) {
-                    // secondary continuation
-                    d->continuation = [previous = std::move(d->continuation),
-                                       context = QPointer(context),
-                                       continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
-                        previous(d);
-                        if (context) {
-                            if constexpr (std::is_void_v<T>) {
-                                continuation();
-                            } else {
-                                if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                                    continuation(d.result.value());
-                                } else {
-                                    continuation(T { d.result.value() });
-                                }
-                            }
-                        }
-                    };
-                    return;
-                } else {
-                    // first continuation
-                    d->continuation = [context = QPointer(context),
-                                       continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
-                        if (context) {
-                            if constexpr (std::is_void_v<T>) {
-                                continuation();
-                            } else {
-                                if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                                    continuation(d.result.value());
-                                } else {
-                                    continuation(T { d.result.value() });
-                                }
-                            }
-                        }
-                    };
-                }
-            } else {
-                d->continuation = [context = QPointer(context),
-                                   continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
-                    if (context) {
-                        if constexpr (std::is_void_v<T>) {
-                            continuation();
-                        } else {
-                            // move out value (only one continuation allowed)
-                            auto value = std::move(*d.result);
-                            d.result.reset();
-                            continuation(std::move(value));
-                        }
+            d->continuation = [context = QPointer(context),
+                               continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
+                if (context) {
+                    if constexpr (std::is_void_v<T>) {
+                        continuation();
+                    } else {
+                        // move out value (only one continuation allowed)
+                        auto value = std::move(*d.result);
+                        d.result.reset();
+                        continuation(std::move(value));
                     }
-                };
-            }
+                }
+            };
         }
     }
 

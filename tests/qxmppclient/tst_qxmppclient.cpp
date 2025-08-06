@@ -189,8 +189,7 @@ void tst_QXmppClient::testTaskDirect()
 
     QVERIFY(thenCalled);
     QVERIFY(p.task().isFinished());
-    // QXmppIq is copyable
-    QVERIFY(p.task().hasResult());
+    QVERIFY(!p.task().hasResult());
 }
 
 static QXmppTask<QXmppIq> generateRegisterIq()
@@ -234,8 +233,7 @@ void tst_QXmppClient::testTaskStore()
     QVERIFY(thenCalled);
 
     QVERIFY(p.task().isFinished());
-    // QXmppIq is copyable
-    QVERIFY(p.task().hasResult());
+    QVERIFY(!p.task().hasResult());
 }
 
 void tst_QXmppClient::taskMultipleThen()
@@ -258,19 +256,7 @@ void tst_QXmppClient::taskMultipleThen()
     QVERIFY(called.isEmpty());
     context1.reset();
     p.finish(u"test"_s);
-    QCOMPARE(called, u"13"_s);
-
-    p.task().then(this, [&](QString) {
-        called.append(u'4');
-    });
-    p.task().then(this, [&](QString) {
-        called.append(u'5');
-    });
-    p.task().then(this, [&](QString) {
-        called.append(u'6');
-    });
-
-    QCOMPARE(called, u"13456");
+    QCOMPARE(called, u"3"_s);
 }
 
 void tst_QXmppClient::colorGeneration()
