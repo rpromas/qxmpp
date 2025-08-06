@@ -4,10 +4,24 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.11.0 (UNRELEASED)
--------------------------
+QXmpp 1.11.0 (August 7, 2025)
+-----------------------------
 
-*under development*
+ - RpcIq: Fix only-whitespace strings are stripped (@lnjX, !694)
+ - CMake: Add `BUILD_WITH_QT6` option instead of `QT_VERSION_MAJOR` (@lnjX)
+ - JingleIq: Replace reason attribute with optional<Reason> (@lnjX, !696)
+ - New voice call example (@lnjX, !696)
+ - Implement XEP-0320: Use of DTLS-SRTP in Jingle Sessions (@lnjX, !696)
+ - Security and stability improvements by parsing whole stream through QXmlStreamReader internally and creating QDomElements manually (@lnjX, !700)
+ - Client/Server: Close connection on unexpected element received (@lnjX, !700)
+ - OutgoingClient: Re-create socket on connection errors to avoid race conditions (@lnjX, !700)
+ - Big parsing/serialization overhaul (@lnjX, !705)
+   - abstraction for parsing of sub-elements and implicitly checking for tag name/xmlns
+   - enum parsing/serialization with compile-time registry
+   - declarative XML serialization using new XmlWriter
+ - New internal Iq<T> type, separating parsing of IQ and payload (@lnjX, !708)
+ - Task: Inline TaskData and use std::optional to avoid additional heap allocation (@lnjX, !709)
+ - PubSubIq: Add notify attribute for retraction (@lnjX, !713)
 
 Breaking changes:
  - JingleIq::RtpSessionStateMuting: 'isMute' is not default initialized anymore like 'creator' is
