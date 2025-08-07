@@ -87,8 +87,14 @@ public:
     QList<QXmppDiscoveryIq::Item> items() const;
     void setItems(const QList<QXmppDiscoveryIq::Item> &items);
 
+    [[deprecated("Use dataForms() instead")]]
     QXmppDataForm form() const;
+    [[deprecated("Use setDataForms() instead")]]
     void setForm(const QXmppDataForm &form);
+
+    const QList<QXmppDataForm> &dataForms() const;
+    void setDataForms(const QList<QXmppDataForm> &dataForms);
+    std::optional<QXmppDataForm> dataForm(QStringView formType) const;
 
     QString queryNode() const;
     void setQueryNode(const QString &node);
