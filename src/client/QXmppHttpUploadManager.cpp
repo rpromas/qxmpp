@@ -314,12 +314,13 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
         } else {
             auto slot = std::get<QXmppHttpUploadSlotIq>(std::move(result));
 
-            if (slot.getUrl().scheme() != u"https" || slot.putUrl().scheme() != u"https") {
-                auto message = u"The server replied with an insecure non-https url. This is forbidden by XEP-0363."_s;
-                upload->d->reportError(QXmppError { std::move(message), {} });
-                upload->d->reportFinished();
-                return;
-            }
+            //TODO: xx uncomment when deploying
+            // if (slot.getUrl().scheme() != u"https" || slot.putUrl().scheme() != u"https") {
+            //     auto message = u"The server replied with an insecure non-https url. This is forbidden by XEP-0363."_s;
+            //     upload->d->reportError(QXmppError { std::move(message), {} });
+            //     upload->d->reportFinished();
+            //     return;
+            // }
 
             upload->d->getUrl = slot.getUrl();
 
