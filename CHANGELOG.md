@@ -4,6 +4,12 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.11.1 (August 13, 2025)
+------------------------------
+
+ - Fix behaviour change in DiscoveryIq: Continue to parse multiple form elements into one
+   QXmppDataForm object (@lnj)
+
 QXmpp 1.11.0 (August 7, 2025)
 -----------------------------
 
