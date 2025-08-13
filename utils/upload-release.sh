@@ -22,11 +22,20 @@ if [ -z "$1" ]; then
     exit
 fi
 
+if ! command -v jq &> /dev/null; then
+    echo "jq is required but not installed. Please install it and try again."
+    exit 1
+fi
+
 mkdir -p $work_dir
 cd $work_dir
 
 # Download, compress and sign the release files.
-git clone --depth=1 -b "${release_tag_name}" "${project_repo_url}" "${checkout_dir}"
+echo "Cloning repository ${project_repo_url} at tag ${release_tag_name}..."
+if ! git clone --depth=1 --quiet -b "${release_tag_name}" "${project_repo_url}" "${checkout_dir}" >/dev/null 2>&1; then
+    echo "Failed to clone repository ${project_repo_url} at tag ${release_tag_name}."
+    exit 1
+fi
 rm -rf "${checkout_dir}/.git"
 tar -I "xz -9" -cf "${compressed_archive}" "${checkout_dir}"
 gpg -o "${compressed_archive}.sig" -abs "${compressed_archive}"
@@ -36,20 +45,23 @@ release_files="${compressed_archive} ${compressed_archive}.sig"
 release_files_string=$(echo ${release_files} | tr "[:blank:]" ",")
 curl -T "{${release_files_string}}" "${release_files_upload_url}"
 
-printf "%s\n" \
-    "Steps required to publish release files:" \
-    "Create admin ticket: ${sysadmin_ticket_url}" \
-    "Title: Publish $compressed_archive" \
-    "Description:" \
-    "Target: ${target}/${project_name}" \
+task_title="Publish $compressed_archive"
+task_description="Publish $compressed_archive to ${target}/${project_name}.
 
-printf '\nSHA-1:\n```\n'
-sha1sum ${release_files}
-printf '```\n\nSHA-256:\n```\n'
-sha256sum ${release_files}
-printf '```\n'
+SHA-1:
+\`\`\`
+$(sha1sum ${release_files})
+\`\`\`
 
-cd -
+SHA-256:
+\`\`\`
+$(sha256sum ${release_files})
+\`\`\`"
+
+echo "Now, create a sysadmin ticket to publish on download.kde.org:"
+echo "https://phabricator.kde.org/maniphest/task/edit/form/2/?title=$(jq -sRr @uri <<< "$task_title")&priority=normal&description=$(jq -sRr @uri <<< "$task_description")"
+
+cd - >/dev/null
 mv $work_dir/$compressed_archive $work_dir/$compressed_archive.sig ./
 
 # clean up
