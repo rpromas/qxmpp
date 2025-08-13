@@ -909,7 +909,8 @@ void QXmppDataForm::parse(const QDomElement &element)
     /* form properties */
     d->title = firstChildElement(element, u"title").text();
     d->instructions = firstChildElement(element, u"instructions").text();
-    d->fields = parseChildElements<QList<Field>>(element);
+    // compat: allow parsing multiple forms into one QXmppDataForm
+    d->fields.append(parseChildElements<QList<Field>>(element));
 }
 
 void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
