@@ -17,14 +17,8 @@ SPDX-License-Identifier: CC0-1.0
     </a>
 </p>
 <p align="center">
-    <a href="https://github.com/qxmpp-project/qxmpp/actions">
-        <img alt="Build Status" src="https://github.com/qxmpp-project/qxmpp/workflows/tests/badge.svg">
-    </a>
-    <a href="https://codecov.io/gh/qxmpp-project/qxmpp">
-        <img alt="Code Coverage" src="https://img.shields.io/codecov/c/github/qxmpp-project/qxmpp.svg">
-    </a>
-    <a href="https://github.com/qxmpp-project/qxmpp/releases/latest">
-        <img alt="Latest release" src="https://img.shields.io/github/v/release/qxmpp-project/qxmpp">
+    <a href="https://invent.kde.org/libraries/qxmpp/-/pipelines">
+        <img alt="Build Status" src="https://invent.kde.org/libraries/qxmpp/badges/master/pipeline.svg">
     </a>
     <a href="https://doc.qxmpp.org/">
         <img alt="Documentation" src="https://img.shields.io/website?down_message=offline&label=documentation&up_message=online&url=https%3A%2F%2Fdoc.qxmpp.org%2F">
@@ -35,8 +29,8 @@ SPDX-License-Identifier: CC0-1.0
     <a href="https://liberapay.com/QXmpp/donate">
         <img alt="Donate using Liberapay" src="https://img.shields.io/liberapay/patrons/QXmpp.svg?logo=liberapay">
     </a>
-    <a href="https://api.reuse.software/info/github.com/qxmpp-project/qxmpp">
-        <img alt="REUSE status" src="https://api.reuse.software/badge/github.com/qxmpp-project/qxmpp">
+    <a href="https://api.reuse.software/info/invent.kde.org/libraries/qxmpp">
+        <img alt="REUSE status" src="https://api.reuse.software/badge/invent.kde.org/libraries/qxmpp">
     </a>
 </p>
 
