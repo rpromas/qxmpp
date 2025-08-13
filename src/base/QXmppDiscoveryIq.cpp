@@ -472,7 +472,10 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
     d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
     d->identities = parseChildElements<QList<Identity>>(queryElement);
     d->items = parseChildElements<QList<Item>>(queryElement);
-    d->form = parseOptionalChildElement<QXmppDataForm>(queryElement).value_or(QXmppDataForm());
+    // compat: parse all form fields into one data form
+    for (const auto &formElement : iterChildElements<QXmppDataForm>(queryElement)) {
+        d->form.parse(formElement);
+    }
 }
 
 void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const

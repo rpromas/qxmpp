@@ -196,6 +196,37 @@ void tst_QXmppHttpUploadManager::testDiscoveryService_data()
             "</query>"
             "</iq>"
         << true;
+
+    QTest::newRow("correct disco info with multiple forms")
+        << "<iq from='" +
+            UPLOAD_SERVICE_NAME.toUtf8() +
+            "' id='step_02' to='romeo@montague.tld/garden' type='result'>"
+            "<query xmlns='http://jabber.org/protocol/disco#info'>"
+            "<identity category='store' type='file' name='HTTP File Upload' />"
+            "<feature var='urn:xmpp:http:upload:0' />"
+            "<x type='result' xmlns='jabber:x:data'>"
+            "<field var='FORM_TYPE' type='hidden'>"
+            "<value>urn:xmpp:http:upload:2</value>"
+            "</field>"
+            "</x>"
+            "<x type='result' xmlns='jabber:x:data'>"
+            "<field var='FORM_TYPE' type='hidden'>"
+            "<value>urn:xmpp:http:upload:0</value>"
+            "</field>"
+            "<field var='max-file-size'>"
+            "<value>" +
+            QByteArray::number(MAX_FILE_SIZE) +
+            "</value>"
+            "</field>"
+            "</x>"
+            "<x type='result' xmlns='jabber:x:data'>"
+            "<field var='FORM_TYPE' type='hidden'>"
+            "<value>urn:xmpp:http:new-fancy-upload:0</value>"
+            "</field>"
+            "</x>"
+            "</query>"
+            "</iq>"
+        << true;
 }
 
 void tst_QXmppHttpUploadManager::testDiscoveryService()
