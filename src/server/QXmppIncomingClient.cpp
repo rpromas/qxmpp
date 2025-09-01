@@ -12,6 +12,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
@@ -388,24 +389,26 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             const QString type = nodeRecv.attribute(u"type"_s);
             const auto id = nodeRecv.attribute(u"id"_s);
 
-            if (isIqElement<QXmppBindIq>(nodeRecv) && type == u"set") {
-                QXmppBindIq bindSet;
-                bindSet.parse(nodeRecv);
-                d->resource = bindSet.resource().trimmed();
-                if (d->resource.isEmpty()) {
-                    d->resource = QXmppUtils::generateStanzaHash();
+            if (isElement<BindElement>(nodeRecv.firstChildElement())) {
+                if (auto bindSet = SetIq<BindElement>::fromDom(nodeRecv)) {
+                    d->resource = bindSet->payload.resource.trimmed();
+                    if (d->resource.isEmpty()) {
+                        d->resource = QXmppUtils::generateStanzaHash();
+                    }
+                    d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
+
+                    sendData(serializeXml(ResultIq<BindElement> {
+                        bindSet->id,
+                        {},
+                        {},
+                        {},
+                        BindElement { d->jid, {} },
+                    }));
+
+                    // bound
+                    Q_EMIT connected();
+                    return;
                 }
-                d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
-
-                QXmppBindIq bindResult;
-                bindResult.setType(QXmppIq::Result);
-                bindResult.setId(bindSet.id());
-                bindResult.setJid(d->jid);
-                sendPacket(bindResult);
-
-                // bound
-                Q_EMIT connected();
-                return;
             } else if (iqPayloadXmlTag(nodeRecv) == SessionIqXmlTag && type == u"set") {
                 QXmppIq sessionResult;
                 sessionResult.setType(QXmppIq::Result);

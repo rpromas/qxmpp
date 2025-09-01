@@ -6,7 +6,7 @@
 
 #include "QXmppOutgoingClient.h"
 
-#include "QXmppBindIq.h"
+#include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
@@ -18,7 +18,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Async.h"
+#include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 
@@ -947,52 +947,51 @@ QXmppTask<BindManager::Result> BindManager::bindAddress(const QString &resource)
     Q_ASSERT(m_iqId.isNull());
 
     m_promise = QXmppPromise<Result>();
-
-    const auto iq = QXmppBindIq::bindAddressIq(resource);
-    m_iqId = iq.id();
-    m_socket->sendData(serializeXml(iq));
+    m_iqId = generateSequentialStanzaId();
+    m_socket->sendData(serializeXml(SetIq<BindElement> {
+        m_iqId,
+        {},
+        {},
+        {},
+        BindElement { {}, resource },
+    }));
 
     return m_promise->task();
 }
 
 HandleElementResult BindManager::handleElement(const QDomElement &el)
 {
-    auto process = [](QXmppBindIq &&iq) -> Result {
-        if (iq.type() == QXmppIq::Result) {
-            if (iq.jid().isEmpty()) {
-                return ProtocolError { u"Server did not return JID upon resource binding."_s };
-            }
-
-            static const QRegularExpression jidRegex(u"^([^@/]+)@([^@/]+)/(.+)$"_s);
-            if (const auto match = jidRegex.match(iq.jid()); match.hasMatch()) {
-                return BoundAddress {
-                    match.captured(1),
-                    match.captured(2),
-                    match.captured(3),
-                };
-            }
-
-            return ProtocolError { u"Bind IQ received with invalid JID"_s };
-        }
-
-        return iq.error();
-    };
-
-    if (isIqElement<QXmppBindIq>(el) && el.attribute(u"id"_s) == m_iqId) {
+    if (el.tagName() == u"iq" && isElement<BindElement>(el.firstChildElement()) && el.attribute(u"id"_s) == m_iqId) {
         Q_ASSERT(m_promise.has_value());
 
         auto p = std::move(*m_promise);
         m_iqId.clear();
         m_promise.reset();
 
-        QXmppBindIq bind;
-        bind.parse(el);
+        p.finish(map<Result>(
+            overloaded {
+                [](BindElement &&bind) -> Result {
+                    if (bind.jid.isEmpty()) {
+                        return ProtocolError { u"Server did not return JID upon resource binding."_s };
+                    }
 
-        // do not accept other IQ types than result and error
-        if (bind.type() == QXmppIq::Result || bind.type() == QXmppIq::Error) {
-            p.finish(process(std::move(bind)));
-            return Finished;
-        }
+                    static const QRegularExpression jidRegex(u"^([^@/]+)@([^@/]+)/(.+)$"_s);
+                    if (const auto match = jidRegex.match(bind.jid); match.hasMatch()) {
+                        return BoundAddress {
+                            match.captured(1),
+                            match.captured(2),
+                            match.captured(3),
+                        };
+                    }
+
+                    return ProtocolError { u"Bind IQ received with invalid JID"_s };
+                },
+                [](QXmppError &&error) -> Result {
+                    return ProtocolError { error.description };
+                },
+            },
+            parseIqResponse<BindElement>(el)));
+        return Finished;
     }
     return Rejected;
 }

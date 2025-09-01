@@ -7,6 +7,7 @@
 #include "Stream.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVisitHelper_p.h"
 
@@ -93,6 +94,26 @@ std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
 void StarttlsProceed::toXml(XmlWriter &w) const
 {
     w.write(Element { XmlTag });
+}
+
+std::optional<BindElement> BindElement::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    return BindElement {
+        .jid = firstChildElement(el, u"jid").text(),
+        .resource = firstChildElement(el, u"resource").text(),
+    };
+}
+
+void BindElement::toXml(XmlWriter &w) const
+{
+    w.write(Element {
+        { u"bind", ns_bind },
+        OptionalTextElement { u"jid", jid },
+        OptionalTextElement { u"resource", resource },
+    });
 }
 
 void CsiActive::toXml(XmlWriter &w) const

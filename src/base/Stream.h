@@ -43,6 +43,15 @@ struct StarttlsProceed {
     void toXml(XmlWriter &) const;
 };
 
+struct BindElement {
+    QString jid;
+    QString resource;
+
+    static constexpr std::tuple XmlTag = { u"bind", ns_bind };
+    static std::optional<BindElement> fromDom(const QDomElement &el);
+    void toXml(XmlWriter &w) const;
+};
+
 struct CsiActive {
     static constexpr std::tuple XmlTag = { u"active", ns_csi };
     void toXml(XmlWriter &) const;
