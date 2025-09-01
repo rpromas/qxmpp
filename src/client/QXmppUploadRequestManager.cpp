@@ -11,6 +11,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 
 #include "Async.h"
 #include "StringLiterals.h"
@@ -290,21 +291,19 @@ void QXmppUploadRequestManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
             QXmppUploadService service;
             service.setJid(iq.from());
 
-            // get size limit
-            bool isFormNsCorrect = false;
-            for (const QXmppDataForm::Field &field : iq.form().constFields()) {
-                if (field.key() == u"FORM_TYPE") {
-                    isFormNsCorrect = field.value().toString() == ns_http_upload;
-                } else if (isFormNsCorrect && field.key() == u"max-file-size") {
-                    service.setSizeLimit(field.value().toLongLong());
+            if (auto form = iq.dataForm(ns_http_upload)) {
+                if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
+                    if (auto maxSize = parseInt<uint64_t>(maxSizeValue->toString())) {
+                        service.setSizeLimit(*maxSize);
+                    }
                 }
             }
 
             d->uploadServices.append(service);
             Q_EMIT serviceFoundChanged();
+            return;
         }
     }
-    return;
 }
 
 void QXmppUploadRequestManager::onRegistered(QXmppClient *client)

@@ -155,7 +155,7 @@ QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
 
     // extended information
     if (!d->clientInfoForm.isNull()) {
-        iq.setForm(d->clientInfoForm);
+        iq.setDataForms({ d->clientInfoForm });
     }
 
     return iq;
