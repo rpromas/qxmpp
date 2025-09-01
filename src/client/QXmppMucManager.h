@@ -231,7 +231,6 @@ public Q_SLOTS:
 
 private Q_SLOTS:
     void _q_disconnected();
-    void _q_discoveryInfoReceived(const QXmppDiscoveryIq &iq);
     void _q_messageReceived(const QXmppMessage &message);
     void _q_presenceReceived(const QXmppPresence &presence);
 

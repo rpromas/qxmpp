@@ -176,14 +176,8 @@ QXmppMucRoom::QXmppMucRoom(QXmppClient *client, const QString &jid, QObject *par
     connect(d->client, &QXmppClient::presenceReceived,
             this, &QXmppMucRoom::_q_presenceReceived);
 
-    if (d->discoManager) {
-        connect(d->discoManager, &QXmppDiscoveryManager::infoReceived,
-                this, &QXmppMucRoom::_q_discoveryInfoReceived);
-    }
-
     // convenience signals for properties
     connect(this, &QXmppMucRoom::joined, this, &QXmppMucRoom::isJoinedChanged);
-
     connect(this, &QXmppMucRoom::left, this, &QXmppMucRoom::isJoinedChanged);
 }
 
@@ -558,25 +552,6 @@ void QXmppMucRoom::_q_disconnected()
     }
 }
 
-void QXmppMucRoom::_q_discoveryInfoReceived(const QXmppDiscoveryIq &iq)
-{
-    if (iq.from() == d->jid) {
-        QString name;
-        const auto &identities = iq.identities();
-        for (const auto &identity : identities) {
-            if (identity.category() == u"conference") {
-                name = identity.name();
-                break;
-            }
-        }
-
-        if (name != d->name) {
-            d->name = name;
-            Q_EMIT nameChanged(name);
-        }
-    }
-}
-
 void QXmppMucRoom::_q_messageReceived(const QXmppMessage &message)
 {
     if (QXmppUtils::jidToBareJid(message.from()) != d->jid) {
@@ -642,7 +617,25 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
             if (jid == d->ownJid()) {
                 // request room information
                 if (d->discoManager) {
-                    d->discoManager->requestInfo(d->jid);
+                    d->discoManager->requestDiscoInfo(d->jid).then(this, [this](auto &&result) {
+                        if (!std::holds_alternative<QXmppDiscoveryIq>(result)) {
+                            return;
+                        }
+
+                        QString name;
+                        const auto &identities = std::get<QXmppDiscoveryIq>(result).identities();
+                        for (const auto &identity : identities) {
+                            if (identity.category() == u"conference") {
+                                name = identity.name();
+                                break;
+                            }
+                        }
+
+                        if (name != d->name) {
+                            d->name = name;
+                            Q_EMIT nameChanged(name);
+                        }
+                    });
                 }
 
                 Q_EMIT joined();
