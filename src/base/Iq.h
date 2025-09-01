@@ -189,10 +189,10 @@ auto iqFromDomImpl(const QDomElement &el) -> std::optional<Iq<Type, Payload>>
 
 // parse Iq type from QDomElement or pass error
 template<typename Payload>
-auto parseIqResponse(std::variant<QDomElement, QXmppError> &&sendResult) -> std::variant<Payload, QXmppError>
+auto parseIqResponse(std::variant<QDomElement, QXmppError> &&sendResult) -> std::variant<Payload, QXmppStanza::Error, QXmppError>
 {
     using StanzaError = QXmppStanza::Error;
-    using Result = std::variant<Payload, QXmppError>;
+    using Result = std::variant<Payload, QXmppStanza::Error, QXmppError>;
 
     return map<Result>(
         [](QDomElement &&el) -> Result {
@@ -208,21 +208,24 @@ auto parseIqResponse(std::variant<QDomElement, QXmppError> &&sendResult) -> std:
                 }
             } else if (type == IqType::Error) {
                 if (auto error = parseElement<StanzaError>(el.lastChildElement())) {
-                    return QXmppError { error->text(), std::move(*error) };
+                    return std::move(*error);
                 } else {
-                    return QXmppError {
-                        u"Failed to parse error response"_s,
-                        StanzaError(StanzaError::Cancel, StanzaError::UndefinedCondition),
-                    };
+                    return QXmppError { u"Failed to parse error response"_s, {} };
                 }
             } else {
-                return QXmppError {
-                    u"Received unexpected IQ type"_s,
-                    StanzaError(StanzaError::Modify, StanzaError::UnexpectedRequest),
-                };
+                return QXmppError { u"Received unexpected IQ type"_s, {} };
             }
         },
         std::move(sendResult));
+}
+
+template<typename Payload>
+auto parseIqResponseFlat(std::variant<QDomElement, QXmppError> &&sendResult)
+{
+    using Result = std::variant<Payload, QXmppError>;
+    return map<Result>(
+        [](QXmppStanza::Error &&e) -> Result { return QXmppError { e.text(), std::move(e) }; },
+        parseIqResponse<Payload>(std::move(sendResult)));
 }
 
 // For usage with QXmppClient::sendIq()

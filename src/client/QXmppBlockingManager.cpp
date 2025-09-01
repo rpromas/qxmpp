@@ -234,7 +234,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
             // parse into QXmppBlocklist/Error variant
             auto blocklistResult = map<BlocklistResult>(
                 [](Blocking<List> &&list) { return QXmppBlocklist(list.jids); },
-                parseIqResponse<Blocking<List>>(std::move(result)));
+                parseIqResponseFlat<Blocking<List>>(std::move(result)));
 
             // store blocklist on success
             if (!d->blocklist) {
