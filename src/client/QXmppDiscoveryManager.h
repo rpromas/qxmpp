@@ -32,9 +32,6 @@ public:
 
     QXmppDiscoveryIq capabilities();
 
-    QString requestInfo(const QString &jid, const QString &node = QString());
-    QString requestItems(const QString &jid, const QString &node = QString());
-
     using InfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
     using ItemsResult = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
     QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
@@ -62,12 +59,18 @@ public:
     std::variant<QXmppDiscoveryIq, QXmppStanza::Error> handleIq(QXmppDiscoveryIq &&iq);
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when an information response is received.
-    void infoReceived(const QXmppDiscoveryIq &);
+    Q_SIGNAL void infoReceived(const QXmppDiscoveryIq &);
 
     /// This signal is emitted when an items response is received.
-    void itemsReceived(const QXmppDiscoveryIq &);
+    Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
+
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Use requestDiscoInfo")]]
+    QString requestInfo(const QString &jid, const QString &node = QString());
+    [[deprecated("Use requestDiscoItems")]]
+    QString requestItems(const QString &jid, const QString &node = QString());
+#endif
 
 private:
     const std::unique_ptr<QXmppDiscoveryManagerPrivate> d;

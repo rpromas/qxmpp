@@ -74,42 +74,6 @@ QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &node)
-{
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-    return client()->sendLegacyId(request);
-}
-
-///
-/// Requests items from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &node)
-{
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-    return client()->sendLegacyId(request);
-}
-
-///
-/// Requests information from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)

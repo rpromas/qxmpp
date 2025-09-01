@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppClient_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPacket_p.h"
 #include "QXmppRosterManager.h"
@@ -18,6 +19,8 @@
 #include <QTimer>
 
 using namespace QXmpp::Private;
+
+// Client
 
 ///
 /// \brief You need to implement this method to process incoming XMPP
@@ -134,6 +137,48 @@ void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
     } else {
         send(QXmppMessage({}, bareJid, message));
     }
+}
+
+// DiscoveryManager
+
+///
+/// Requests information from the specified XMPP entity.
+///
+/// \param jid  The target entity's JID.
+/// \param node The target node (optional).
+///
+/// \deprecated
+///
+QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &node)
+{
+    QXmppDiscoveryIq request;
+    request.setType(QXmppIq::Get);
+    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
+    request.setTo(jid);
+    if (!node.isEmpty()) {
+        request.setQueryNode(node);
+    }
+    return client()->sendLegacyId(request);
+}
+
+///
+/// Requests items from the specified XMPP entity.
+///
+/// \param jid  The target entity's JID.
+/// \param node The target node (optional).
+///
+/// \deprecated
+///
+QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &node)
+{
+    QXmppDiscoveryIq request;
+    request.setType(QXmppIq::Get);
+    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
+    request.setTo(jid);
+    if (!node.isEmpty()) {
+        request.setQueryNode(node);
+    }
+    return client()->sendLegacyId(request);
 }
 
 // RemoteMethod
