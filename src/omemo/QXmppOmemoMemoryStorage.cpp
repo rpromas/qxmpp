@@ -14,8 +14,6 @@ using namespace QXmpp::Private;
 /// \brief The QXmppOmemoMemoryStorage class stores data used by
 /// \xep{0384, OMEMO Encryption} in the memory.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

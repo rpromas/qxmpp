@@ -18,8 +18,6 @@ using namespace QXmpp::Private;
 ///
 /// \brief The QXmppTrustManager manages end-to-end encryption trust decisions.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \ingroup Managers
 ///
 /// \since QXmpp 1.5

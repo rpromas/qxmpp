@@ -511,8 +511,6 @@ bool QXmppClient::sendPacket(const QXmppNonza &packet)
 /// If connection errors occur, the packet is resent if possible. If
 /// reconnecting is not possible, an error is reported.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \returns A QXmppTask that makes it possible to track the state of the packet.
 ///
 /// \since QXmpp 1.5
@@ -562,8 +560,6 @@ QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, co
 /// This does the same as send(), but does not do any end-to-end encryption on
 /// the stanza.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \returns A QXmppTask that makes it possible to track the state of the packet.
 ///
 /// \since QXmpp 1.5
@@ -606,8 +602,6 @@ QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std:
 ///
 /// \sa sendSensitiveIq()
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
@@ -626,8 +620,6 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
 ///
 /// IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
 /// QXmppStanza::Error.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -700,8 +692,6 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
 ///
 /// \returns Returns QXmpp::Success (on response type 'result') or the contained
 /// QXmppStanza::Error (on response type 'error')
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///

@@ -52,8 +52,6 @@ using namespace QXmpp::Private;
 ///
 /// In addition, archiving via MAM must be enabled on the server.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \ingroup Managers
 ///
 /// \since QXmpp 1.5

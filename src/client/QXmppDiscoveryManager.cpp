@@ -118,8 +118,6 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
@@ -140,8 +138,6 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
 ///
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///

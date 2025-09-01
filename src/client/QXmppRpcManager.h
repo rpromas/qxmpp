@@ -16,9 +16,10 @@ class QXmppRpcErrorIq;
 class QXmppRpcInvokeIq;
 class QXmppRpcResponseIq;
 
+///
 /// \brief The QXmppRpcManager class make it possible to invoke remote methods
 /// and to expose local interfaces for remote procedure calls, as specified by
-/// \xep{0009}: Jabber-RPC.
+/// \xep{0009, Jabber-RPC}.
 ///
 /// To make use of this manager, you need to instantiate it and load it into
 /// the QXmppClient instance as follows:
@@ -28,10 +29,8 @@ class QXmppRpcResponseIq;
 /// client->addExtension(manager);
 /// \endcode
 ///
-/// \note THIS API IS NOT FINALIZED YET
-///
 /// \ingroup Managers
-
+///
 class QXMPP_EXPORT QXmppRpcManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -57,12 +56,9 @@ public:
     QStringList discoveryFeatures() const override;
     QList<QXmppDiscoveryIq::Identity> discoveryIdentities() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
-Q_SIGNALS:
-    /// \cond
-    void rpcCallResponse(const QXmppRpcResponseIq &result);
-    void rpcCallError(const QXmppRpcErrorIq &err);
+    Q_SIGNAL void rpcCallResponse(const QXmppRpcResponseIq &result);
+    Q_SIGNAL void rpcCallError(const QXmppRpcErrorIq &err);
     /// \endcond
 
 private:

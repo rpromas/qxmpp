@@ -53,10 +53,6 @@ QString QXmppEntityTimeManager::requestTime(const QString &jid)
 ///
 /// The timeReceived() signal is not emitted.
 ///
-/// \param jid
-///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<EntityTimeResult>

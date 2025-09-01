@@ -9,8 +9,6 @@
 ///
 /// The term "key" is used for a public long-term key.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

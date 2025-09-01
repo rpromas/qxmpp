@@ -209,8 +209,6 @@ QXmppPubSubManager::~QXmppPubSubManager()
 /// The features are only returned if the service is of type serviceType,
 /// otherwise InvalidServiceType is returned.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the entity hosting the pubsub service
 /// \param serviceType type of service to retrieve features for
 ///
@@ -726,14 +724,13 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::cancelNodeConfiguratio
 ///
 /// Subscribes to a node.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the pubsub service
 /// \param nodeName name of the pubsub node being subscribed
 /// \param subscriberJid bare or full JID of the subscriber
 ///
 QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::subscribeToNode(const QString &serviceJid, const QString &nodeName, const QString &subscriberJid)
 {
+    // TODO: Return subscription
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setTo(serviceJid);
@@ -746,14 +743,13 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::subscribeToNode(const 
 ///
 /// Unsubscribes from a node.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the pubsub service
 /// \param nodeName name of the pubsub node being subscribed
 /// \param subscriberJid bare or full JID of the subscriber
 ///
 QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(const QString &serviceJid, const QString &nodeName, const QString &subscriberJid)
 {
+    // TODO: Return subscription
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setTo(serviceJid);
@@ -763,7 +759,6 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
     return client()->sendGenericIq(std::move(request));
 }
 
-/// \cond
 ///
 /// \fn QXmppPubSubManager::requestOwnPepFeatures()
 ///
@@ -772,11 +767,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 /// This is a convenience method equivalent to calling
 /// QXmppPubSubManager::requestFeatures on the current account's bare JID.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
-/// \endcond
 
-///
 ///
 /// \fn QXmppPubSubManager::requestOwnPepNodes()
 ///

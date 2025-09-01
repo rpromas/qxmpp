@@ -183,8 +183,6 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
@@ -202,8 +200,6 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
 /// \param uploadService The HTTP File Upload service that is used to request
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -228,8 +224,6 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
 /// \param uploadService The HTTP File Upload service that is used to request
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///

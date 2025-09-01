@@ -17,8 +17,6 @@ using namespace QXmpp::Private;
 /// \brief The QXmppTrustMemoryStorage class stores trust data for end-to-end
 /// encryption in the memory.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

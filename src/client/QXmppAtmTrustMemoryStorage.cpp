@@ -18,8 +18,6 @@ using namespace QXmpp::Private;
 /// \brief The QXmppAtmTrustMemoryStorage class stores trust data for
 /// \xep{0450, Automatic Trust Management (ATM)} in the memory.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

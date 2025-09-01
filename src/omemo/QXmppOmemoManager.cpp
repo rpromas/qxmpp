@@ -316,8 +316,6 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 /// client->send(stanza, params);
 /// \endcode
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \ingroup Managers
 ///
 /// \since QXmpp 1.5
