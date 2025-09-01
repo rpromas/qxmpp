@@ -261,12 +261,6 @@ void QXmppPresence::setCapabilityVer(const QByteArray &ver)
     d->capabilityVer = ver;
 }
 
-/// Legacy \xep{0115}: Entity Capabilities
-QStringList QXmppPresence::capabilityExt() const
-{
-    return d->capabilityExt;
-}
-
 ///
 /// Returns whether a \xep{0272, Multiparty Jingle (Muji)} session is being prepared.
 ///
@@ -615,4 +609,6 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
         [&] { QXmppStanza::extensionsToXml(xmlWriter); },
     });
 }
+
+QStringList QXmppPresence::capabilityExt() const { return d->capabilityExt; }
 /// \endcond

@@ -107,8 +107,6 @@ public:
     QByteArray capabilityVer() const;
     void setCapabilityVer(const QByteArray &);
 
-    QStringList capabilityExt() const;
-
     // XEP-0272: Multiparty Jingle (Muji)
     bool isPreparingMujiSession() const;
     void setIsPreparingMujiSession(bool isPreparingMujiSession);
@@ -134,6 +132,11 @@ public:
     /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;
+
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Legacy entity capabilities (used 2003-2007)")]]
+    QStringList capabilityExt() const;
+#endif
     /// \endcond
 
 private:
