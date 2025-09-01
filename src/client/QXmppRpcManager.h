@@ -16,6 +16,10 @@ class QXmppRpcErrorIq;
 class QXmppRpcInvokeIq;
 class QXmppRpcResponseIq;
 
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 ///
 /// \brief The QXmppRpcManager class make it possible to invoke remote methods
 /// and to expose local interfaces for remote procedure calls, as specified by
@@ -31,7 +35,7 @@ class QXmppRpcResponseIq;
 ///
 /// \ingroup Managers
 ///
-class QXMPP_EXPORT QXmppRpcManager : public QXmppClientExtension
+class QXMPP_EXPORT [[deprecated("Removed from public API (unmaintained)")]] QXmppRpcManager : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -66,5 +70,8 @@ private:
 
     QMap<QString, QXmppInvokable *> m_interfaces;
 };
+
+QT_WARNING_POP
+#endif
 
 #endif

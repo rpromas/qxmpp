@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2009 Manjeet Dahiya <manjeetdahiya@gmail.com>
+// SPDX-FileCopyrightText: 2009 Ian Reinhart Geiser <geiseri@kde.org>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -6,11 +7,17 @@
 #include "QXmppMessage.h"
 #include "QXmppPacket_p.h"
 #include "QXmppRosterManager.h"
+#include "QXmppRpcManager.h"
 #include "QXmppStreamManagement_p.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
 #include "StringLiterals.h"
+
+#include <QEventLoop>
+#include <QTimer>
+
+using namespace QXmpp::Private;
 
 ///
 /// \brief You need to implement this method to process incoming XMPP
@@ -128,3 +135,219 @@ void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
         send(QXmppMessage({}, bareJid, message));
     }
 }
+
+// RemoteMethod
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+QXmppRemoteMethod::QXmppRemoteMethod(const QString &jid, const QString &method, const QVariantList &args, QXmppClient *client) : QObject(client), m_client(client)
+{
+    m_payload.setTo(jid);
+    m_payload.setFrom(client->configuration().jid());
+    m_payload.setMethod(method);
+    m_payload.setArguments(args);
+}
+
+QXmppRemoteMethodResult QXmppRemoteMethod::call()
+{
+    // FIXME : spinning an event loop is a VERY bad idea, it can cause
+    // us to lose incoming packets
+    QEventLoop loop(this);
+    connect(this, &QXmppRemoteMethod::callDone, &loop, &QEventLoop::quit);
+    QTimer::singleShot(30000, &loop, &QEventLoop::quit);  // Timeout in case the other end hangs...
+
+    auto payload = m_payload;
+    m_client->send(std::move(m_payload));
+
+    loop.exec(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents);
+    return m_result;
+}
+
+void QXmppRemoteMethod::gotError(const QXmppRpcErrorIq &iq)
+{
+    if (iq.id() == m_payload.id()) {
+        m_result.hasError = true;
+        m_result.errorMessage = iq.error().text();
+        m_result.code = iq.error().type();
+        Q_EMIT callDone();
+    }
+}
+
+void QXmppRemoteMethod::gotResult(const QXmppRpcResponseIq &iq)
+{
+    if (iq.id() == m_payload.id()) {
+        m_result.hasError = false;
+        // FIXME: we don't handle multiple responses
+        const auto values = iq.values();
+        m_result.result = values.first();
+        Q_EMIT callDone();
+    }
+}
+
+// RpcManager
+
+/// Constructs a QXmppRpcManager.
+QXmppRpcManager::QXmppRpcManager()
+{
+}
+
+/// Adds a local interface which can be queried using RPC.
+void QXmppRpcManager::addInvokableInterface(QXmppInvokable *interface)
+{
+    m_interfaces[QString::fromUtf8(interface->metaObject()->className())] = interface;
+}
+
+/// Invokes a remote interface using RPC.
+void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
+{
+    QXmppStanza::Error error;
+
+    const QStringList methodBits = iq.method().split(u'.');
+    if (methodBits.size() != 2) {
+        return;
+    }
+    const QString interface = methodBits.first();
+    const QString method = methodBits.last();
+    QXmppInvokable *iface = m_interfaces.value(interface);
+    if (iface) {
+        if (iface->isAuthorized(iq.from())) {
+
+            if (iface->interfaces().contains(method)) {
+                QVariant result = iface->dispatch(method.toLatin1(),
+                                                  iq.arguments());
+                QXmppRpcResponseIq resultIq;
+                resultIq.setId(iq.id());
+                resultIq.setTo(iq.from());
+                resultIq.setValues(QVariantList() << result);
+                client()->send(std::move(resultIq));
+                return;
+            } else {
+                error.setType(QXmppStanza::Error::Cancel);
+                error.setCondition(QXmppStanza::Error::ItemNotFound);
+            }
+        } else {
+            error.setType(QXmppStanza::Error::Auth);
+            error.setCondition(QXmppStanza::Error::Forbidden);
+        }
+    } else {
+        error.setType(QXmppStanza::Error::Cancel);
+        error.setCondition(QXmppStanza::Error::ItemNotFound);
+    }
+    QXmppRpcErrorIq errorIq;
+    errorIq.setId(iq.id());
+    errorIq.setTo(iq.from());
+    errorIq.setQuery(iq);
+    errorIq.setError(error);
+    client()->send(std::move(errorIq));
+}
+
+///
+/// Calls a remote method using RPC with the specified arguments.
+///
+/// \note This method blocks until the response is received, and it may
+/// cause XMPP stanzas to be lost!
+///
+QXmppRemoteMethodResult QXmppRpcManager::callRemoteMethod(const QString &jid,
+                                                          const QString &interface,
+                                                          const QVariant &arg1,
+                                                          const QVariant &arg2,
+                                                          const QVariant &arg3,
+                                                          const QVariant &arg4,
+                                                          const QVariant &arg5,
+                                                          const QVariant &arg6,
+                                                          const QVariant &arg7,
+                                                          const QVariant &arg8,
+                                                          const QVariant &arg9,
+                                                          const QVariant &arg10)
+{
+    QVariantList args;
+    if (arg1.isValid()) {
+        args << arg1;
+    }
+    if (arg2.isValid()) {
+        args << arg2;
+    }
+    if (arg3.isValid()) {
+        args << arg3;
+    }
+    if (arg4.isValid()) {
+        args << arg4;
+    }
+    if (arg5.isValid()) {
+        args << arg5;
+    }
+    if (arg6.isValid()) {
+        args << arg6;
+    }
+    if (arg7.isValid()) {
+        args << arg7;
+    }
+    if (arg8.isValid()) {
+        args << arg8;
+    }
+    if (arg9.isValid()) {
+        args << arg9;
+    }
+    if (arg10.isValid()) {
+        args << arg10;
+    }
+
+    bool check;
+    Q_UNUSED(check)
+
+    QXmppRemoteMethod method(jid, interface, args, client());
+    check = connect(this, SIGNAL(rpcCallResponse(QXmppRpcResponseIq)),
+                    &method, SLOT(gotResult(QXmppRpcResponseIq)));
+    Q_ASSERT(check);
+    check = connect(this, SIGNAL(rpcCallError(QXmppRpcErrorIq)),
+                    &method, SLOT(gotError(QXmppRpcErrorIq)));
+    Q_ASSERT(check);
+
+    return method.call();
+}
+
+/// \cond
+QStringList QXmppRpcManager::discoveryFeatures() const
+{
+    return {
+        // XEP-0009: Jabber-RPC
+        ns_rpc.toString(),
+    };
+}
+
+QList<QXmppDiscoveryIq::Identity> QXmppRpcManager::discoveryIdentities() const
+{
+    QXmppDiscoveryIq::Identity identity;
+    identity.setCategory(u"automation"_s);
+    identity.setType(u"rpc"_s);
+    return QList<QXmppDiscoveryIq::Identity>() << identity;
+}
+
+bool QXmppRpcManager::handleStanza(const QDomElement &element)
+{
+    // XEP-0009: Jabber-RPC
+    if (QXmppRpcInvokeIq::isRpcInvokeIq(element)) {
+        QXmppRpcInvokeIq rpcIqPacket;
+        rpcIqPacket.parse(element);
+        invokeInterfaceMethod(rpcIqPacket);
+        return true;
+    } else if (QXmppRpcResponseIq::isRpcResponseIq(element)) {
+        QXmppRpcResponseIq rpcResponseIq;
+        rpcResponseIq.parse(element);
+        Q_EMIT rpcCallResponse(rpcResponseIq);
+        return true;
+    } else if (QXmppRpcErrorIq::isRpcErrorIq(element)) {
+        QXmppRpcErrorIq rpcErrorIq;
+        rpcErrorIq.parse(element);
+        Q_EMIT rpcCallError(rpcErrorIq);
+        return true;
+    }
+    return false;
+}
+/// \endcond
+
+QT_WARNING_POP
+
+#include "moc_QXmppRemoteMethod.cpp"
+#include "moc_QXmppRpcManager.cpp"

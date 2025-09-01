@@ -277,8 +277,6 @@ set(SOURCE_FILES
     client/QXmppRosterManager.cpp
     client/QXmppRegistrationManager.cpp
     client/QXmppPubSubManager.cpp
-    client/QXmppRemoteMethod.cpp
-    client/QXmppRpcManager.cpp
     client/QXmppSaslManager.cpp
     client/QXmppSendStanzaParams.cpp
     client/QXmppTransferManager.cpp

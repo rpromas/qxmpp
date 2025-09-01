@@ -12,7 +12,11 @@
 
 class QXmppClient;
 
-struct QXmppRemoteMethodResult {
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+struct [[deprecated("Removed from public API (unmaintained)")]] QXmppRemoteMethodResult {
     QXmppRemoteMethodResult() : hasError(false), code(0) { }
     bool hasError;
     int code;
@@ -20,7 +24,7 @@ struct QXmppRemoteMethodResult {
     QVariant result;
 };
 
-class QXMPP_EXPORT QXmppRemoteMethod : public QObject
+class QXMPP_EXPORT [[deprecated("Removed from public API (unmaintained)")]] QXmppRemoteMethod : public QObject
 {
     Q_OBJECT
 public:
@@ -39,5 +43,8 @@ private:
     QXmppClient *m_client;
     QXmppRemoteMethodResult m_result;
 };
+
+QT_WARNING_POP
+#endif
 
 #endif  // QXMPPREMOTEMETHOD_H
