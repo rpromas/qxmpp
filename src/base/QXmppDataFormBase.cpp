@@ -203,7 +203,7 @@ void QXmppExtensibleDataFormBase::parseForm(const QXmppDataForm &form)
 
 void QXmppExtensibleDataFormBase::serializeForm(QXmppDataForm &form) const
 {
-    form.fields() << d->unknownFields;
+    form.setFields(std::as_const(form).fields() + d->unknownFields);
 }
 
 ///

@@ -56,7 +56,7 @@ protected:
     template<typename T>
     static void serializeValue(QXmppDataForm &form, QXmppDataForm::Field::Type type, const QString &name, const T &value)
     {
-        form.fields() << QXmppDataForm::Field(type, name, value);
+        form.appendField(QXmppDataForm::Field(type, name, value));
     }
 
     template<typename T>

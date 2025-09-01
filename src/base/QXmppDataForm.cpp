@@ -392,61 +392,6 @@ void QXmppDataForm::Field::setLabel(const QString &label)
 }
 
 ///
-/// Returns the field's media.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSources() or
-/// \c QXmppDataForm::Field::mediaSize() instead.
-///
-QXmppDataForm::Media QXmppDataForm::Field::media() const
-{
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    Media media;
-    QList<QPair<QString, QString>> pairUris;
-    pairUris.reserve(d->mediaSources.size());
-
-    for (const auto &source : std::as_const(d->mediaSources)) {
-        pairUris << qMakePair<QString, QString>(
-            source.contentType().name(),
-            source.uri().toString());
-    }
-
-    media.setHeight(d->mediaSize.height());
-    media.setWidth(d->mediaSize.width());
-    media.setUris(pairUris);
-    return media;
-    QT_WARNING_POP
-}
-
-///
-/// Sets the field's \a media.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::setMediaSources() or
-/// \c QXmppDataForm::Field::setMediaSize() instead.
-///
-void QXmppDataForm::Field::setMedia(const QXmppDataForm::Media &media)
-{
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    const QList<QPair<QString, QString>> &uris = media.uris();
-
-    QVector<QXmppDataForm::MediaSource> sources;
-    sources.reserve(uris.size());
-
-    for (const auto &pairUri : uris) {
-        sources << QXmppDataForm::MediaSource(
-            QUrl(pairUri.second),
-            QMimeDatabase().mimeTypeForName(pairUri.first));
-    }
-
-    d->mediaSources = sources;
-    d->mediaSize = QSize(media.width(), media.height());
-    QT_WARNING_POP
-}
-
-///
 /// Returns the field's options.
 ///
 QList<QPair<QString, QString>> QXmppDataForm::Field::options() const
@@ -534,17 +479,6 @@ QSize QXmppDataForm::Field::mediaSize() const
 }
 
 ///
-/// Returns the size of the attached media according to \xep{0221}: Data Forms
-/// Media Element.
-///
-/// \since QXmpp 1.1
-///
-QSize &QXmppDataForm::Field::mediaSize()
-{
-    return d->mediaSize;
-}
-
-///
 /// Sets the size of the attached media according to \xep{0221}: Data Forms Media
 /// Element.
 ///
@@ -562,17 +496,6 @@ void QXmppDataForm::Field::setMediaSize(const QSize &size)
 /// \since QXmpp 1.1
 ///
 QVector<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
-{
-    return d->mediaSources;
-}
-
-///
-/// Returns the sources for the attached media according to \xep{0221}: Data
-/// Forms Media Element.
-///
-/// \since QXmpp 1.1
-///
-QVector<QXmppDataForm::MediaSource> &QXmppDataForm::Field::mediaSources()
 {
     return d->mediaSources;
 }
@@ -638,13 +561,13 @@ std::optional<QXmppDataForm::Field> QXmppDataForm::Field::fromDom(const QDomElem
     /* field media */
     if (const auto mediaElement = firstChildElement(el, u"media", ns_media_element);
         !mediaElement.isNull()) {
-        field.mediaSize().setHeight(mediaElement.attribute(u"height"_s, u"-1"_s).toInt());
-        field.mediaSize().setWidth(mediaElement.attribute(u"width"_s, u"-1"_s).toInt());
+        field.setMediaSize(QSize(mediaElement.attribute(u"width"_s, u"-1"_s).toInt(),
+                                 mediaElement.attribute(u"height"_s, u"-1"_s).toInt()));
 
         QMimeDatabase database;
 
         for (const auto &element : iterChildElements<MediaSource>(mediaElement)) {
-            field.mediaSources() << MediaSource(
+            field.d->mediaSources << MediaSource(
                 QUrl(element.text()),
                 database.mimeTypeForName(element.attribute(u"type"_s)));
         }
@@ -725,6 +648,57 @@ void QXmppDataForm::Field::toXml(QXmlStreamWriter *w) const
         OptionalContent { d->required, Element { u"required" } },
     });
 }
+
+QXmppDataForm::Media QXmppDataForm::Field::media() const
+{
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    Media media;
+    QList<QPair<QString, QString>> pairUris;
+    pairUris.reserve(d->mediaSources.size());
+
+    for (const auto &source : std::as_const(d->mediaSources)) {
+        pairUris << qMakePair<QString, QString>(
+            source.contentType().name(),
+            source.uri().toString());
+    }
+
+    media.setHeight(d->mediaSize.height());
+    media.setWidth(d->mediaSize.width());
+    media.setUris(pairUris);
+    return media;
+    QT_WARNING_POP
+}
+
+void QXmppDataForm::Field::setMedia(const QXmppDataForm::Media &media)
+{
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    const QList<QPair<QString, QString>> &uris = media.uris();
+
+    QVector<QXmppDataForm::MediaSource> sources;
+    sources.reserve(uris.size());
+
+    for (const auto &pairUri : uris) {
+        sources << QXmppDataForm::MediaSource(
+            QUrl(pairUri.second),
+            QMimeDatabase().mimeTypeForName(pairUri.first));
+    }
+
+    d->mediaSources = sources;
+    d->mediaSize = QSize(media.width(), media.height());
+    QT_WARNING_POP
+}
+
+QVector<QXmppDataForm::MediaSource> &QXmppDataForm::Field::mediaSources()
+{
+    return d->mediaSources;
+}
+
+QSize &QXmppDataForm::Field::mediaSize()
+{
+    return d->mediaSize;
+}
 /// \endcond
 
 class QXmppDataFormPrivate : public QSharedData
@@ -781,30 +755,30 @@ QXmppDataForm &QXmppDataForm::operator=(const QXmppDataForm &other) = default;
 /// Default move-assignment operator.
 QXmppDataForm &QXmppDataForm::operator=(QXmppDataForm &&) = default;
 
-///
-/// Returns the form's fields.
-///
+/// Returns all fields.
 QList<QXmppDataForm::Field> QXmppDataForm::fields() const
 {
     return d->fields;
 }
 
-///
-/// Returns the form's fields by reference.
-///
-QList<QXmppDataForm::Field> &QXmppDataForm::fields()
+/// Returns all fields.
+/// \since QXmpp 1.12
+const QList<QXmppDataForm::Field> &QXmppDataForm::constFields() const
 {
     return d->fields;
 }
 
-///
 /// Sets the form's fields.
-///
-/// \param fields
-///
 void QXmppDataForm::setFields(const QList<QXmppDataForm::Field> &fields)
 {
     d->fields = fields;
+}
+
+/// Appends a field.
+/// \since QXmpp 1.12
+void QXmppDataForm::appendField(Field &&field)
+{
+    d->fields.append(std::move(field));
 }
 
 ///
@@ -927,4 +901,6 @@ void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
         d->fields,
     });
 }
+
+QList<QXmppDataForm::Field> &QXmppDataForm::fields() { return d->fields; }
 /// \endcond

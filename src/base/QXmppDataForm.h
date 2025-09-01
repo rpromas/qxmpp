@@ -129,14 +129,6 @@ public:
         QString label() const;
         void setLabel(const QString &label);
 
-#if QXMPP_DEPRECATED_SINCE(1, 1)
-        QT_DEPRECATED_X("Use QXmppDataForm::Field::mediaSources() or QXmppDataForm::Field::mediaSize() instead")
-        Media media() const;
-
-        QT_DEPRECATED_X("Use QXmppDataForm::Field::setMediaSources() or QXmppDataForm::Field::setMediaSize() instead")
-        void setMedia(const Media &media);
-#endif
-
         QList<QPair<QString, QString>> options() const;
         void setOptions(const QList<QPair<QString, QString>> &options);
 
@@ -149,12 +141,10 @@ public:
         QVariant value() const;
         void setValue(const QVariant &value);
 
-        QVector<QXmppDataForm::MediaSource> &mediaSources();
         QVector<QXmppDataForm::MediaSource> mediaSources() const;
         void setMediaSources(const QVector<QXmppDataForm::MediaSource> &mediaSources);
 
         QSize mediaSize() const;
-        QSize &mediaSize();
         void setMediaSize(const QSize &size);
 
         bool operator==(const Field &other) const;
@@ -163,6 +153,19 @@ public:
         static constexpr std::tuple XmlTag = { u"field", QXmpp::Private::ns_data };
         static std::optional<Field> fromDom(const QDomElement &el);
         void toXml(QXmlStreamWriter *writer) const;
+
+#if QXMPP_DEPRECATED_SINCE(1, 1)
+        [[deprecated("Use mediaSources() and mediaSize()")]]
+        Media media() const;
+        [[deprecated("Use setMediaSources() and setMediaSize()")]]
+        void setMedia(const Media &media);
+#endif
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+        [[deprecated("Use const-getter or setter")]]
+        QVector<QXmppDataForm::MediaSource> &mediaSources();
+        [[deprecated("Use const-getter or setter")]]
+        QSize &mediaSize();
+#endif
         /// \endcond
 
     private:
@@ -199,8 +202,9 @@ public:
     void setInstructions(const QString &instructions);
 
     QList<Field> fields() const;
-    QList<Field> &fields();
+    const QList<Field> &constFields() const;
     void setFields(const QList<QXmppDataForm::Field> &fields);
+    void appendField(QXmppDataForm::Field &&field);
 
     QString title() const;
     void setTitle(const QString &title);
@@ -216,6 +220,11 @@ public:
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_data };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
+
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Use const-getter or setter")]]
+    QList<Field> &fields();
+#endif
     /// \endcond
 
 private:

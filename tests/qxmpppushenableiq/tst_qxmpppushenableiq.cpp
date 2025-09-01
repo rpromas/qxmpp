@@ -97,7 +97,7 @@ void tst_QXmppPushEnableIq::testDataForm()
     QXmppPushEnableIq iq;
     parsePacket(iq, xml);
     QVERIFY(!iq.dataForm().isNull());
-    QCOMPARE(iq.dataForm().fields().size(), 2);
+    QCOMPARE(iq.dataForm().constFields().size(), 2);
 
     serializePacket(iq, xml);
 
