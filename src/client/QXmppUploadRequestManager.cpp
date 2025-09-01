@@ -169,10 +169,7 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
     iq.setSize(fileSize);
     iq.setContentType(mimeType);
 
-    if (client()->sendPacket(iq)) {
-        return iq.id();
-    }
-    return {};
+    return client()->sendLegacyId(iq);
 }
 
 ///

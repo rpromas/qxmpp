@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIq.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -70,9 +71,7 @@ public:
     bool bookmarksReceived;
 };
 
-///
 /// Constructs a new bookmark manager.
-///
 QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
@@ -81,6 +80,7 @@ QXmppBookmarkManager::QXmppBookmarkManager()
 
 QXmppBookmarkManager::~QXmppBookmarkManager() = default;
 
+///
 /// Returns true if the bookmarks have been received from the server,
 /// false otherwise.
 ///
@@ -89,27 +89,25 @@ bool QXmppBookmarkManager::areBookmarksReceived() const
     return d->bookmarksReceived;
 }
 
+///
 /// Returns the bookmarks stored on the server.
 ///
 /// Before calling this method, check that the bookmarks
 /// have indeed been received by calling areBookmarksReceived().
 ///
-
 QXmppBookmarkSet QXmppBookmarkManager::bookmarks() const
 {
     return d->bookmarks;
 }
 
 /// Stores the bookmarks on the server.
-///
-/// \param bookmarks
-
 bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
 {
     QXmppPrivateStorageIq iq;
     iq.setType(QXmppIq::Set);
     iq.setBookmarks(bookmarks);
-    if (!client()->sendPacket(iq)) {
+
+    if (!client()->sendLegacy(iq)) {
         return false;
     }
 
@@ -169,7 +167,7 @@ void QXmppBookmarkManager::slotConnected()
 {
     QXmppPrivateStorageIq iq;
     iq.setType(QXmppIq::Get);
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 void QXmppBookmarkManager::slotDisconnected()

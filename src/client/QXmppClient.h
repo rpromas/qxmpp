@@ -214,17 +214,6 @@ public:
     QXmppTask<IqResult> sendSensitiveIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
     QXmppTask<EmptyResult> sendGenericIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
 
-#if QXMPP_DEPRECATED_SINCE(1, 1)
-    QT_DEPRECATED_X("Use QXmppClient::findExtension<QXmppRosterManager>() instead")
-    QXmppRosterManager &rosterManager();
-
-    QT_DEPRECATED_X("Use QXmppClient::findExtension<QXmppVCardManager>() instead")
-    QXmppVCardManager &vCardManager();
-
-    QT_DEPRECATED_X("Use QXmppClient::findExtension<QXmppVersionManager>() instead")
-    QXmppVersionManager &versionManager();
-#endif
-
     /// This signal is emitted when the client connects successfully to the
     /// XMPP server i.e. when a successful XMPP connection is established.
     /// XMPP Connection involves following sequential steps:
@@ -306,15 +295,37 @@ public:
     /// \since QXmpp 1.8
     Q_SIGNAL void credentialsChanged();
 
-public Q_SLOTS:
-    void connectToServer(const QXmppConfiguration &,
-                         const QXmppPresence &initialPresence =
-                             QXmppPresence());
-    void connectToServer(const QString &jid,
-                         const QString &password);
-    void disconnectFromServer();
-    bool sendPacket(const QXmppNonza &);
-    void sendMessage(const QString &bareJid, const QString &message);
+    Q_SLOT void connectToServer(const QXmppConfiguration &, const QXmppPresence &initialPresence = {});
+    Q_SLOT void connectToServer(const QString &jid, const QString &password);
+    Q_SLOT void disconnectFromServer();
+
+#if QXMPP_DEPRECATED_SINCE(1, 1)
+    [[deprecated("Use findExtension<QXmppRosterManager>() instead")]]
+    QXmppRosterManager &rosterManager();
+
+    [[deprecated("Use findExtension<QXmppVCardManager>() instead")]]
+    QXmppVCardManager &vCardManager();
+
+    [[deprecated("Use findExtension<QXmppVersionManager>() instead")]]
+    QXmppVersionManager &versionManager();
+#endif
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Use async send()")]]
+    Q_SLOT bool sendPacket(const QXmppNonza &);
+    [[deprecated("Use async send()")]]
+    Q_SLOT void sendMessage(const QString &bareJid, const QString &message);
+#endif
+
+    /// \cond
+    bool sendLegacy(const QXmppNonza &s)
+    {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
+        return sendPacket(s);
+        QT_WARNING_POP
+    }
+    QString sendLegacyId(const QXmppStanza &s) { return sendLegacy(s) ? s.id() : QString(); }
+    /// \endcond
 
 private:
     QXmppOutgoingClient *stream() const;
@@ -329,7 +340,6 @@ private:
     void _q_streamConnected(const QXmpp::Private::SessionBegin &);
     void _q_streamDisconnected();
 
-private:
     const std::unique_ptr<QXmppClientPrivate> d;
 
     friend class QXmppClientExtension;

@@ -50,11 +50,7 @@ QString QXmppVersionManager::requestVersion(const QString &jid)
     QXmppVersionIq request;
     request.setType(QXmppIq::Get);
     request.setTo(jid);
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(request);
 }
 
 /// Sets the local XMPP client's name.

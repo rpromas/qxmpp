@@ -83,11 +83,7 @@ QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &no
     if (!node.isEmpty()) {
         request.setQueryNode(node);
     }
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(request);
 }
 
 ///
@@ -105,11 +101,7 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
     if (!node.isEmpty()) {
         request.setQueryNode(node);
     }
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(request);
 }
 
 ///

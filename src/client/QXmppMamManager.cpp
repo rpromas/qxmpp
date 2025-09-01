@@ -252,8 +252,9 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QXmppResultSetQuery &resultSetQuery)
 {
     auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);
-    client()->sendPacket(queryIq);
-    return queryIq.id();
+    auto id = queryIq.id();
+    client()->send(std::move(queryIq));
+    return id;
 }
 
 ///

@@ -5,9 +5,9 @@
 #include "QXmppRemoteMethod.h"
 
 #include "QXmppClient.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 
-#include <QDebug>
 #include <QEventLoop>
 #include <QTimer>
 
@@ -27,7 +27,8 @@ QXmppRemoteMethodResult QXmppRemoteMethod::call()
     connect(this, &QXmppRemoteMethod::callDone, &loop, &QEventLoop::quit);
     QTimer::singleShot(30000, &loop, &QEventLoop::quit);  // Timeout in case the other end hangs...
 
-    m_client->sendPacket(m_payload);
+    auto payload = m_payload;
+    m_client->send(std::move(m_payload));
 
     loop.exec(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents);
     return m_result;

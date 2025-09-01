@@ -11,6 +11,7 @@
 #include "QXmppSocks.h"
 #include "QXmppStreamInitiationIq_p.h"
 #include "QXmppStun.h"
+#include "QXmppTask.h"
 #include "QXmppTransferManager_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -475,7 +476,7 @@ void QXmppTransferIncomingJob::connectToNextHost()
         error.setCode(404);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        d->client->sendPacket(response);
+        d->client->send(std::move(response));
 
         terminate(QXmppTransferJob::ProtocolError);
         return;
@@ -551,7 +552,7 @@ void QXmppTransferIncomingJob::_q_candidateReady()
     ackIq.setType(QXmppIq::Result);
     ackIq.setSid(d->sid);
     ackIq.setStreamHostUsed(m_candidateHost.jid());
-    d->client->sendPacket(ackIq);
+    d->client->send(std::move(ackIq));
 }
 
 void QXmppTransferIncomingJob::_q_candidateDisconnected()
@@ -652,7 +653,7 @@ void QXmppTransferOutgoingJob::_q_proxyReady()
     streamIq.setSid(d->sid);
     streamIq.setActivate(d->jid);
     d->requestId = streamIq.id();
-    d->client->sendPacket(streamIq);
+    d->client->send(std::move(streamIq));
 }
 
 void QXmppTransferOutgoingJob::_q_sendData()
@@ -878,7 +879,7 @@ void QXmppTransferManager::byteStreamSetReceived(const QXmppByteStreamIq &iq)
         error.setCode(406);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -960,13 +961,13 @@ void QXmppTransferManager::ibbCloseIqReceived(const QXmppIbbCloseIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
     // acknowledge the packet
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 
     // check received data
     job->checkData();
@@ -986,7 +987,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -995,7 +996,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::UnexpectedRequest);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1005,7 +1006,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
 
     // acknowledge the packet
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 }
 
 void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
@@ -1021,7 +1022,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1030,7 +1031,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Modify, QXmppStanza::Error::ResourceConstraint);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1039,7 +1040,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
 
     // accept transfer
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 }
 
 void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
@@ -1067,7 +1068,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
             dataIq.setSequence(job->d->ibbSequence++);
             dataIq.setPayload(buffer);
             job->d->requestId = dataIq.id();
-            client()->sendPacket(dataIq);
+            client()->send(std::move(dataIq));
 
             job->d->done += buffer.size();
             Q_EMIT job->progress(job->d->done, job->fileSize());
@@ -1077,7 +1078,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
             closeIq.setTo(job->d->jid);
             closeIq.setSid(job->d->sid);
             job->d->requestId = closeIq.id();
-            client()->sendPacket(closeIq);
+            client()->send(std::move(closeIq));
 
             job->terminate(QXmppTransferJob::NoError);
         }
@@ -1087,7 +1088,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
         closeIq.setTo(job->d->jid);
         closeIq.setSid(job->d->sid);
         job->d->requestId = closeIq.id();
-        client()->sendPacket(closeIq);
+        client()->send(std::move(closeIq));
 
         job->terminate(QXmppTransferJob::ProtocolError);
     }
@@ -1159,7 +1160,7 @@ void QXmppTransferManager::_q_jobError(QXmppTransferJob::Error error)
         closeIq.setTo(job->d->jid);
         closeIq.setSid(job->d->sid);
         job->d->requestId = closeIq.id();
-        client()->sendPacket(closeIq);
+        client()->send(std::move(closeIq));
     }
 }
 
@@ -1198,7 +1199,7 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
         response.setId(job->d->offerId);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
 
         job->terminate(QXmppTransferJob::AbortError);
         return;
@@ -1226,7 +1227,7 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
     response.setProfile(QXmppStreamInitiationIq::FileTransfer);
     response.setFeatureForm(form);
 
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 
     // notify user
     Q_EMIT jobStarted(job);
@@ -1349,7 +1350,7 @@ QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, QIODevice *
     request.setFeatureForm(form);
     request.setSiId(job->d->sid);
     job->d->requestId = request.id();
-    client()->sendPacket(request);
+    client()->send(std::move(request));
 
     // notify user
     Q_EMIT jobStarted(job);
@@ -1406,7 +1407,7 @@ void QXmppTransferManager::socksServerSendOffer(QXmppTransferJob *job)
     streamIq.setSid(job->d->sid);
     streamIq.setStreamHosts(streamHosts);
     job->d->requestId = streamIq.id();
-    client()->sendPacket(streamIq);
+    client()->send(std::move(streamIq));
 }
 
 void QXmppTransferManager::streamInitiationIqReceived(const QXmppStreamInitiationIq &iq)
@@ -1453,7 +1454,7 @@ void QXmppTransferManager::streamInitiationResultReceived(const QXmppStreamIniti
         openIq.setSid(job->d->sid);
         openIq.setBlockSize(job->d->blockSize);
         job->d->requestId = openIq.id();
-        client()->sendPacket(openIq);
+        client()->send(std::move(openIq));
     } else if (job->method() == QXmppTransferJob::SocksMethod) {
         if (!d->proxy.isEmpty()) {
             job->d->socksProxy.setJid(d->proxy);
@@ -1464,7 +1465,7 @@ void QXmppTransferManager::streamInitiationResultReceived(const QXmppStreamIniti
             streamIq.setTo(job->d->socksProxy.jid());
             streamIq.setSid(job->d->sid);
             job->d->requestId = streamIq.id();
-            client()->sendPacket(streamIq);
+            client()->send(std::move(streamIq));
         } else {
             socksServerSendOffer(job);
         }
@@ -1489,7 +1490,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1500,7 +1501,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1542,7 +1543,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
 
         delete job;
         return;

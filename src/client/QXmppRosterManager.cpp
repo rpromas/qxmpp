@@ -154,7 +154,7 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
     presence.setTo(bareJid);
     presence.setType(QXmppPresence::Subscribed);
     presence.setStatusText(reason);
-    return client()->sendPacket(presence);
+    return client()->sendLegacy(presence);
 }
 
 ///
@@ -215,7 +215,7 @@ bool QXmppRosterManager::handleStanza(const QDomElement &element)
         // send result iq
         QXmppIq returnIq(QXmppIq::Result);
         returnIq.setId(rosterIq.id());
-        client()->sendPacket(returnIq);
+        client()->send(std::move(returnIq));
 
         // store updated entries and notify changes
         const auto items = rosterIq.items();
@@ -440,7 +440,7 @@ bool QXmppRosterManager::refuseSubscription(const QString &bareJid, const QStrin
     presence.setTo(bareJid);
     presence.setType(QXmppPresence::Unsubscribed);
     presence.setStatusText(reason);
-    return client()->sendPacket(presence);
+    return client()->sendLegacy(presence);
 }
 
 ///
@@ -464,7 +464,7 @@ bool QXmppRosterManager::addItem(const QString &bareJid, const QString &name, co
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -484,7 +484,7 @@ bool QXmppRosterManager::removeItem(const QString &bareJid)
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -513,7 +513,7 @@ bool QXmppRosterManager::renameItem(const QString &bareJid, const QString &name)
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -528,7 +528,7 @@ bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason
     packet.setTo(QXmppUtils::jidToBareJid(bareJid));
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
-    return client()->sendPacket(packet);
+    return client()->sendLegacy(packet);
 }
 
 ///
@@ -543,7 +543,7 @@ bool QXmppRosterManager::unsubscribe(const QString &bareJid, const QString &reas
     packet.setTo(QXmppUtils::jidToBareJid(bareJid));
     packet.setType(QXmppPresence::Unsubscribe);
     packet.setStatusText(reason);
-    return client()->sendPacket(packet);
+    return client()->sendLegacy(packet);
 }
 
 void QXmppRosterManager::onRegistered(QXmppClient *client)

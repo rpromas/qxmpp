@@ -35,6 +35,8 @@ class QXmppClientPrivate
 public:
     QXmppClientPrivate(QXmppClient *qq);
 
+    void resendPresence();
+
     /// Current presence of the client
     QXmppPresence clientPresence;
     QList<QXmppClientExtension *> extensions;

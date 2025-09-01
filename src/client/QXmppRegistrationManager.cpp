@@ -78,7 +78,7 @@ void QXmppRegistrationManager::changePassword(const QString &newPassword)
     d->changePasswordIqId = iq.id();
     d->newPassword = newPassword;
 
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 ///
@@ -93,7 +93,7 @@ void QXmppRegistrationManager::deleteAccount()
     d->deleteAccountIqId = iq.id();
 
     client()->setIgnoredStreamErrors({ QXmpp::StreamError::Conflict, QXmpp::StreamError::NotAuthorized });
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 bool QXmppRegistrationManager::supportedByServer() const
@@ -112,7 +112,7 @@ void QXmppRegistrationManager::requestRegistrationForm(const QString &service)
     QXmppRegisterIq iq;
     iq.setType(QXmppIq::Get);
     iq.setTo(service);
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 ///
@@ -151,7 +151,7 @@ void QXmppRegistrationManager::sendCachedRegistrationForm()
 
     d->registrationFormToSend.setType(QXmppIq::Set);
 
-    client()->sendPacket(d->registrationFormToSend);
+    client()->send(std::move(d->registrationFormToSend));
     d->registrationIqId = d->registrationFormToSend.id();
 
     // clear cache

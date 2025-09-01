@@ -101,12 +101,7 @@ QXmppTask<QXmppVCardManager::Result> QXmppVCardManager::setVCard(const QXmppVCar
 ///
 QString QXmppVCardManager::requestVCard(const QString &jid)
 {
-    QXmppVCardIq request(jid);
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(QXmppVCardIq(jid));
 }
 
 /// Returns the vCard of the connected client.
@@ -122,7 +117,8 @@ void QXmppVCardManager::setClientVCard(const QXmppVCardIq &clientVCard)
     d->clientVCard.setTo({});
     d->clientVCard.setFrom({});
     d->clientVCard.setType(QXmppIq::Set);
-    client()->sendPacket(d->clientVCard);
+    auto vcard = d->clientVCard;
+    client()->send(std::move(vcard));
 }
 
 ///

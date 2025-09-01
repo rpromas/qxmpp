@@ -7,6 +7,7 @@
 #include "QXmppArchiveIq.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 
 #include <QDomElement>
@@ -62,7 +63,7 @@ void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &s
     packet.setWith(jid);
     packet.setStart(start);
     packet.setEnd(end);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 /// \overload
@@ -96,7 +97,7 @@ void QXmppArchiveManager::removeCollections(const QString &jid, const QDateTime 
     packet.setWith(jid);
     packet.setStart(start);
     packet.setEnd(end);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 ///
@@ -113,7 +114,7 @@ void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime
     packet.setResultSetQuery(rsm);
     packet.setStart(start);
     packet.setWith(jid);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 /// \overload
@@ -131,11 +132,3 @@ void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime
     rsm.setMax(max);
     retrieveCollection(jid, start, rsm);
 }
-
-#if 0
-void QXmppArchiveManager::getPreferences()
-{
-    QXmppArchivePrefIq packet;
-    client()->sendPacket(packet);
-}
-#endif

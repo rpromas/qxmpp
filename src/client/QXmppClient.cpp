@@ -62,6 +62,12 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
 {
 }
 
+void QXmppClientPrivate::resendPresence()
+{
+    auto presence = clientPresence;
+    q->send(std::move(presence));
+}
+
 void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 {
     auto *ext = q->findExtension<QXmppDiscoveryManager>();
@@ -478,30 +484,6 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 }
 
 ///
-/// After successfully connecting to the server use this function to send
-/// stanzas to the server. This function can solely be used to send various kind
-/// of stanzas to the server. QXmppStanza is a parent class of all the stanzas
-/// QXmppMessage, QXmppPresence, QXmppIq, QXmppBind, QXmppRosterIq, QXmppSession
-/// and QXmppVCard.
-///
-/// This function does not end-to-end encrypt the packets.
-///
-/// \return Returns true if the packet was sent, false otherwise.
-///
-/// Following code snippet illustrates how to send a message using this function:
-/// \code
-/// QXmppMessage message(from, to, message);
-/// client.sendPacket(message);
-/// \endcode
-///
-/// \param packet A valid XMPP stanza. It can be an iq, a message or a presence stanza.
-///
-bool QXmppClient::sendPacket(const QXmppNonza &packet)
-{
-    return d->stream->streamAckManager().sendPacketCompat(packet);
-}
-
-///
 /// Sends a packet and reports the result via QXmppTask.
 ///
 /// If stream management is enabled, the task continues to be active until the
@@ -718,7 +700,7 @@ void QXmppClient::disconnectFromServer()
     d->clientPresence.setType(QXmppPresence::Unavailable);
     d->clientPresence.setStatusText(u"Logged out"_s);
     if (d->stream->isConnected()) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     }
 
     d->stream->disconnectFromHost();
@@ -779,39 +761,6 @@ QXmppClient::StreamManagementState QXmppClient::streamManagementState() const
     return NoStreamManagement;
 }
 
-///
-/// Utility function to send message to all the resources associated with the
-/// specified bareJid. If there are no resources available, that is the contact
-/// is offline or not present in the roster, it will still send a message to
-/// the bareJid.
-///
-/// \note Usage of this method is discouraged because most modern clients use
-/// carbon messages (\xep{0280}: Message Carbons) and MAM (\xep{0313}: Message
-/// Archive Management) and so could possibly receive messages multiple times
-/// or not receive them at all.
-/// \c QXmppClient::sendPacket() should be used instead with a \c QXmppMessage.
-///
-/// \param bareJid bareJid of the receiving entity
-/// \param message Message string to be sent.
-///
-void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
-{
-    QXmppRosterManager *rosterManager = findExtension<QXmppRosterManager>();
-
-    const QStringList resources = rosterManager
-        ? rosterManager->getResources(bareJid)
-        : QStringList();
-
-    if (!resources.isEmpty()) {
-        for (const auto &resource : resources) {
-            sendPacket(
-                QXmppMessage({}, bareJid + u"/"_s + resource, message));
-        }
-    } else {
-        sendPacket(QXmppMessage({}, bareJid, message));
-    }
-}
-
 QXmppOutgoingClient *QXmppClient::stream() const
 {
     return d->stream;
@@ -861,12 +810,12 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
         // NOTE: we can't call disconnect() because it alters
         // the client presence
         if (d->stream->isConnected()) {
-            sendPacket(d->clientPresence);
+            d->resendPresence();
         }
 
         d->stream->disconnectFromHost();
     } else if (d->stream->isConnected()) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     } else {
         connectToServer(d->stream->configuration(), presence);
     }
@@ -979,7 +928,7 @@ void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session
 
     // send initial presence
     if (d->stream->isAuthenticated() && streamManagementState() != ResumedStream) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     }
 }
 

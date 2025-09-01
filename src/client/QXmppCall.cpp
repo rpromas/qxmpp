@@ -508,7 +508,7 @@ bool QXmppCallPrivate::sendAck(const QXmppJingleIq &iq)
     ack.setId(iq.id());
     ack.setTo(iq.from());
     ack.setType(QXmppIq::Result);
-    return manager->client()->sendPacket(ack);
+    return manager->client()->sendLegacy(ack);
 }
 
 void QXmppCallPrivate::sendInvite()

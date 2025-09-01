@@ -9,6 +9,7 @@
 #include "QXmppInvokable.h"
 #include "QXmppRemoteMethod.h"
 #include "QXmppRpcIq.h"
+#include "QXmppTask.h"
 
 #include "StringLiterals.h"
 
@@ -47,7 +48,7 @@ void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
                 resultIq.setId(iq.id());
                 resultIq.setTo(iq.from());
                 resultIq.setValues(QVariantList() << result);
-                client()->sendPacket(resultIq);
+                client()->send(std::move(resultIq));
                 return;
             } else {
                 error.setType(QXmppStanza::Error::Cancel);
@@ -66,7 +67,7 @@ void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
     errorIq.setTo(iq.from());
     errorIq.setQuery(iq);
     errorIq.setError(error);
-    client()->sendPacket(errorIq);
+    client()->send(std::move(errorIq));
 }
 
 ///

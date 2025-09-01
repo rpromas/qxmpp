@@ -69,9 +69,10 @@ void tst_QXmppClient::testSendMessage()
         QCOMPARE(msg.body(), u"implement XEP-* plz"_s);
     });
 
-    client->sendMessage(
-        u"support@qxmpp.org"_s,
-        u"implement XEP-* plz"_s);
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    client->sendMessage(u"support@qxmpp.org"_s, u"implement XEP-* plz"_s);
+    QT_WARNING_POP
 
     // see handleMessageSent()
 
