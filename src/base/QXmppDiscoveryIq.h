@@ -5,7 +5,7 @@
 #ifndef QXMPPDISCOVERY_H
 #define QXMPPDISCOVERY_H
 
-#include "QXmppDataForm.h"
+#include "QXmppDataFormBase.h"
 #include "QXmppIq.h"
 
 #include <QSharedDataPointer>
@@ -95,6 +95,19 @@ public:
     const QList<QXmppDataForm> &dataForms() const;
     void setDataForms(const QList<QXmppDataForm> &dataForms);
     std::optional<QXmppDataForm> dataForm(QStringView formType) const;
+
+    /// Looks for a form with the form type of FormT and parses it if found.
+    /// \since QXmpp 1.12
+    template<QXmpp::Private::DataFormConvertible FormT>
+    std::optional<FormT> dataForm() const
+    {
+        if (auto form = dataForm(QXmpp::Private::DataFormType<FormT>)) {
+            if (auto result = FormT::fromDataForm(*form)) {
+                return *result;
+            }
+        }
+        return {};
+    }
 
     QString queryNode() const;
     void setQueryNode(const QString &node);

@@ -37,7 +37,7 @@ struct QXmppContactAddressesPrivate : QSharedData {
 /// Parses QXmppDataForm into contact addresses and returns it if successful.
 std::optional<QXmppContactAddresses> QXmppContactAddresses::fromDataForm(const QXmppDataForm &form)
 {
-    if (form.formType() != ns_contact_addresses) {
+    if (form.formType() != DataFormType) {
         return std::nullopt;
     }
 

@@ -5,6 +5,7 @@
 #ifndef QXMPPCONTACTADDRESSES_H
 #define QXMPPCONTACTADDRESSES_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppDataFormBase.h"
 
 struct QXmppContactAddressesPrivate;

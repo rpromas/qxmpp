@@ -132,6 +132,13 @@ void tst_QXmppDiscoveryIq::contactAddresses()
     QVERIFY(!form.isNull());
     xml = QString::fromUtf8(xml).remove(QChar('\n')).toUtf8();
     serializePacket(form, xml);
+
+    // findForm with parsing
+    QXmppDiscoveryIq iq;
+    iq.setDataForms({ parsed->toDataForm() });
+    auto contactAddresses = iq.dataForm<QXmppContactAddresses>();
+    QVERIFY(contactAddresses);
+    QCOMPARE(contactAddresses->supportAddresses().constFirst(), u"http://shakespeare.lit/support.php");
 }
 
 QTEST_MAIN(tst_QXmppDiscoveryIq)

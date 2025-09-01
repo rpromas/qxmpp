@@ -123,4 +123,17 @@ private:
     QSharedDataPointer<QXmppExtensibleDataFormBasePrivate> d;
 };
 
+namespace QXmpp::Private {
+
+template<typename T>
+concept DataFormConvertible = requires(const QXmppDataForm &form) {
+    { T::DataFormType };
+    { T::fromDataForm(form) } -> std::same_as<std::optional<T>>;
+};
+
+template<DataFormConvertible T>
+inline constexpr auto DataFormType = T::DataFormType;
+
+}  // namespace QXmpp::Private
+
 #endif  // QXMPPDATAFORMBASED_H
