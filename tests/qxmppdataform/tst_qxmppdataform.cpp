@@ -61,6 +61,13 @@ void tst_QXmppDataForm::testSubmit()
     QXmppDataForm form;
     parsePacket(form, xml);
     QCOMPARE(form.isNull(), false);
+
+    QVERIFY(form.field(u"search_request").has_value());
+    QCOMPARE(form.field(u"search_request")->value().toString(), u"verona");
+
+    QVERIFY(form.fieldValue(u"search_request").has_value());
+    QCOMPARE(form.fieldValue(u"search_request")->toString(), u"verona");
+
     serializePacket(form, xml);
 }
 

@@ -782,6 +782,34 @@ void QXmppDataForm::appendField(Field &&field)
 }
 
 ///
+/// Look up field by name.
+///
+/// \since QXmpp 1.12
+///
+std::optional<QXmppDataForm::Field> QXmppDataForm::field(QStringView fieldName) const
+{
+    auto itr = std::ranges::find(d->fields, fieldName, &Field::key);
+    if (itr != d->fields.constEnd()) {
+        return *itr;
+    }
+    return {};
+}
+
+///
+/// Look up field by name and return value if found.
+///
+/// \since QXmpp 1.12
+///
+std::optional<QVariant> QXmppDataForm::fieldValue(QStringView fieldName) const
+{
+    auto itr = std::ranges::find(d->fields, fieldName, &Field::key);
+    if (itr != d->fields.constEnd()) {
+        return itr->value();
+    }
+    return {};
+}
+
+///
 /// Returns the form's instructions.
 ///
 QString QXmppDataForm::instructions() const

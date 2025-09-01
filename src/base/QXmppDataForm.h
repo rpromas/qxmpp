@@ -206,6 +206,10 @@ public:
     void setFields(const QList<QXmppDataForm::Field> &fields);
     void appendField(QXmppDataForm::Field &&field);
 
+    // lookup by key
+    std::optional<QXmppDataForm::Field> field(QStringView fieldName) const;
+    std::optional<QVariant> fieldValue(QStringView fieldName) const;
+
     QString title() const;
     void setTitle(const QString &title);
 
