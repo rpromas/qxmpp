@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
 
 #include "Stream.h"
 #include "StreamError.h"
 #include "XmppSocket.h"
+#include "compat/QXmppSessionIq.h"
 #include "compat/QXmppStartTlsPacket.h"
 #include "util.h"
 
@@ -31,6 +33,12 @@ private:
     // parsing
     Q_SLOT void testStartTlsPacket_data();
     Q_SLOT void testStartTlsPacket();
+
+    Q_SLOT void testNoResource();
+    Q_SLOT void testResource();
+    Q_SLOT void testResult();
+
+    Q_SLOT void testSessionIq();
 };
 
 void tst_QXmppStream::initTestCase()
@@ -173,10 +181,11 @@ void tst_QXmppStream::starttlsPackets()
 }
 #endif
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 void tst_QXmppStream::testStartTlsPacket_data()
 {
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
     QTest::addColumn<QByteArray>("xml");
     QTest::addColumn<bool>("valid");
     QTest::addColumn<QXmppStartTlsPacket::Type>("type");
@@ -194,14 +203,10 @@ void tst_QXmppStream::testStartTlsPacket_data()
     ROW("invalid-tag", R"(<invalid-tag-name xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>)", false, QXmppStartTlsPacket::StartTls);
 
 #undef ROW
-    QT_WARNING_POP
 }
 
 void tst_QXmppStream::testStartTlsPacket()
 {
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-
     QFETCH(QByteArray, xml);
     QFETCH(bool, valid);
     QFETCH(QXmppStartTlsPacket::Type, type);
@@ -230,7 +235,75 @@ void tst_QXmppStream::testStartTlsPacket()
         packet3.setType(type);
         serializePacket(packet2, xml);
     }
+}
+
+void tst_QXmppStream::testNoResource()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_1\" type=\"set\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\"/>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Set);
+    QCOMPARE(bind.id(), u"bind_1"_s);
+    QCOMPARE(bind.jid(), QString());
+    QCOMPARE(bind.resource(), QString());
+    serializePacket(bind, xml);
+}
+
+void tst_QXmppStream::testResource()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_2\" type=\"set\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\">"
+        "<resource>someresource</resource>"
+        "</bind>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Set);
+    QCOMPARE(bind.id(), u"bind_2"_s);
+    QCOMPARE(bind.jid(), QString());
+    QCOMPARE(bind.resource(), u"someresource"_s);
+    serializePacket(bind, xml);
+}
+
+void tst_QXmppStream::testResult()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_2\" type=\"result\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\">"
+        "<jid>somenode@example.com/someresource</jid>"
+        "</bind>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Result);
+    QCOMPARE(bind.id(), u"bind_2"_s);
+    QCOMPARE(bind.jid(), u"somenode@example.com/someresource"_s);
+    QCOMPARE(bind.resource(), QString());
+    serializePacket(bind, xml);
+}
+QT_WARNING_POP
+
+void tst_QXmppStream::testSessionIq()
+{
+    const QByteArray xml(
+        "<iq id=\"session_1\" to=\"example.com\" type=\"set\">"
+        "<session xmlns=\"urn:ietf:params:xml:ns:xmpp-session\"/>"
+        "</iq>");
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QXmppSessionIq session;
     QT_WARNING_POP
+
+    parsePacket(session, xml);
+    serializePacket(session, xml);
 }
 
 QTEST_MAIN(tst_QXmppStream)

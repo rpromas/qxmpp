@@ -8,13 +8,8 @@
 
 #include "QXmppIq.h"
 
-///
-/// \brief The QXmppBindIq class represents an IQ used for resource
-/// binding as defined by RFC 3921.
-///
-/// \ingroup Stanzas
-///
-class QXMPP_EXPORT QXmppBindIq : public QXmppIq
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+class QXMPP_EXPORT [[deprecated("Removed from public API")]] QXmppBindIq : public QXmppIq
 {
 public:
     static QXmppBindIq bindAddressIq(const QString &resource);
@@ -39,5 +34,6 @@ private:
     QString m_jid;
     QString m_resource;
 };
+#endif
 
 #endif  // QXMPPBIND_H

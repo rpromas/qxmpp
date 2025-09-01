@@ -28,6 +28,7 @@
 #include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QSharedData>
@@ -90,10 +91,59 @@ bool QXmppArchivePrefIq::isArchivePrefIq(const QDomElement &element)
 
 // BindIq
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+QXmppBindIq QXmppBindIq::bindAddressIq(const QString &resource)
+{
+    QXmppBindIq iq;
+    iq.setType(QXmppIq::Set);
+    iq.setResource(resource);
+    return iq;
+}
+
+QString QXmppBindIq::jid() const
+{
+    return m_jid;
+}
+
+void QXmppBindIq::setJid(const QString &jid)
+{
+    m_jid = jid;
+}
+
+QString QXmppBindIq::resource() const
+{
+    return m_resource;
+}
+
+void QXmppBindIq::setResource(const QString &resource)
+{
+    m_resource = resource;
+}
+
+void QXmppBindIq::parseElementFromChild(const QDomElement &element)
+{
+    QDomElement bindElement = firstChildElement(element, u"bind");
+    m_jid = firstChildElement(bindElement, u"jid").text();
+    m_resource = firstChildElement(bindElement, u"resource").text();
+}
+
+void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        { u"bind", ns_bind },
+        OptionalTextElement { u"jid", m_jid },
+        OptionalTextElement { u"resource", m_resource },
+    });
+}
+
 bool QXmppBindIq::isBindIq(const QDomElement &element)
 {
     return isIqType(element, u"bind", ns_bind);
 }
+
+QT_WARNING_POP
 
 // Bob
 
@@ -247,8 +297,6 @@ void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
-
-/// \endcond
 
 // PubSubIq
 

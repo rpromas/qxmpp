@@ -173,7 +173,6 @@ set(SOURCE_FILES
     # Base
     base/Stream.cpp
     base/QXmppArchiveIq.cpp
-    base/QXmppBindIq.cpp
     base/QXmppBitsOfBinary.cpp
     base/QXmppBookmarkSet.cpp
     base/QXmppByteStreamIq.cpp
