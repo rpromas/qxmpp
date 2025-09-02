@@ -4,8 +4,8 @@
 
 #include "GstWrapper.h"
 
-#include <format>
 #include <gst/gst.h>
+#include <sstream>
 #include <stdexcept>
 
 namespace QXmpp::Private {
@@ -37,9 +37,9 @@ void linkPads(GstPad *srcPad, GstPad *sinkPad)
 {
     auto result = gst_pad_link(srcPad, sinkPad);
     if (result != GST_PAD_LINK_OK) {
-        throw std::runtime_error(std::format(
-            "gst pad link error ({} -> {}): {}",
-            gst_pad_get_name(srcPad), gst_pad_get_name(sinkPad), gst_pad_link_get_name(result)));
+        std::ostringstream oss;
+        oss << "gst pad link error (" << gst_pad_get_name(srcPad) << " -> " << gst_pad_get_name(sinkPad) << "): " << gst_pad_link_get_name(result);
+        throw std::runtime_error(oss.str());
     }
 }
 
