@@ -352,9 +352,19 @@ std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
     return {};
 }
 
+template<typename T>
+concept SupportedNumber =
+    std::same_as<T, int8_t> || std::same_as<T, uint8_t> ||
+    std::same_as<T, int16_t> || std::same_as<T, uint16_t> ||
+    std::same_as<T, int32_t> || std::same_as<T, uint32_t> ||
+    std::same_as<T, int64_t> || std::same_as<T, uint64_t> ||
+    std::same_as<T, float> || std::same_as<T, double>;
+
 template<typename Int>
 Int stringToInt(QStringView str, bool *ok)
 {
+    static_assert(SupportedNumber<Int>, "invalid integer type");
+
     if constexpr (std::is_same_v<Int, int8_t>) {
         auto result = str.toShort(ok);
         if (*ok && result <= std::numeric_limits<int8_t>::max() && result >= std::numeric_limits<int8_t>::min()) {
@@ -385,8 +395,6 @@ Int stringToInt(QStringView str, bool *ok)
         return str.toDouble(ok);
     } else if constexpr (std::is_same_v<Int, float>) {
         return str.toFloat(ok);
-    } else {
-        static_assert(false, "invalid integer type");
     }
 }
 

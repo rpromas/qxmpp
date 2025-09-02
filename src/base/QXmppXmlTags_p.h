@@ -82,6 +82,10 @@ concept HasCustomCheckIqType =
 template<typename T, IsXmlTag Tag>
 bool isPayloadType(Tag xmlTag)
 {
+    static_assert(
+        Private::HasPayloadXmlTag<T> || HasCustomCheckIqType<T>,
+        "T must offer PayloadXmlTag, PayloadType::XmlTag or checkIqType()");
+
     if constexpr (Private::HasPayloadXmlTag<T>) {
         return xmlTag == Private::PayloadXmlTag<T>;
     } else if constexpr (HasCustomCheckIqType<T>) {
@@ -90,8 +94,6 @@ bool isPayloadType(Tag xmlTag)
 
         auto &[name, xmlns] = xmlTag;
         return T::checkIqType(name, xmlns);
-    } else {
-        static_assert(false, "T must offer PayloadXmlTag, PayloadType::XmlTag or checkIqType()");
     }
 }
 
