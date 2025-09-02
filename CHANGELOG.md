@@ -9,6 +9,11 @@ QXmpp 1.12.0 (UNRELEASED)
 
 *under development*
 
+QXmpp 1.11.2 (September 2, 2025)
+--------------------------------
+
+ - Fix build with g++ 12 (@lnj)
+
 QXmpp 1.11.1 (August 13, 2025)
 ------------------------------
 

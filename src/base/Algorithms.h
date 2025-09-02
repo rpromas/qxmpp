@@ -36,6 +36,10 @@ concept HasInsert = requires(T t, T::value_type value) {
 template<typename OutputVector, typename InputVector, typename Converter>
 auto transform(const InputVector &input, Converter convert)
 {
+    static_assert(
+        HasPushBack<OutputVector> || HasInsert<OutputVector>,
+        "OutputVector must support push_back() or insert()");
+
     OutputVector output;
     if constexpr (std::ranges::sized_range<InputVector>) {
         output.reserve(input.size());
@@ -45,8 +49,6 @@ auto transform(const InputVector &input, Converter convert)
             output.push_back(std::invoke(convert, value));
         } else if constexpr (HasInsert<OutputVector>) {
             output.insert(std::invoke(convert, value));
-        } else {
-            static_assert(false, "OutputVector must support push_back() or insert()");
         }
     }
     return output;
@@ -55,6 +57,10 @@ auto transform(const InputVector &input, Converter convert)
 template<typename OutputVector, typename InputVector, typename Converter>
 auto transform(InputVector &&input, Converter convert)
 {
+    static_assert(
+        HasPushBack<OutputVector> || HasInsert<OutputVector>,
+        "OutputVector must support push_back() or insert()");
+
     OutputVector output;
     if constexpr (std::ranges::sized_range<InputVector>) {
         output.reserve(input.size());
@@ -64,8 +70,6 @@ auto transform(InputVector &&input, Converter convert)
             output.push_back(std::invoke(convert, std::move(*it)));
         } else if constexpr (HasInsert<OutputVector>) {
             output.insert(std::invoke(convert, std::move(*it)));
-        } else {
-            static_assert(false, "OutputVector must support push_back() or insert()");
         }
     }
     return output;
