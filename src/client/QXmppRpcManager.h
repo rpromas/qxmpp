@@ -16,6 +16,7 @@ class QXmppRpcErrorIq;
 class QXmppRpcInvokeIq;
 class QXmppRpcResponseIq;
 
+/// \cond
 #if QXMPP_DEPRECATED_SINCE(1, 12)
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
@@ -58,14 +59,12 @@ public:
                                              const QVariant &arg9 = QVariant(),
                                              const QVariant &arg10 = QVariant());
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     QList<QXmppDiscoveryIq::Identity> discoveryIdentities() const override;
     bool handleStanza(const QDomElement &element) override;
 
     Q_SIGNAL void rpcCallResponse(const QXmppRpcResponseIq &result);
     Q_SIGNAL void rpcCallError(const QXmppRpcErrorIq &err);
-    /// \endcond
 
 private:
     void invokeInterfaceMethod(const QXmppRpcInvokeIq &iq);
@@ -75,5 +74,6 @@ private:
 
 QT_WARNING_POP
 #endif
+/// \endcond
 
 #endif

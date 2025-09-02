@@ -8,6 +8,7 @@
 
 #include "QXmppIq.h"
 
+/// \cond
 #if QXMPP_DEPRECATED_SINCE(1, 12)
 class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API") QXmppBindIq : public QXmppIq
 {
@@ -20,7 +21,6 @@ public:
     QString resource() const;
     void setResource(const QString &);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"bind", QXmpp::Private::ns_bind };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isBindIq(const QDomElement &element);
@@ -28,12 +28,12 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_jid;
     QString m_resource;
 };
 #endif
+/// \endcond
 
 #endif  // QXMPPBIND_H

@@ -183,6 +183,7 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
 
 // RemoteMethod
 
+/// \cond
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
@@ -352,7 +353,6 @@ QXmppRemoteMethodResult QXmppRpcManager::callRemoteMethod(const QString &jid,
     return method.call();
 }
 
-/// \cond
 QStringList QXmppRpcManager::discoveryFeatures() const
 {
     return {
@@ -390,9 +390,9 @@ bool QXmppRpcManager::handleStanza(const QDomElement &element)
     }
     return false;
 }
-/// \endcond
 
 QT_WARNING_POP
+/// \endcond
 
 #include "moc_QXmppRemoteMethod.cpp"
 #include "moc_QXmppRpcManager.cpp"
