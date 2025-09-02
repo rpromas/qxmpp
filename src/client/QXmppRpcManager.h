@@ -35,7 +35,9 @@ QT_WARNING_DISABLE_DEPRECATED
 ///
 /// \ingroup Managers
 ///
-class QXMPP_EXPORT [[deprecated("Removed from public API (unmaintained)")]] QXmppRpcManager : public QXmppClientExtension
+/// \deprecated
+///
+class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API (unmaintained)") QXmppRpcManager : public QXmppClientExtension
 {
     Q_OBJECT
 

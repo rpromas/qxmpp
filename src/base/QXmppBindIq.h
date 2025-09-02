@@ -9,7 +9,7 @@
 #include "QXmppIq.h"
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
-class QXMPP_EXPORT [[deprecated("Removed from public API")]] QXmppBindIq : public QXmppIq
+class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API") QXmppBindIq : public QXmppIq
 {
 public:
     static QXmppBindIq bindAddressIq(const QString &resource);

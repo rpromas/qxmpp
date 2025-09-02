@@ -24,7 +24,7 @@ struct [[deprecated("Removed from public API (unmaintained)")]] QXmppRemoteMetho
     QVariant result;
 };
 
-class QXMPP_EXPORT [[deprecated("Removed from public API (unmaintained)")]] QXmppRemoteMethod : public QObject
+class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API (unmaintained)") QXmppRemoteMethod : public QObject
 {
     Q_OBJECT
 public:
