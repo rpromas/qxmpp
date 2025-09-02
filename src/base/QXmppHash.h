@@ -8,6 +8,8 @@
 #include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
+#include <tuple>
+
 #include <QByteArray>
 
 class QDomElement;
@@ -40,7 +42,7 @@ public:
     QXmppHash();
 
     /// \cond
-    static constexpr auto XmlTag = std::tuple { u"hash", QXmpp::Private::ns_hashes };
+    static constexpr std::tuple XmlTag = { u"hash", QXmpp::Private::ns_hashes };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
