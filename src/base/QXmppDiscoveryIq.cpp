@@ -368,9 +368,11 @@ QXmppDataForm QXmppDiscoveryIq::form() const
     mixedForm.setFields({});
 
     // copy all fields
+    QList<QXmppDataForm::Field> mixedFields;
     for (const auto &form : d->dataForms) {
-        mixedForm.fields().append(form.fields());
+        mixedFields << form.fields();
     }
+    mixedForm.setFields(mixedFields);
 
     return mixedForm;
 }
@@ -481,7 +483,7 @@ QByteArray QXmppDiscoveryIq::verificationString() const
         return a.formType() < b.formType();
     });
 
-    for (auto &form : forms) {
+    for (const auto &form : forms) {
         S += form.formType();
         S += u'<';
 
