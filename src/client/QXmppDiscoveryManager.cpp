@@ -41,7 +41,7 @@ using namespace QXmpp::Private;
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate)
 {
-    d->clientCapabilitiesNode = u"https://github.com/qxmpp-project/qxmpp"_s;
+    d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
     d->identities = { d->defaultIdentity() };
 }
 
@@ -188,7 +188,7 @@ void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
 ///
 /// Returns the capabilities node of the local XMPP client.
 ///
-/// By default this is "https://github.com/qxmpp-project/qxmpp".
+/// By default this is "org.qxmpp.caps".
 ///
 QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 {
@@ -197,6 +197,8 @@ QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 
 ///
 /// Sets the capabilities node of the local XMPP client.
+///
+/// By default this is "org.qxmpp.caps".
 ///
 void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
 {
