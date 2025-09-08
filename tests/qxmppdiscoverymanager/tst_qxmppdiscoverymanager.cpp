@@ -13,8 +13,8 @@ private:
     Q_SLOT void testInfo();
     Q_SLOT void testItems();
     Q_SLOT void testRequests();
-    Q_SLOT void parallelRequestElisionItems();
-    Q_SLOT void parallelRequestElisionInfo();
+    Q_SLOT void cachingItems();
+    Q_SLOT void cachingInfo();
 };
 
 void tst_QXmppDiscoveryManager::testInfo()
@@ -26,7 +26,6 @@ void tst_QXmppDiscoveryManager::testInfo()
     QT_WARNING_DISABLE_DEPRECATED
     auto task = discoManager->requestDiscoInfo("user@example.org");
     QT_WARNING_POP
-    auto task2 = discoManager->info("user@example.org");
 
     test.expect("<iq id='qx2' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
     test.inject<QString>(R"(
@@ -45,6 +44,7 @@ void tst_QXmppDiscoveryManager::testInfo()
     QCOMPARE(info.identities().count(), 1);
 
     // new API (data is also cached when using the old API)
+    auto task2 = discoManager->info("user@example.org");
     test.expectNoPacket();
 
     const auto info2 = expectFutureVariant<QXmppDiscoInfo>(task2);
@@ -120,7 +120,7 @@ void tst_QXmppDiscoveryManager::testRequests()
         "</iq>");
 }
 
-void tst_QXmppDiscoveryManager::parallelRequestElisionItems()
+void tst_QXmppDiscoveryManager::cachingItems()
 {
     TestClient test;
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
@@ -142,13 +142,16 @@ void tst_QXmppDiscoveryManager::parallelRequestElisionItems()
     <item jid='ae890ac52d0df67ed7cfdf51b644e901@test.org'/>
   </query>
 </iq>)");
+
+    auto t4 = discoManager->items("user@example.org");
     test.expectNoPacket();
 
     const auto items1 = expectFutureVariant<QList<QXmppDiscoItem>>(t1);
     const auto items2 = expectFutureVariant<QList<QXmppDiscoItem>>(t2);
     const auto items3 = expectFutureVariant<QList<QXmppDiscoItem>>(t3);
+    const auto items4 = expectFutureVariant<QList<QXmppDiscoItem>>(t4);
 
-    for (const auto &items : { items1, items2, items3 }) {
+    for (const auto &items : { items1, items2, items3, items4 }) {
         QCOMPARE(items.size(), 4);
         QCOMPARE(items.at(0).jid(), u"368866411b877c30064a5f62b917cffe@test.org"_s);
         QCOMPARE(items.at(1).jid(), u"3300659945416e274474e469a1f0154c@test.org"_s);
@@ -157,7 +160,7 @@ void tst_QXmppDiscoveryManager::parallelRequestElisionItems()
     }
 }
 
-void tst_QXmppDiscoveryManager::parallelRequestElisionInfo()
+void tst_QXmppDiscoveryManager::cachingInfo()
 {
     TestClient test;
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
@@ -176,13 +179,16 @@ void tst_QXmppDiscoveryManager::parallelRequestElisionInfo()
         <feature var='urn:xmpp:mix:core:1'/>
     </query>
 </iq>)");
+
+    auto t4 = discoManager->info("user@example.org");
     test.expectNoPacket();
 
     const auto info1 = expectFutureVariant<QXmppDiscoInfo>(t1);
     const auto info2 = expectFutureVariant<QXmppDiscoInfo>(t2);
     const auto info3 = expectFutureVariant<QXmppDiscoInfo>(t3);
+    const auto info4 = expectFutureVariant<QXmppDiscoInfo>(t4);
 
-    for (const auto &info : { info1, info2, info3 }) {
+    for (const auto &info : { info1, info2, info3, info4 }) {
         QCOMPARE(info.identities().size(), 1);
         QCOMPARE(info.features().size(), 2);
         QCOMPARE(info.features().at(0), u"http://jabber.org/protocol/pubsub"_s);

@@ -19,22 +19,26 @@ class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
 
-///
-/// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
-/// entities as defined by \xep{0030, Service Discovery}.
-///
-/// \ingroup Managers
-///
 class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
 {
     Q_OBJECT
 
 public:
+    /// Policies for how cached service discovery information is used.
+    enum class CachePolicy {
+        /// Always ensure the data is up-to-date. Cached data may be used only if it is guaranteed
+        /// to be current (e.g. via entity capabilities).
+        Strict,
+        /// Cached data may be used even if it is not guaranteed to be current, within the
+        /// configured limits.
+        Relaxed,
+    };
+
     QXmppDiscoveryManager();
     ~QXmppDiscoveryManager() override;
 
-    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> info(const QString &jid, const QString &node = {});
-    QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {});
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> info(const QString &jid, const QString &node = {}, CachePolicy fetchPolicy = CachePolicy::Relaxed);
+    QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {}, CachePolicy fetchPolicy = CachePolicy::Relaxed);
 
     const QList<QXmppDiscoIdentity> &identities() const;
     void setIdentities(const QList<QXmppDiscoIdentity> &identities);
@@ -97,6 +101,10 @@ public:
     [[deprecated("Use requestDiscoItems")]]
     QString requestItems(const QString &jid, const QString &node = QString());
 #endif
+
+protected:
+    void onRegistered(QXmppClient *client);
+    void onUnregistered(QXmppClient *client);
 
 private:
     friend class QXmppDiscoveryManagerPrivate;

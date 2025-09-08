@@ -91,6 +91,10 @@ public:
     QList<QXmppDiscoIdentity> identities;
     QList<QXmppDataForm> dataForms;
 
+    // cached data
+    QCache<std::tuple<QString, QString>, QXmppDiscoInfo> infoCache;
+    QCache<std::tuple<QString, QString>, QList<QXmppDiscoItem>> itemsCache;
+
     // outgoing requests
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QXmppDiscoInfo>> infoRequests;
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QList<QXmppDiscoItem>>> itemsRequests;

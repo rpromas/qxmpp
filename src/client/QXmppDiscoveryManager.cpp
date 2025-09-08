@@ -39,9 +39,22 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
         parseIqResponseFlat<Response>);
 }
 
+///
+/// \class QXmppDiscoveryManager
+///
+/// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
+/// entities as defined by \xep{0030, Service Discovery}.
+///
+/// Since QXmpp 1.12 info and items queries are cached per session by default.
+///
+/// \ingroup Managers
+///
+
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
+    d->infoCache.setMaxCost(50);
+    d->itemsCache.setMaxCost(50);
     d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
     d->identities = { d->defaultIdentity() };
 }
@@ -53,13 +66,28 @@ QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 ///
 /// \since QXmpp 1.12
 ///
-QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node)
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
+    if (cachePolicy == CachePolicy::Relaxed) {
+        if (auto *cachedInfo = d->infoCache[{ jid, node }]) {
+            return makeReadyTask<Result<QXmppDiscoInfo>>(*cachedInfo);
+        }
+    }
+
     return d->infoRequests.produce(
         { jid, node },
         [this](const auto &key) {
             auto &[jid, node] = key;
-            return get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node });
+            return chain<Result<QXmppDiscoInfo>>(
+                get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node }),
+                this,
+                [this, jid, node](auto &&result) -> Result<QXmppDiscoInfo> {
+                    // only cache successful responses for now (permanent errors could also be cached)
+                    if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+                        d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { *info });
+                    }
+                    return result;
+                });
         },
         this);
 }
@@ -69,8 +97,14 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
 ///
 /// \since QXmpp 1.12
 ///
-QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node)
+QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
+    if (cachePolicy == CachePolicy::Relaxed) {
+        if (auto *cachedItems = d->itemsCache[{ jid, node }]) {
+            return makeReadyTask<Result<QList<QXmppDiscoItem>>>(*cachedItems);
+        }
+    }
+
     return d->itemsRequests.produce(
         { jid, node },
         [this](const auto &key) {
@@ -80,6 +114,7 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
                 this,
                 [this, jid, node](auto &&result) -> Result<QList<QXmppDiscoItem>> {
                     if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
+                        d->itemsCache.insert({ jid, node }, new QList<QXmppDiscoItem> { itemsPayload->items() });
                         return itemsPayload->items();
                     } else {
                         return std::get<QXmppError>(std::move(result));
@@ -232,6 +267,21 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
     return false;
 }
 /// \endcond
+
+void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
+{
+    connect(client, &QXmppClient::connected, this, [this, client]() {
+        if (client->streamManagementState() != QXmppClient::ResumedStream) {
+            d->itemsCache.clear();
+            d->infoCache.clear();
+        }
+    });
+}
+
+void QXmppDiscoveryManager::onUnregistered(QXmppClient *client)
+{
+    disconnect(client, nullptr, this, nullptr);
+}
 
 QString QXmppDiscoveryManagerPrivate::defaultApplicationName()
 {
