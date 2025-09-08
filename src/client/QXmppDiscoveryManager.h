@@ -10,6 +10,8 @@
 
 #include <variant>
 
+#include <QDateTime>
+
 template<typename T>
 class QXmppTask;
 class QXmppDataForm;

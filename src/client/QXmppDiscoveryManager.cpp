@@ -20,6 +20,16 @@
 
 using namespace QXmpp;
 
+template<typename... Ts>
+inline uint qHash(const std::tuple<Ts...> &t, uint seed = 0) noexcept
+{
+    return std::apply([&](auto const &...args) {
+        ((seed = qHash(args, seed ^ 0x9e3779b9u + (seed << 6) + (seed >> 2))), ...);
+        return seed;
+    },
+                      t);
+}
+
 template<typename Response, typename Payload>
 static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, const QString &to, Payload &&payload)
 {
@@ -39,38 +49,44 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 
 ///
-/// Fetches discovery items from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \since QXmpp 1.12
-///
-QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node)
-{
-    return chain<Result<QList<QXmppDiscoItem>>>(
-        get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
-        this,
-        [](auto &&result) -> Result<QList<QXmppDiscoItem>> {
-            if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
-                return itemsPayload->items();
-            } else {
-                return std::get<QXmppError>(std::move(result));
-            }
-        });
-}
-
-///
 /// Fetches discovery info from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
 ///
 /// \since QXmpp 1.12
 ///
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node)
 {
-    return get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node });
+    return d->infoRequests.produce(
+        { jid, node },
+        [this](const auto &key) {
+            auto &[jid, node] = key;
+            return get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node });
+        },
+        this);
+}
+
+///
+/// Fetches discovery items from the specified XMPP entity.
+///
+/// \since QXmpp 1.12
+///
+QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node)
+{
+    return d->itemsRequests.produce(
+        { jid, node },
+        [this](const auto &key) {
+            auto &[jid, node] = key;
+            return chain<Result<QList<QXmppDiscoItem>>>(
+                get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
+                this,
+                [this, jid, node](auto &&result) -> Result<QList<QXmppDiscoItem>> {
+                    if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
+                        return itemsPayload->items();
+                    } else {
+                        return std::get<QXmppError>(std::move(result));
+                    }
+                });
+        },
+        this);
 }
 
 ///
