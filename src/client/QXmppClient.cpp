@@ -193,7 +193,7 @@ bool process(QXmppClient *client, const QList<QXmppClientExtension *> &extension
     }
     QXmppMessage message;
     if (e2eeExt) {
-        message.parse(element, e2eeExt->isEncrypted(element) ? ScePublic : SceSensitive);
+        message.parse(element, e2eeExt->isEncrypted(element) ? ScePublic : SceAll);
     } else {
         message.parse(element);
     }
