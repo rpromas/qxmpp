@@ -110,6 +110,11 @@ auto QXmppEncryptedFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> da
         metadata,
         std::move(reportProgress),
         [=, reportFinished = std::move(reportFinished)](UploadResult result) {
+            if (std::holds_alternative<QXmppError>(result)) {
+                reportFinished(std::move(result));
+                return;
+            }
+            
             auto encryptedResult = visitForward<UploadResult>(std::move(result), [&](std::any httpSourceAny) {
                 QXmppEncryptedFileSource encryptedSource;
                 encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);

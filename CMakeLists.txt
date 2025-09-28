@@ -17,6 +17,7 @@ set(CMAKE_AUTORCC ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules")
 
+set(QT_VERSION_MAJOR 6)
 # Qt
 if(NOT DEFINED QT_VERSION_MAJOR)
     find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network Xml)
@@ -37,9 +38,9 @@ option(BUILD_TESTS "Build tests." OFF)
 option(BUILD_INTERNAL_TESTS "Build internal tests." OFF)
 option(BUILD_DOCUMENTATION "Build API documentation." OFF)
 option(BUILD_EXAMPLES "Build examples." OFF)
-option(BUILD_OMEMO "Build the OMEMO module" ON)
-option(WITH_GSTREAMER "Build with GStreamer support for Jingle" ON)
-option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing" ${Qca-qt${QT_VERSION_MAJOR}_FOUND})
+option(BUILD_OMEMO "Build the OMEMO module" OFF)
+option(WITH_GSTREAMER "Build with GStreamer support for Jingle" OFF)
+option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing" OFF)
 option(ENABLE_ASAN "Build with address sanitizer" OFF)
 
 set(QXMPP_TARGET QXmppQt${QT_VERSION_MAJOR})

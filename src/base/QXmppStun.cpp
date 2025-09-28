@@ -2518,7 +2518,7 @@ QList<QUdpSocket *> QXmppIceComponent::reservePorts(const QList<QHostAddress> &a
 qint64 QXmppIceComponent::sendDatagram(const QByteArray &datagram)
 {
     CandidatePair *pair = d->activePair ? d->activePair : d->fallbackPair;
-    if (!pair) {
+    if (!pair || pair->remote.host().isNull()) {
         return -1;
     }
     return pair->transport->writeDatagram(datagram, pair->remote.host(), pair->remote.port());
