@@ -301,7 +301,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
 
     auto future = client()->findExtension<QXmppUploadRequestManager>()->requestSlot(filename, fileSize, mimeType, uploadServiceJid);
     // TODO: rawSourceDevice: could this lead to a memory leak if the "then lambda" is never executed?
-    future.then(this, [this, upload, rawSourceDevice = data.release()](SlotResult result) mutable {
+    future.then(this, [this, upload, rawSourceDevice = data.release(), mimeType](SlotResult result) mutable {
         // first check whether upload was cancelled in the meantime
         if (upload->d->cancelled) {
             upload->d->reportFinished();
@@ -324,6 +324,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
             upload->d->getUrl = slot.getUrl();
 
             QNetworkRequest request(slot.putUrl());
+            request.setHeader(QNetworkRequest::ContentTypeHeader, mimeType.name());
             auto headers = slot.putHeaders();
             for (auto itr = headers.cbegin(); itr != headers.cend(); ++itr) {
                 request.setRawHeader(itr.key().toUtf8(), itr.value().toUtf8());
