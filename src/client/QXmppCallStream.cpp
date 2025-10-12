@@ -14,6 +14,10 @@
 #include <gst/gst.h>
 
 #include <QRandomGenerator>
+#include <QtCrypto>  // QCA headers
+#include <QString>
+#include <QStringView>
+
 
 /// \cond
 QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstElement *pipeline_,
@@ -34,6 +38,13 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
       name(std::move(name_)),
       id(id_)
 {
+    constexpr QStringView keyStr = u"w89qwvAP49kMr8S4hQORT63XRJQ9QTt6";  // Example key string
+    constexpr QStringView ivStr  = u"e9cnPWTaktW6Farc";   // Example IV string
+
+    // Convert to QByteArray with correct size
+    key = keyStr.toUtf8().leftJustified(32, '\0'); // AES-256 requires 32 bytes
+    iv = ivStr.toUtf8().leftJustified(16, '\0');   // IV must be 16 bytes (AES block size)
+
     localSsrc = QRandomGenerator::global()->generate();
 
     iceReceiveBin = gst_bin_new(u"receive_%1"_s.arg(id).toLatin1().data());
@@ -116,6 +127,77 @@ QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
     }
 }
 
+// Encrypts plaintext using AES-256 in CBC mode with PKCS7 padding.
+// @param plaintext The data to encrypt.
+// @param key The 32-byte AES key.
+// @param iv The 16-byte initialization vector.
+// @return The encrypted data as a QByteArray, or an empty QByteArray on failure.
+QByteArray aesEncrypt(const QByteArray &plaintext, const QByteArray &key, const QByteArray &iv)
+{
+    // Validate key and IV sizes
+    if (key.size() != 32) {
+        qWarning() << "Invalid key size: expected 32 bytes, got" << key.size();
+        return {};
+    }
+    if (iv.size() != 16) {
+        qWarning() << "Invalid IV size: expected 16 bytes, got" << iv.size();
+        return {};
+    }
+
+            // Initialize key and IV
+    QCA::SymmetricKey symKey(key);
+    QCA::InitializationVector ivector(iv);
+
+            // Initialize cipher for AES-256 CBC with PKCS7 padding
+    QCA::Cipher cipher(QString::fromLatin1("aes256"), QCA::Cipher::CBC, QCA::Cipher::DefaultPadding, QCA::Encode, symKey, ivector);
+
+    // Perform encryption
+    QCA::SecureArray encrypted = cipher.process(plaintext);
+    if (!cipher.ok()) {
+        qWarning() << "Encryption failed!";
+        return {};
+    }
+
+            // Convert securely to QByteArray
+    return encrypted.toByteArray();
+}
+
+// Decrypts ciphertext using AES-256 in CBC mode with PKCS7 padding.
+// @param ciphertext The data to decrypt.
+// @param key The 32-byte AES key.
+// @param iv The 16-byte initialization vector.
+// @return The decrypted data as a QByteArray, or an empty QByteArray on failure.
+QByteArray aesDecrypt(const QByteArray &ciphertext, const QByteArray &key, const QByteArray &iv)
+{
+    // Validate key and IV sizes
+    if (key.size() != 32) {
+        qWarning() << "Invalid key size: expected 32 bytes, got" << key.size();
+        return {};
+    }
+    if (iv.size() != 16) {
+        qWarning() << "Invalid IV size: expected 16 bytes, got" << iv.size();
+        return {};
+    }
+
+    // Initialize key and IV
+    QCA::SymmetricKey symKey(key);
+    QCA::InitializationVector ivector(iv);
+
+    // Initialize cipher for AES-256 CBC with PKCS7 padding
+    QCA::Cipher cipher(QString::fromLatin1("aes256"), QCA::Cipher::CBC, QCA::Cipher::DefaultPadding, QCA::Decode, symKey, ivector);
+
+    // Perform decryption
+    QCA::SecureArray decrypted = cipher.process(ciphertext);
+    if (!cipher.ok()) {
+        qWarning() << "Decryption failed!";
+        return {};
+    }
+
+        //Convert securely to QByteArray
+    return decrypted.toByteArray();
+}
+
+
 GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int component)
 {
     GstSample *sample;
@@ -141,6 +223,8 @@ GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int comp
     gst_buffer_unmap(buffer, &mapInfo);
     gst_sample_unref(sample);
 
+    datagram = aesEncrypt(datagram, key, iv);
+
     if (connection->component(component)->isConnected() &&
         connection->component(component)->sendDatagram(datagram) != datagram.size()) {
         return GST_FLOW_ERROR;
@@ -150,13 +234,14 @@ GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int comp
 
 void QXmppCallStreamPrivate::datagramReceived(const QByteArray &datagram, GstElement *appsrc)
 {
-    GstBuffer *buffer = gst_buffer_new_and_alloc(datagram.size());
+    QByteArray decryptedDatagram = aesDecrypt(datagram, key, iv);
+    GstBuffer *buffer = gst_buffer_new_and_alloc(decryptedDatagram.size());
     GstMapInfo mapInfo;
     if (!gst_buffer_map(buffer, &mapInfo, GST_MAP_WRITE)) {
         qFatal("Could not map buffer");
         return;
     }
-    std::memcpy(mapInfo.data, datagram.data(), mapInfo.size);
+    std::memcpy(mapInfo.data, decryptedDatagram.data(), mapInfo.size);
     gst_buffer_unmap(buffer, &mapInfo);
     GstFlowReturn ret;
     g_signal_emit_by_name(appsrc, "push-buffer", buffer, &ret);

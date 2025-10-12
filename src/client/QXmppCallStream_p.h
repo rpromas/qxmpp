@@ -79,6 +79,9 @@ public:
     int id;
 
     QList<QXmppJinglePayloadType> payloadTypes;
+
+    QByteArray key;
+    QByteArray iv;
 };
 
 #endif
