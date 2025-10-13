@@ -9,6 +9,13 @@ QXmpp 1.12.0 (UNRELEASED)
 
 *under development*
 
+QXmpp 1.11.3 (October 13, 2025)
+-------------------------------
+
+ - Fixes for Apple Clang (@lnj, !719)
+ - HttpUploadManager: Add Content-Type header when uploading via HTTP (@melvo, !721)
+ - EncryptedFileSharingProvider: Fix crash on cancellation (@fazevedo, !720)
+
 QXmpp 1.11.2 (September 2, 2025)
 --------------------------------
 
