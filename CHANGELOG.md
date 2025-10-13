@@ -4,6 +4,13 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.11.3 (October 13, 2025)
+-------------------------------
+
+ - Fixes for Apple Clang (@lnj, !719)
+ - HttpUploadManager: Add Content-Type header when uploading via HTTP (@melvo, !721)
+ - EncryptedFileSharingProvider: Fix crash on cancellation (@fazevedo, !720)
+
 QXmpp 1.11.2 (September 2, 2025)
 --------------------------------
 
