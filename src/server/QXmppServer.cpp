@@ -118,17 +118,17 @@ bool QXmppServerPrivate::routeData(const QString &to, const QByteArray &data)
     if (toDomain == domain) {
         // look for a client connection
         QList<QXmppIncomingClient *> found;
-        if (QXmppUtils::jidToResource(to).isEmpty()) {
-            const auto &connections = incomingClientsByBareJid.value(to);
+        // if (QXmppUtils::jidToResource(to).isEmpty()) {
+            const auto &connections = incomingClientsByBareJid.value(QXmppUtils::jidToBareJid(to));
             for (auto *conn : connections) {
                 found << conn;
             }
-        } else {
-            QXmppIncomingClient *conn = incomingClientsByJid.value(to);
-            if (conn) {
-                found << conn;
-            }
-        }
+        // } else {
+        //     QXmppIncomingClient *conn = incomingClientsByJid.value(to);
+        //     if (conn) {
+        //         found << conn;
+        //     }
+        // }
 
         // send data
         for (auto *conn : std::as_const(found)) {
