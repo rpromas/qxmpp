@@ -659,16 +659,16 @@ void tst_QXmppMixManager::testCreateChannelWithId()
 
 void tst_QXmppMixManager::testRequestChannelJids()
 {
-    auto tester = Tester();
-    auto &client = tester.client;
-    auto manager = tester.manager;
-
-    auto call = [&client, manager]() {
+    auto test = Tester();
+    auto &[client, manager] = test;
+    auto call = [manager]() {
         return manager->requestChannelJids(u"mix.shakespeare.example"_s);
     };
 
     auto task = call();
+    testError(task, client, u"qx1"_s, u"mix.shakespeare.example"_s);
 
+    task = call();
     client.expect(
         "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
         "<query xmlns='http://jabber.org/protocol/disco#items'/>"
@@ -687,8 +687,6 @@ void tst_QXmppMixManager::testRequestChannelJids()
     QCOMPARE(jids.at(0), u"coven@mix.shakespeare.example"_s);
     QCOMPARE(jids.at(1), u"spells@mix.shakespeare.example"_s);
     QCOMPARE(jids.at(2), u"wizards@mix.shakespeare.example"_s);
-
-    testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testRequestChannelNodes()
@@ -702,7 +700,9 @@ void tst_QXmppMixManager::testRequestChannelNodes()
     };
 
     auto task = call();
+    testErrorFromChannel(task, client);
 
+    task = call();
     client.expect(
         "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<query xmlns='http://jabber.org/protocol/disco#items' node='mix'/>"
@@ -717,8 +717,6 @@ void tst_QXmppMixManager::testRequestChannelNodes()
 
     auto nodes = expectFutureVariant<QXmppMixConfigItem::Nodes>(task);
     QCOMPARE(nodes, QXmppMixConfigItem::Node::AllowedJids | QXmppMixConfigItem::Node::Presence);
-
-    testErrorFromChannel(task = call(), client);
 }
 
 void tst_QXmppMixManager::testRequestChannelConfiguration()
