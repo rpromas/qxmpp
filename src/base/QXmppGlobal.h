@@ -10,6 +10,8 @@
 
 #include "qxmpp_export.h"
 
+#include <variant>
+
 #include <QString>
 
 struct QXmppError;
