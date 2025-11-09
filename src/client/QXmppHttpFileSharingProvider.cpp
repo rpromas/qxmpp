@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022 Jonah Brüchert <jbb@kaidan.im>
 // SPDX-FileCopyrightText: 2022 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2025 Filipe Azevedo <pasnox@gmail.com>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -152,8 +153,7 @@ auto QXmppHttpFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> data,
         info.filename().value_or(QXmppUtils::generateStanzaHash(10)),
         info.mediaType().value_or(QMimeDatabase().mimeTypeForName(u"application/octet-stream"_s)),
         info.size() ? info.size().value() : -1);
-
-    QObject::connect(state->upload.get(), &QXmppHttpUpload::finished, [state, reportFinished = std::move(reportFinished)](const QXmppHttpUpload::Result &result) mutable {
+    auto finished = [state, reportFinished = std::move(reportFinished)](const QXmppHttpUpload::Result &result) mutable {
         reportFinished(map<UploadResult>(
             [](const QUrl &url) {
                 return std::any(QXmppHttpFileSource(url));
@@ -162,12 +162,19 @@ auto QXmppHttpFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> data,
 
         // reduce ref count, so the signal connection doesn't keep the state alive forever
         state.reset();
-    });
+    };
+
+    QObject::connect(state->upload.get(), &QXmppHttpUpload::finished, finished);
     QObject::connect(state->upload.get(), &QXmppHttpUpload::progressChanged, [stateRef = std::weak_ptr<State>(state), reportProgress = std::move(reportProgress)]() {
         if (auto state = stateRef.lock()) {
             reportProgress(state->upload->bytesSent(), state->upload->bytesTotal());
         }
     });
+
+    // If we have an early error from d->manager->uploadFile, then trigger finished ourselves.
+    if (state->upload->isFinished()) {
+        finished(*state->upload->result());
+    }
 
     return std::dynamic_pointer_cast<QXmppFileSharingProvider::Upload>(state);
 }
