@@ -4,10 +4,13 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.12.0 (UNRELEASED)
--------------------------
+QXmpp 1.12.0 (November 9, 2025)
+-------------------------------
 
-*under development*
+ - Deprecate old APIs and finalize new APIs (@lnj, !716)
+ - Implement XEP-0157: Contact Addresses for XMPP Services (@lnj, !715)
+ - Modernize DiscoveryManager: Split up QXmppDiscoveryIq, add request deduplication and caching of disco info features (@lnj, !717)
+ - HttpFileSharingProvider: Fix early finished uploads hanging (@fazevedo, !722)
 
 QXmpp 1.11.3 (October 13, 2025)
 -------------------------------
