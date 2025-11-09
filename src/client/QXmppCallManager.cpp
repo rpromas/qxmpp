@@ -17,11 +17,11 @@
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "GstWrapper.h"
 #include "StringLiterals.h"
 
 #include <gst/gst.h>
-#include <ranges>
 
 #include <QDomElement>
 #include <QTimer>
@@ -183,7 +183,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
-    discoManager->requestDiscoInfo(jid).then(this, [this, call](auto result) {
+    discoManager->info(jid).then(this, [this, call](auto result) {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             warning(u"Error fetching service discovery features for calling %1: %2"_s
                         .arg(call->jid(), error->description));
@@ -192,8 +192,8 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         }
 
         // determine supported features of remote
-        auto &&info = std::get<QXmppDiscoveryIq>(std::move(result));
-        bool remoteSupportsDtls = info.features().contains(ns_jingle_dtls);
+        auto &&info = std::get<QXmppDiscoInfo>(std::move(result));
+        bool remoteSupportsDtls = contains(info.features(), ns_jingle_dtls);
 
         call->d->useDtls = d->supportsDtls && remoteSupportsDtls;
 
