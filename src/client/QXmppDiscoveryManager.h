@@ -73,32 +73,32 @@ public:
     QXmppTask<ItemsResult> requestDiscoItems(const QString &jid, const QString &node = {});
     QT_WARNING_POP
 
-    [[deprecated("Use buildDiscoInfo()")]]
+    [[deprecated("Use buildClientInfo()")]]
     QXmppDiscoveryIq capabilities();
 
-    [[deprecated("Use ownIdentities()")]]
+    [[deprecated("Use identities()")]]
     QString clientCategory() const;
-    [[deprecated("Use setOwnIdentities()")]]
+    [[deprecated("Use setIdentities()")]]
     void setClientCategory(const QString &);
 
-    [[deprecated("Use ownIdentities()")]]
+    [[deprecated("Use identities()")]]
     void setClientName(const QString &);
-    [[deprecated("Use setOwnIdentities()")]]
+    [[deprecated("Use setIdentities()")]]
     QString clientApplicationName() const;
 
-    [[deprecated("Use ownIdentities()")]]
+    [[deprecated("Use identities()")]]
     QString clientType() const;
-    [[deprecated("Use setOwnIdentities()")]]
+    [[deprecated("Use setIdentities()")]]
     void setClientType(const QString &);
 
-    [[deprecated("Use ownDataForms()")]]
+    [[deprecated("Use infoForms()")]]
     QXmppDataForm clientInfoForm() const;
-    [[deprecated("Use setOwnDataForms()")]]
+    [[deprecated("Use setInfoForms()()")]]
     void setClientInfoForm(const QXmppDataForm &form);
 
-    [[deprecated("Use requestDiscoInfo")]]
+    [[deprecated("Use info()")]]
     QString requestInfo(const QString &jid, const QString &node = QString());
-    [[deprecated("Use requestDiscoItems")]]
+    [[deprecated("Use items()")]]
     QString requestItems(const QString &jid, const QString &node = QString());
 #endif
 

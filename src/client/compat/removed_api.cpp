@@ -152,7 +152,7 @@ QT_WARNING_DISABLE_DEPRECATED
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \deprecated
+/// \deprecated Use info()
 ///
 QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &node)
 {
@@ -172,7 +172,7 @@ QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &no
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \deprecated
+/// \deprecated Use items()
 ///
 QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &node)
 {
@@ -210,7 +210,7 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \deprecated
+/// \deprecated Use info()
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
@@ -238,7 +238,7 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \deprecated
+/// \deprecated Use items()
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
@@ -249,7 +249,7 @@ QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDisc
 ///
 /// Returns the client's full capabilities.
 ///
-/// \deprecated
+/// \deprecated Use buildClientInfo()
 ///
 QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
 {
@@ -271,7 +271,7 @@ QT_WARNING_POP
 /// You can find a list of valid categories at:
 /// http://xmpp.org/registrar/disco-categories.html
 ///
-/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+/// \deprecated Use setIdentities(), this function will remove other identities if set.
 ///
 void QXmppDiscoveryManager::setClientCategory(const QString &category)
 {
@@ -287,7 +287,7 @@ void QXmppDiscoveryManager::setClientCategory(const QString &category)
 /// You can find a list of valid types at:
 /// http://xmpp.org/registrar/disco-categories.html
 ///
-/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+/// \deprecated Use setIdentities(), this function will remove other identities if set.
 ///
 void QXmppDiscoveryManager::setClientType(const QString &type)
 {
@@ -300,7 +300,7 @@ void QXmppDiscoveryManager::setClientType(const QString &type)
 ///
 /// Sets the name of the local XMPP client.
 ///
-/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+/// \deprecated Use setIdentities(), this function will remove other identities if set.
 ///
 void QXmppDiscoveryManager::setClientName(const QString &name)
 {
@@ -315,7 +315,7 @@ void QXmppDiscoveryManager::setClientName(const QString &name)
 ///
 /// By default this is "client".
 ///
-/// \deprecated Use ownIdentities()
+/// \deprecated Use identities()
 ///
 QString QXmppDiscoveryManager::clientCategory() const
 {
@@ -331,7 +331,7 @@ QString QXmppDiscoveryManager::clientCategory() const
 /// With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
 /// "phone", otherwise it defaults to "pc".
 ///
-/// \deprecated Use ownIdentities()
+/// \deprecated Use identities()
 ///
 QString QXmppDiscoveryManager::clientType() const
 {
@@ -346,7 +346,7 @@ QString QXmppDiscoveryManager::clientType() const
 ///
 /// By default this is "QXmpp x.y.z".
 ///
-/// \deprecated Use setOwnIdentities()
+/// \deprecated Use identities()
 ///
 QString QXmppDiscoveryManager::clientApplicationName() const
 {
@@ -359,7 +359,7 @@ QString QXmppDiscoveryManager::clientApplicationName() const
 ///
 /// Returns the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
 ///
-/// \deprecated Use ownDataForms()
+/// \deprecated Use infoForms()
 ///
 QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
 {
@@ -369,7 +369,7 @@ QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
 ///
 /// Sets the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
 ///
-/// \deprecated Use setOwnDataForms()
+/// \deprecated Use setInfoForms()
 ///
 void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
 {
