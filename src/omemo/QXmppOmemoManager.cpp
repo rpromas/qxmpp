@@ -14,6 +14,9 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include <protocol.h>
+#include <signal_protocol.h>
+#include "session_pre_key.h"
 
 #include <QStringBuilder>
 
@@ -362,6 +365,7 @@ QXmppTask<bool> Manager::load()
         const auto &optionalOwnDevice = omemoData.ownDevice;
         if (optionalOwnDevice) {
             d->ownDevice = *optionalOwnDevice;
+            d->deviceBundle.setPublicIdentityKey(d->ownDevice.publicIdentityKey);
         } else {
             debug(u"Device could not be loaded because it is not stored"_s);
             interface.finish(false);
@@ -375,6 +379,20 @@ QXmppTask<bool> Manager::load()
             return;
         } else {
             d->signedPreKeyPairs = signedPreKeyPairs;
+
+            const auto keyId = d->signedPreKeyPairs.keys().first();
+            d->deviceBundle.setSignedPublicPreKeyId(keyId);
+
+            const auto& signedPreKeyData = d->signedPreKeyPairs[keyId];
+
+            session_signed_pre_key* sessionSignedPreKey;
+            session_signed_pre_key_deserialize(&sessionSignedPreKey, reinterpret_cast<const uint8_t*>(signedPreKeyData.data.data()), signedPreKeyData.data.size(), d->globalContext.get());
+
+            BufferPtr signedPublicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_signed_pre_key_get_key_pair(sessionSignedPreKey))));
+            const auto signedPublicPreKeyByteArray = signedPublicPreKeyBuffer.toByteArray();
+
+            d->deviceBundle.setSignedPublicPreKey(signedPublicPreKeyByteArray);
+            d->deviceBundle.setSignedPublicPreKeySignature(QByteArray(reinterpret_cast<const char *>(session_signed_pre_key_get_signature_omemo(sessionSignedPreKey)), session_signed_pre_key_get_signature_omemo_len(sessionSignedPreKey)));
         }
 
         const auto &preKeyPairs = omemoData.preKeyPairs;
@@ -384,6 +402,15 @@ QXmppTask<bool> Manager::load()
             return;
         } else {
             d->preKeyPairs = preKeyPairs;
+            for (const uint32_t key : d->preKeyPairs.keys())
+            {
+                session_pre_key* preKey;
+                session_pre_key_deserialize(&preKey, reinterpret_cast<const uint8_t*>(preKeyPairs[key].data()), preKeyPairs[key].size(), d->globalContext.get());
+                BufferPtr publicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_pre_key_get_key_pair(preKey))));
+                const auto serializedPublicPreKey = publicPreKeyBuffer.toByteArray();
+                d->deviceBundle.addPublicPreKey(key, serializedPublicPreKey);
+            }
+            qDebug() << "Did load prekey pairs:" << d->preKeyPairs.size();
         }
 
         d->devices = omemoData.devices;
