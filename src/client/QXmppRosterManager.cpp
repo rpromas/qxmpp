@@ -284,6 +284,9 @@ void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
         handleSubscriptionRequest(bareJid, presence, false);
         break;
     }
+    case QXmppPresence::Unsubscribe:
+        Q_EMIT subscriptionRemoved(bareJid);
+        break;
     default:
         break;
     }

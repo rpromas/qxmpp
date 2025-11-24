@@ -118,6 +118,9 @@ Q_SIGNALS:
     /// or both then QXmppConfiguration::autoAcceptSubscriptions() is ignored.
     void subscriptionReceived(const QString &bareJid);
 
+    // Added by me
+    void subscriptionRemoved(const QString &bareJid);
+
     void subscriptionRequestReceived(const QString &subscriberBareJid, const QXmppPresence &presence);
 
     /// This signal is emitted when the roster entry of a particular bareJid is
