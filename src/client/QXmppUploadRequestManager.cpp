@@ -9,15 +9,18 @@
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHttpUploadIq.h"
+#include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>
 #include <QFileInfo>
 #include <QMimeDatabase>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppUploadServicePrivate : public QSharedData
@@ -33,42 +36,38 @@ QXmppUploadService::QXmppUploadService()
 }
 
 /// Copy constructor
-
 QXmppUploadService::QXmppUploadService(const QXmppUploadService &) = default;
 
 QXmppUploadService::~QXmppUploadService() = default;
 
 /// Equal operator
-
 QXmppUploadService &QXmppUploadService::operator=(const QXmppUploadService &) = default;
 
 /// Returns the JID of the HTTP File Upload service.
-
 QString QXmppUploadService::jid() const
 {
     return d->jid;
 }
 
 /// Sets the JID of the HTTP File Upload service.
-
 void QXmppUploadService::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
+///
 /// Returns the size limit of files that can be uploaded to this upload
 /// service.
 ///
 /// A size limit of -1 means that there is no file size limit or it could not
 /// be determined.
-
+///
 qint64 QXmppUploadService::sizeLimit() const
 {
     return d->sizeLimit;
 }
 
 /// Sets the size limit of files that can be uploaded to this upload service.
-
 void QXmppUploadService::setSizeLimit(qint64 sizeLimit)
 {
     d->sizeLimit = sizeLimit;
@@ -96,6 +95,7 @@ QXmppUploadRequestManager::QXmppUploadRequestManager()
 
 QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;
 
+///
 /// Requests an upload slot from the server.
 ///
 /// \param file The info of the file to be uploaded.
@@ -105,13 +105,14 @@ QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;
 /// \return The id of the sent IQ. If sendPacket() isn't successful or no
 ///         upload service has been discovered yet, an empty string will be
 ///         returned.
-
+///
 QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                                                      const QString &uploadService)
 {
     return requestUploadSlot(file, file.fileName(), uploadService);
 }
 
+///
 /// Requests an upload slot from the server.
 ///
 /// \param file The info of the file to be uploaded.
@@ -123,7 +124,7 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
 /// \return The id of the sent IQ. If sendPacket() isn't successful or no
 ///         upload service has been discovered yet, an empty string will be
 ///         returned.
-
+///
 QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                                                      const QString &customFileName,
                                                      const QString &uploadService)
@@ -133,6 +134,7 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                              uploadService);
 }
 
+///
 /// Requests an upload slot from the server.
 ///
 /// \param fileName The name of the file to be uploaded. This may be used by
@@ -147,7 +149,7 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
 /// \return The id of the sent IQ. If sendPacket() isn't successful or no
 ///         upload service has been discovered yet, an empty string will be
 ///         returned.
-
+///
 QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
                                                      qint64 fileSize,
                                                      const QMimeType &mimeType,
@@ -168,10 +170,7 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
     iq.setSize(fileSize);
     iq.setContentType(mimeType);
 
-    if (client()->sendPacket(iq)) {
-        return iq.id();
-    }
-    return {};
+    return client()->sendLegacyId(iq);
 }
 
 ///
@@ -181,8 +180,6 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
 /// \param uploadService The HTTP File Upload service that is used to request
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -201,8 +198,6 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
 /// \param uploadService The HTTP File Upload service that is used to request
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -227,8 +222,6 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
 /// \param uploadService The HTTP File Upload service that is used to request
 ///                      the upload slot. If this is empty, the first
 ///                      discovered one is used.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -257,14 +250,12 @@ auto QXmppUploadRequestManager::requestSlot(const QString &fileName,
 }
 
 /// Returns true if an HTTP File Upload service has been discovered.
-
 bool QXmppUploadRequestManager::serviceFound() const
 {
     return !d->uploadServices.isEmpty();
 }
 
 /// Returns all discovered HTTP File Upload services.
-
 QVector<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
 {
     return d->uploadServices;
@@ -272,13 +263,13 @@ QVector<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
 
 bool QXmppUploadRequestManager::handleStanza(const QDomElement &element)
 {
-    if (QXmppHttpUploadSlotIq::isHttpUploadSlotIq(element)) {
+    if (isIqElement<QXmppHttpUploadSlotIq>(element)) {
         QXmppHttpUploadSlotIq slot;
         slot.parse(element);
 
         Q_EMIT slotReceived(slot);
         return true;
-    } else if (QXmppHttpUploadRequestIq::isHttpUploadRequestIq(element)) {
+    } else if (isIqElement<QXmppHttpUploadRequestIq>(element)) {
         QXmppHttpUploadRequestIq requestError;
         requestError.parse(element);
 
@@ -295,27 +286,24 @@ void QXmppUploadRequestManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
     }
 
     const auto identities = iq.identities();
-    for (const QXmppDiscoveryIq::Identity &identity : identities) {
+    for (const auto &identity : identities) {
         if (identity.category() == u"store" && identity.type() == u"file") {
             QXmppUploadService service;
             service.setJid(iq.from());
 
-            // get size limit
-            bool isFormNsCorrect = false;
-            const auto fields = iq.form().fields();
-            for (const QXmppDataForm::Field &field : fields) {
-                if (field.key() == u"FORM_TYPE") {
-                    isFormNsCorrect = field.value().toString() == ns_http_upload;
-                } else if (isFormNsCorrect && field.key() == u"max-file-size") {
-                    service.setSizeLimit(field.value().toLongLong());
+            if (auto form = iq.dataForm(ns_http_upload)) {
+                if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
+                    if (auto maxSize = parseInt<uint64_t>(maxSizeValue->toString())) {
+                        service.setSizeLimit(*maxSize);
+                    }
                 }
             }
 
             d->uploadServices.append(service);
             Q_EMIT serviceFoundChanged();
+            return;
         }
     }
-    return;
 }
 
 void QXmppUploadRequestManager::onRegistered(QXmppClient *client)

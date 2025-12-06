@@ -4,15 +4,13 @@
 
 #include "QXmppHttpUploadIq.h"
 
-#include "QXmppConstants_p.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
-#include <QDomElement>
 #include <QMimeDatabase>
 #include <QSharedData>
-#include <QUrl>
 
 using namespace QXmpp::Private;
 
@@ -90,14 +88,6 @@ void QXmppHttpUploadRequestIq::setContentType(const QMimeType &type)
     d->contentType = type;
 }
 
-///
-/// Returns true, if the the element is an HTTP File Upload slot request IQ.
-///
-bool QXmppHttpUploadRequestIq::isHttpUploadRequestIq(const QDomElement &element)
-{
-    return isIqType(element, u"request", ns_http_upload);
-}
-
 /// \cond
 void QXmppHttpUploadRequestIq::parseElementFromChild(const QDomElement &element)
 {
@@ -115,16 +105,12 @@ void QXmppHttpUploadRequestIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppHttpUploadRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("request"));
-    writer->writeDefaultNamespace(toString65(ns_http_upload));
-    // filename and size are required
-    writer->writeAttribute(QSL65("filename"), d->fileName);
-    writer->writeAttribute(QSL65("size"), QString::number(d->size));
-    // content-type is optional
-    if (!d->contentType.isDefault() && d->contentType.isValid()) {
-        writer->writeAttribute(QSL65("content-type"), d->contentType.name());
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        Attribute { u"filename", d->fileName },
+        Attribute { u"size", d->size },
+        OptionalAttribute { u"content-type", d->contentType },
+    });
 }
 /// \endcond
 
@@ -209,14 +195,6 @@ void QXmppHttpUploadSlotIq::setPutHeaders(const QMap<QString, QString> &putHeade
                   });
 }
 
-///
-/// Returns true, if the the element is an HTTP File Upload slot result IQ.
-///
-bool QXmppHttpUploadSlotIq::isHttpUploadSlotIq(const QDomElement &element)
-{
-    return isIqType(element, u"slot", ns_http_upload);
-}
-
 /// \cond
 void QXmppHttpUploadSlotIq::parseElementFromChild(const QDomElement &element)
 {
@@ -236,31 +214,27 @@ void QXmppHttpUploadSlotIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppHttpUploadSlotIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("slot"));
-    writer->writeDefaultNamespace(toString65(ns_http_upload));
-
-    writer->writeStartElement(QSL65("put"));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeAttribute("url", d->putUrl.toEncoded());
-#else
-    writer->writeAttribute(u"url"_s, QString::fromUtf8(d->putUrl.toEncoded()));
-#endif
-    std::for_each(d->putHeaders.keyBegin(), d->putHeaders.keyEnd(), [&](const QString &name) {
-        writer->writeStartElement(QSL65("header"));
-        writer->writeAttribute(QSL65("name"), name);
-        writer->writeCharacters(d->putHeaders.value(name));
-        writer->writeEndElement();
+    XmlWriter w(writer);
+    w.write(Element {
+        PayloadXmlTag,
+        Element {
+            u"put",
+            Attribute { u"url", d->putUrl.toEncoded() },
+            [&] {
+                std::for_each(d->putHeaders.keyValueBegin(), d->putHeaders.keyValueEnd(), [&](const auto &pair) {
+                    auto &[name, value] = pair;
+                    w.write(Element {
+                        u"header",
+                        Attribute { u"name", name },
+                        Characters { value },
+                    });
+                });
+            },
+        },
+        Element {
+            u"get",
+            Attribute { u"url", d->getUrl.toEncoded() },
+        },
     });
-    writer->writeEndElement();
-
-    writer->writeStartElement(QSL65("get"));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeAttribute("url", d->getUrl.toEncoded());
-#else
-    writer->writeAttribute(u"url"_s, QString::fromUtf8(d->getUrl.toEncoded()));
-#endif
-    writer->writeEndElement();
-
-    writer->writeEndElement();
 }
 /// \endcond

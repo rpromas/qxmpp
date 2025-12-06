@@ -16,6 +16,8 @@
 #include <QUuid>
 
 using namespace QXmpp;
+using namespace QXmpp::Private;
+
 using Jmi = QXmppJingleMessageInitiation;
 using JmiManager = QXmppJingleMessageInitiationManager;
 using JmiElement = QXmppJingleMessageInitiationElement;
@@ -84,7 +86,7 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::proceed()
 {
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Proceed);
-
+    jmiElement.setId(d->id);
     return d->request(std::move(jmiElement));
 }
 
@@ -271,7 +273,7 @@ QXmppJingleMessageInitiationManager::~QXmppJingleMessageInitiationManager() = de
 /// \cond
 QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 {
-    return { ns_jingle_message_initiation.toString() };
+    return { ns_jingle_message.toString() };
 }
 /// \endcond
 

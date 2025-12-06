@@ -12,6 +12,7 @@
 #include "QXmppTask.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <any>
 #include <memory>
@@ -31,24 +32,52 @@ struct QXmppError;
     if (!QTest::qVerify(bool(statement), #statement, static_cast<const char *>(description), __FILE__, __LINE__)) \
         throw std::runtime_error(description);
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+constexpr auto TimeZoneUTC = QTimeZone::Initialization::UTC;
+#else
+constexpr auto TimeZoneUTC = Qt::UTC;
+#endif
+
+template<typename String>
+inline std::variant<QDomDocument, QString> internalParseDomDocument(const String &xml, bool namespaceProcessing)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QDomDocument doc;
+    auto options = namespaceProcessing ? QDomDocument::ParseOption::UseNamespaceProcessing : QDomDocument::ParseOption::Default;
+    if (auto result = doc.setContent(xml, options); !result) {
+        return result.errorMessage;
+    }
+    return doc;
+#else
+    QDomDocument doc;
+    QString errorMessage;
+    if (!doc.setContent(xml, namespaceProcessing, &errorMessage)) {
+        return errorMessage;
+    }
+    return doc;
+#endif
+}
+
 template<typename String>
 inline QDomDocument xmlToDomDoc(const String &xml, bool namespaceProcessing)
 {
-    QDomDocument doc;
-    QString errorText;
-    bool success = false;
+    std::variant<QDomDocument, QString> result;
+
     if constexpr (std::is_same_v<String, QString> || std::is_same_v<String, QByteArray>) {
-        success = doc.setContent(xml, namespaceProcessing, &errorText);
+        result = internalParseDomDocument(xml, namespaceProcessing);
     } else {
-        success = doc.setContent(QString(xml), namespaceProcessing, &errorText);
+        result = internalParseDomDocument(QString(xml), namespaceProcessing);
     }
-    if (!success) {
+
+    // error
+    if (std::holds_alternative<QString>(result)) {
         qDebug() << "Parsing error:";
         qDebug().noquote() << xml;
-        qDebug().noquote() << "Error:" << errorText;
+        qDebug().noquote() << "Error:" << std::get<QString>(result);
         QTest::qFail("Invalid XML", __FILE__, __LINE__);
+        return {};
     }
-    return doc;
+    return std::get<QDomDocument>(result);
 }
 
 template<typename String>
@@ -130,10 +159,13 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
 template<typename T>
 static QByteArray packetToXml(const T &packet)
 {
+    using namespace QXmpp::Private;
+
     QBuffer buffer;
     buffer.open(QIODevice::ReadWrite);
     QXmlStreamWriter writer(&buffer);
-    packet.toXml(&writer);
+    XmlWriter xmlWriter(&writer);
+    packet.toXml(xmlWriter);
     auto data = buffer.data();
     data.replace(u'\'', "&apos;");
     return data;
@@ -144,6 +176,14 @@ static void parsePacket(T &packet, const QByteArray &xml)
 {
     // qDebug() << "parsing" << xml;
     packet.parse(xmlToDom(xml));
+}
+
+template<typename T>
+static T parseInto(const QDomElement &el)
+{
+    T packet;
+    packet.parse(el);
+    return packet;
 }
 
 template<class T>
@@ -169,11 +209,16 @@ QDomElement writePacketToDom(T packet)
 {
     QBuffer buffer;
     buffer.open(QIODevice::ReadWrite);
-    QXmlStreamWriter writer(&buffer);
-    packet.toXml(&writer);
+    QXmlStreamWriter qtWriter(&buffer);
+    QXmpp::Private::XmlWriter writer(&qtWriter);
+    packet.toXml(writer);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    doc.setContent(buffer.data(), QDomDocument::ParseOption::UseNamespaceProcessing);
+#else
     doc.setContent(buffer.data(), true);
+#endif
 
     return doc.documentElement();
 }

@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2019 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <ole@salscheider.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -11,7 +13,9 @@
 #include <QList>
 
 class QXmppCallManager;
+class QXmppJingleReason;
 
+//
 //  W A R N I N G
 //  -------------
 //
@@ -25,16 +29,19 @@ class QXmppCallManager;
 class QXmppCallManagerPrivate
 {
 public:
-    QXmppCallManagerPrivate(QXmppCallManager *qq);
+    explicit QXmppCallManagerPrivate(QXmppCallManager *qq);
     QXmppCall *findCall(const QString &sid) const;
     QXmppCall *findCall(const QString &sid, QXmppCall::Direction direction) const;
 
     QList<QXmppCall *> calls;
     QList<QPair<QHostAddress, quint16>> stunServers;
     QHostAddress turnHost;
-    quint16 turnPort;
+    quint16 turnPort = 0;
     QString turnUser;
     QString turnPassword;
+
+    bool dtlsRequired = false;
+    bool supportsDtls = false;
 
 private:
     QXmppCallManager *q;

@@ -180,7 +180,7 @@ void tst_QXmppPubSubEvent::testBasic_data()
                                 "ba49252aaa4f5d320c24d3766f0bdcade78c78d3",
                                 QXmppPubSubSubscription::Subscribed,
                                 QXmppPubSubSubscription::Unavailable,
-                                QDateTime({ 2006, 02, 28 }, { 23, 59, 59 }, Qt::UTC)),
+                                QDateTime({ 2006, 02, 28 }, { 23, 59, 59 }, TimeZoneUTC)),
         QVector<QXmppPubSubBaseItem>(),
         std::nullopt);
 
@@ -223,11 +223,11 @@ void tst_QXmppPubSubEvent::testBasic()
     QCOMPARE(event.configurationForm().has_value(), configurationForm.has_value());
     if (configurationForm) {
         const auto parsedConfig = event.configurationForm();
-        QCOMPARE(parsedConfig->fields().count(), configurationForm->fields().count());
-        for (int i = 0; i < configurationForm->fields().count(); i++) {
-            QCOMPARE(parsedConfig->fields().at(i).key(), configurationForm->fields().at(i).key());
-            QCOMPARE(parsedConfig->fields().at(i).value(), configurationForm->fields().at(i).value());
-            QCOMPARE(parsedConfig->fields().at(i).type(), configurationForm->fields().at(i).type());
+        QCOMPARE(parsedConfig->fields().count(), configurationForm->constFields().count());
+        for (int i = 0; i < configurationForm->constFields().count(); i++) {
+            QCOMPARE(parsedConfig->fields().at(i).key(), configurationForm->constFields().at(i).key());
+            QCOMPARE(parsedConfig->fields().at(i).value(), configurationForm->constFields().at(i).value());
+            QCOMPARE(parsedConfig->fields().at(i).type(), configurationForm->constFields().at(i).type());
         }
     }
 

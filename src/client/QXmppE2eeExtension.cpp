@@ -9,8 +9,6 @@
 ///
 /// Abstract client extension for end-to-end-encryption protocols.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

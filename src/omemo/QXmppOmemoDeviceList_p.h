@@ -6,6 +6,7 @@
 #ifndef QXMPPOMEMODEVICELIST_H
 #define QXMPPOMEMODEVICELIST_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppOmemoDeviceElement_p.h"
 
@@ -18,6 +19,7 @@ class QXMPP_AUTOTEST_EXPORT QXmppOmemoDeviceList : public QList<QXmppOmemoDevice
 {
 public:
     /// \cond
+    static constexpr std::tuple XmlTag = { u"devices", QXmpp::Private::ns_omemo_2 };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

@@ -8,12 +8,13 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMessage.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppTrustMessageKeyOwner.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+
+#include "Async.h"
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -50,8 +51,6 @@ using namespace QXmpp::Private;
 /// for delivering trust messages to all online and offline endpoints.
 ///
 /// In addition, archiving via MAM must be enabled on the server.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \ingroup Managers
 ///

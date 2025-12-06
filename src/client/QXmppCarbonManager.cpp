@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -58,7 +59,7 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
         carbonselement.setAttribute(u"xmlns"_s, ns_carbons.toString());
 
         iq.setExtensions(QXmppElementList() << carbonselement);
-        client()->sendPacket(iq);
+        client()->send(std::move(iq));
     }
 }
 

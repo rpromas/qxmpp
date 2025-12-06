@@ -9,10 +9,13 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMucIq.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 
 #include <QDomElement>
 #include <QMap>
+
+using namespace QXmpp::Private;
 
 class QXmppMucManagerPrivate
 {
@@ -173,14 +176,8 @@ QXmppMucRoom::QXmppMucRoom(QXmppClient *client, const QString &jid, QObject *par
     connect(d->client, &QXmppClient::presenceReceived,
             this, &QXmppMucRoom::_q_presenceReceived);
 
-    if (d->discoManager) {
-        connect(d->discoManager, &QXmppDiscoveryManager::infoReceived,
-                this, &QXmppMucRoom::_q_discoveryInfoReceived);
-    }
-
     // convenience signals for properties
     connect(this, &QXmppMucRoom::joined, this, &QXmppMucRoom::isJoinedChanged);
-
     connect(this, &QXmppMucRoom::left, this, &QXmppMucRoom::isJoinedChanged);
 }
 
@@ -215,7 +212,7 @@ bool QXmppMucRoom::ban(const QString &jid, const QString &reason)
     iq.setTo(d->jid);
     iq.setItems(QList<QXmppMucItem>() << item);
 
-    return d->client->sendPacket(iq);
+    return d->client->sendLegacy(iq);
 }
 
 bool QXmppMucRoom::isJoined() const
@@ -245,7 +242,7 @@ bool QXmppMucRoom::join()
     packet.setType(QXmppPresence::Available);
     packet.setMucPassword(d->password);
     packet.setMucSupported(true);
-    return d->client->sendPacket(packet);
+    return d->client->sendLegacy(packet);
 }
 
 ///
@@ -267,7 +264,7 @@ bool QXmppMucRoom::kick(const QString &jid, const QString &reason)
     iq.setTo(d->jid);
     iq.setItems(QList<QXmppMucItem>() << item);
 
-    return d->client->sendPacket(iq);
+    return d->client->sendLegacy(iq);
 }
 
 ///
@@ -283,7 +280,7 @@ bool QXmppMucRoom::leave(const QString &message)
     packet.setTo(d->ownJid());
     packet.setType(QXmppPresence::Unavailable);
     packet.setStatusText(message);
-    return d->client->sendPacket(packet);
+    return d->client->sendLegacy(packet);
 }
 
 QString QXmppMucRoom::name() const
@@ -311,7 +308,7 @@ bool QXmppMucRoom::sendInvitation(const QString &jid, const QString &reason)
     message.setType(QXmppMessage::Normal);
     message.setMucInvitationJid(d->jid);
     message.setMucInvitationReason(reason);
-    return d->client->sendPacket(message);
+    return d->client->sendLegacy(message);
 }
 
 ///
@@ -329,7 +326,7 @@ bool QXmppMucRoom::sendMessage(const QString &text)
     msg.setTo(d->jid);
     msg.setType(QXmppMessage::GroupChat);
     msg.setBody(text);
-    return d->client->sendPacket(msg);
+    return d->client->sendLegacy(msg);
 }
 
 ///
@@ -350,7 +347,7 @@ void QXmppMucRoom::setNickName(const QString &nickName)
         QXmppPresence packet = d->client->clientPresence();
         packet.setTo(d->jid + u'/' + nickName);
         packet.setType(QXmppPresence::Available);
-        d->client->sendPacket(packet);
+        d->client->send(std::move(packet));
     } else {
         d->nickName = nickName;
         Q_EMIT nickNameChanged(nickName);
@@ -424,7 +421,7 @@ void QXmppMucRoom::setSubject(const QString &subject)
     msg.setTo(d->jid);
     msg.setType(QXmppMessage::GroupChat);
     msg.setSubject(subject);
-    d->client->sendPacket(msg);
+    d->client->send(std::move(msg));
 }
 
 ///
@@ -438,7 +435,7 @@ bool QXmppMucRoom::requestConfiguration()
 {
     QXmppMucOwnerIq iq;
     iq.setTo(d->jid);
-    return d->client->sendPacket(iq);
+    return d->client->sendLegacy(iq);
 }
 
 ///
@@ -454,7 +451,7 @@ bool QXmppMucRoom::setConfiguration(const QXmppDataForm &form)
     iqPacket.setType(QXmppIq::Set);
     iqPacket.setTo(d->jid);
     iqPacket.setForm(form);
-    return d->client->sendPacket(iqPacket);
+    return d->client->sendLegacy(iqPacket);
 }
 
 ///
@@ -481,7 +478,7 @@ bool QXmppMucRoom::requestPermissions()
         QXmppMucAdminIq iq;
         iq.setTo(d->jid);
         iq.setItems(QList<QXmppMucItem>() << item);
-        if (!d->client->sendPacket(iq)) {
+        if (!d->client->sendLegacy(iq)) {
             return false;
         }
         d->permissionsQueue += iq.id();
@@ -528,7 +525,7 @@ bool QXmppMucRoom::setPermissions(const QList<QXmppMucItem> &permissions)
     iq.setTo(d->jid);
     iq.setType(QXmppIq::Set);
     iq.setItems(items);
-    return d->client->sendPacket(iq);
+    return d->client->sendLegacy(iq);
 }
 
 void QXmppMucRoom::_q_disconnected()
@@ -552,25 +549,6 @@ void QXmppMucRoom::_q_disconnected()
     // emit "left" signal if we had joined the room
     if (wasJoined) {
         Q_EMIT left();
-    }
-}
-
-void QXmppMucRoom::_q_discoveryInfoReceived(const QXmppDiscoveryIq &iq)
-{
-    if (iq.from() == d->jid) {
-        QString name;
-        const auto &identities = iq.identities();
-        for (const auto &identity : identities) {
-            if (identity.category() == u"conference") {
-                name = identity.name();
-                break;
-            }
-        }
-
-        if (name != d->name) {
-            d->name = name;
-            Q_EMIT nameChanged(name);
-        }
     }
 }
 
@@ -598,7 +576,7 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
     if (isJoined() && jid == d->client->configuration().jid()) {
         QXmppPresence packet = d->client->clientPresence();
         packet.setTo(d->ownJid());
-        d->client->sendPacket(packet);
+        d->client->send(std::move(packet));
     }
 
     if (QXmppUtils::jidToBareJid(jid) != d->jid) {
@@ -639,7 +617,25 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
             if (jid == d->ownJid()) {
                 // request room information
                 if (d->discoManager) {
-                    d->discoManager->requestInfo(d->jid);
+                    d->discoManager->info(d->jid).then(this, [this](auto &&result) {
+                        if (!std::holds_alternative<QXmppDiscoInfo>(result)) {
+                            return;
+                        }
+
+                        QString name;
+                        const auto &identities = std::get<QXmppDiscoInfo>(result).identities();
+                        for (const auto &identity : identities) {
+                            if (identity.category() == u"conference") {
+                                name = identity.name();
+                                break;
+                            }
+                        }
+
+                        if (name != d->name) {
+                            d->name = name;
+                            Q_EMIT nameChanged(name);
+                        }
+                    });
                 }
 
                 Q_EMIT joined();

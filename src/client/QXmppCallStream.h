@@ -1,15 +1,14 @@
-// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <niels_ole@salscheider-online.de>
+// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <ole@salscheider.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #ifndef QXMPPCALLSTREAM_H
 #define QXMPPCALLSTREAM_H
 
-#include <QXmppGlobal.h>
+#include <QXmppLogger.h>
 
 #include <functional>
-
-#include <QObject>
 
 typedef struct _GstPad GstPad;
 typedef struct _GstElement GstElement;
@@ -19,7 +18,7 @@ class QXmppIceConnection;
 class QXmppCall;
 class QXmppCallPrivate;
 
-class QXMPP_EXPORT QXmppCallStream : public QObject
+class QXMPP_EXPORT QXmppCallStream : public QXmppLoggable
 {
     Q_OBJECT
 
@@ -32,11 +31,11 @@ public:
     void setSendPadCallback(std::function<void(GstPad *)> cb);
 
 private:
-    QXmppCallStream(GstElement *pipeline, GstElement *rtpbin,
-                    QString media, QString creator, QString name, int id);
+    QXmppCallStream(GstElement *pipeline, GstElement *rtpbin, QString media, QString creator, QString name, int id, bool useDtls, QObject *parent);
 
     QXmppCallStreamPrivate *d;
 
+    friend class QXmppCallStreamPrivate;
     friend class QXmppCall;
     friend class QXmppCallPrivate;
 };

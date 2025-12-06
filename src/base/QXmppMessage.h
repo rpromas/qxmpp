@@ -86,8 +86,8 @@ public:
     };
 
     ///
-    /// This enum describes a chat state as defined by \xep{0085}: Chat State
-    /// Notifications.
+    /// This enum describes a chat state as defined by \xep{0085, Chat State
+    /// Notifications}.
     ///
     /// \since QXmpp 0.2
     ///
@@ -101,7 +101,7 @@ public:
     };
 
     ///
-    /// This enum describes a chat marker as defined by \xep{0333}: Chat Markers.
+    /// This enum describes a chat marker as defined by \xep{0333, Chat Markers}.
     ///
     /// \since QXmpp 0.8.1
     ///
@@ -113,7 +113,7 @@ public:
     };
 
     ///
-    /// \xep{0334}: Message Processing Hints
+    /// \xep{0334, Message Processing Hints}
     ///
     /// \since QXmpp 1.1
     ///
@@ -123,6 +123,7 @@ public:
         NoCopy = 1 << 2,            ///< Do not copy the message
         Store = 1 << 3              ///< Do store the message
     };
+    Q_DECLARE_FLAGS(Hints, Hint)
 
     QXmppMessage(const QString &from = QString(), const QString &to = QString(),
                  const QString &body = QString(), const QString &thread = QString());
@@ -292,8 +293,10 @@ public:
 
     // XEP-0428: Fallback Indication
 #if QXMPP_DEPRECATED_SINCE(1, 7)
-    [[deprecated("Use fallbackMarkers()")]] bool isFallback() const;
-    [[deprecated("Use setFallbackMarkers()")]] void setIsFallback(bool isFallback);
+    [[deprecated("Use fallbackMarkers()")]]
+    bool isFallback() const;
+    [[deprecated("Use setFallbackMarkers()")]]
+    void setIsFallback(bool isFallback);
 #endif
     const QVector<QXmppFallback> &fallbackMarkers() const;
     void setFallbackMarkers(const QVector<QXmppFallback> &);
@@ -344,6 +347,7 @@ private:
     QSharedDataPointer<QXmppMessagePrivate> d;
 };
 
+Q_DECLARE_OPERATORS_FOR_FLAGS(QXmppMessage::Hints)
 Q_DECLARE_METATYPE(QXmppMessage)
 
 #endif  // QXMPPMESSAGE_H

@@ -12,9 +12,9 @@
 #include "QXmppConstants_p.h"
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
-#include "QXmppGlobal_p.h"
 #include "QXmppJingleData.h"
 #include "QXmppMessageReaction.h"
+#include "QXmppMessage_p.h"
 #include "QXmppMixInvitation.h"
 
 #include "Algorithms.h"
@@ -23,52 +23,78 @@
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
 #endif
+#include "QXmppGlobal_p.h"
 #include "QXmppOutOfBandUrl.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+
+#include "XmlWriter.h"
 
 #include <ranges>
 
 #include <QDateTime>
 #include <QDomElement>
 #include <QTextStream>
+#include <QTimeZone>
 #include <QXmlStreamWriter>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
 namespace views = std::views;
 
-constexpr auto CHAT_STATES = to_array<QStringView>({
-    {},
-    u"active",
-    u"inactive",
-    u"gone",
-    u"composing",
-    u"paused",
-});
-
-constexpr auto MESSAGE_TYPES = to_array<QStringView>({
-    u"error",
-    u"normal",
-    u"chat",
-    u"groupchat",
-    u"headline",
-});
-
-constexpr auto MARKER_TYPES = to_array<QStringView>({
-    {},
-    u"received",
-    u"displayed",
-    u"acknowledged",
-});
-
-static const QVector<QStringView> HINT_TYPES = {
-    u"no-permanent-store",
-    u"no-store",
-    u"no-copy",
-    u"store",
+template<>
+struct Enums::Data<QXmppMessage::State> {
+    using enum QXmppMessage::State;
+    static constexpr auto NullValue = None;
+    static constexpr auto Values = makeValues<QXmppMessage::State>({
+        { None, {} },
+        { Active, u"active" },
+        { Inactive, u"inactive" },
+        { Gone, u"gone" },
+        { Composing, u"composing" },
+        { Paused, u"paused" },
+    });
 };
+
+template<>
+struct Enums::Data<QXmppMessage::Marker> {
+    using enum QXmppMessage::Marker;
+    static constexpr auto Values = makeValues<QXmppMessage::Marker>({
+        { NoMarker, {} },
+        { Received, u"received" },
+        { Displayed, u"displayed" },
+        { Acknowledged, u"acknowledged" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmppMessage::Hint> {
+    using enum QXmppMessage::Hint;
+    static constexpr bool IsFlags = true;
+    static constexpr auto Values = makeValues<QXmppMessage::Hint>({
+        { NoPermanentStore, u"no-permanent-store" },
+        { NoStore, u"no-store" },
+        { NoCopy, u"no-copy" },
+        { Store, u"store" },
+    });
+};
+
+constexpr std::array<QStringView, 8> ENCRYPTION_NAMES = {
+    QStringView(),
+    QStringView(),
+    u"OTR",
+    u"Legacy OpenPGP",
+    u"OpenPGP for XMPP (OX)",
+    u"OMEMO",
+    u"OMEMO 1",
+    u"OMEMO 2",
+};
+
+static QStringView encryptionToName(EncryptionMethod encryption)
+{
+    return ENCRYPTION_NAMES[std::size_t(encryption)];
+}
 
 static bool checkElement(const QDomElement &element, QStringView tagName, QStringView xmlns)
 {
@@ -140,7 +166,7 @@ public:
     QString markedThread;
 
     // XEP-0334: Message Processing Hints
-    quint8 hints = 0;
+    QXmppMessage::Hints hints;
 
     // XEP-0353: Jingle Message Initiation
     std::optional<QXmppJingleMessageInitiationElement> jingleMessageInitiationElement;
@@ -865,7 +891,7 @@ void QXmppMessage::removeHint(const Hint hint)
 ///
 void QXmppMessage::removeAllHints()
 {
-    d->hints = 0;
+    d->hints = {};
 }
 
 ///
@@ -1070,7 +1096,7 @@ void QXmppMessage::setMixUserNick(const QString &mixUserNick)
 ///
 /// \note QXmppMessage::NoEncryption does not necesserily mean that the message
 /// is not encrypted; it may also be that the author of the message does not
-/// support \xep{0380}: Explicit Message Encryption.
+/// support \xep{0380, Explicit Message Encryption}.
 ///
 /// \note If this returns QXmppMessage::UnknownEncryption, you can still get
 /// the namespace of the encryption with \c encryptionMethodNs() and possibly
@@ -1083,23 +1109,23 @@ QXmpp::EncryptionMethod QXmppMessage::encryptionMethod() const
     if (d->encryptionMethod.isEmpty()) {
         return QXmpp::NoEncryption;
     }
-    return QXmpp::Private::encryptionFromString(d->encryptionMethod).value_or(QXmpp::UnknownEncryption);
+    return Enums::fromString<EncryptionMethod>(d->encryptionMethod).value_or(QXmpp::UnknownEncryption);
 }
 
 ///
 /// Advertises that this message is encrypted with the given encryption method.
-/// See \xep{0380}: Explicit Message Encryption for details.
+/// See \xep{0380, Explicit Message Encryption} for details.
 ///
 /// \since QXmpp 1.1
 ///
 void QXmppMessage::setEncryptionMethod(QXmpp::EncryptionMethod method)
 {
-    d->encryptionMethod = QXmpp::Private::encryptionToString(method).toString();
+    d->encryptionMethod = Enums::toString(method).toString();
 }
 
 ///
-/// Returns the namespace of the advertised encryption method via. \xep{0380}:
-/// Explicit Message Encryption.
+/// Returns the namespace of the advertised encryption method via. \xep{0380,
+/// Explicit Message Encryption}.
 ///
 /// \since QXmpp 1.1
 ///
@@ -1110,7 +1136,7 @@ QString QXmppMessage::encryptionMethodNs() const
 
 ///
 /// Sets the namespace of the encryption method this message advertises to be
-/// encrypted with. See \xep{0380}: Explicit Message Encryption for details.
+/// encrypted with. See \xep{0380, Explicit Message Encryption} for details.
 ///
 /// \since QXmpp 1.1
 ///
@@ -1121,7 +1147,7 @@ void QXmppMessage::setEncryptionMethodNs(const QString &encryptionMethod)
 
 ///
 /// Returns the associated name of the encryption method this message
-/// advertises to be encrypted with. See \xep{0380}: Explicit Message Encryption
+/// advertises to be encrypted with. See \xep{0380, Explicit Message Encryption}
 /// for details.
 ///
 /// \since QXmpp 1.1
@@ -1131,7 +1157,7 @@ QString QXmppMessage::encryptionName() const
     if (!d->encryptionName.isEmpty()) {
         return d->encryptionName;
     }
-    return QXmpp::Private::encryptionToName(encryptionMethod()).toString();
+    return encryptionToName(encryptionMethod()).toString();
 }
 
 ///
@@ -1345,7 +1371,7 @@ QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, co
     QString output;
     qsizetype index = 0;
     for (const auto &range : std::as_const(references)) {
-        if (!(range.start < fullText.size()) || !(0 < range.end <= fullText.size())) {
+        if (!(range.start < fullText.size()) || !(range.end > 0 && range.end <= fullText.size())) {
             // skip markers with invalid start/begin
             continue;
         }
@@ -1562,10 +1588,7 @@ void QXmppMessage::parse(const QDomElement &element)
 void QXmppMessage::parse(const QDomElement &element, QXmpp::SceMode sceMode)
 {
     QXmppStanza::parse(element);
-
-    d->type = enumFromString<Type>(MESSAGE_TYPES, element.attribute(u"type"_s))
-                  .value_or(Normal);
-
+    d->type = Enums::fromString<Type>(element.attribute(u"type"_s)).value_or(Normal);
     parseExtensions(element, sceMode);
 }
 
@@ -1576,21 +1599,22 @@ void QXmppMessage::toXml(QXmlStreamWriter *writer) const
 
 void QXmppMessage::toXml(QXmlStreamWriter *writer, QXmpp::SceMode sceMode) const
 {
-    writer->writeStartElement(QSL65("message"));
-    writeOptionalXmlAttribute(writer, u"xml:lang", lang());
-    writeOptionalXmlAttribute(writer, u"id", id());
-    writeOptionalXmlAttribute(writer, u"to", to());
-    writeOptionalXmlAttribute(writer, u"from", from());
-    writeOptionalXmlAttribute(writer, u"type", MESSAGE_TYPES.at(size_t(d->type)));
-    error().toXml(writer);
+    XmlWriter(writer).write(Element {
+        u"message",
+        OptionalAttribute { u"xml:lang", lang() },
+        OptionalAttribute { u"id", id() },
+        OptionalAttribute { u"to", to() },
+        OptionalAttribute { u"from", from() },
+        Attribute { u"type", d->type },
+        errorOptional(),
+        [&] {
+            // known extensions
+            serializeExtensions(writer, sceMode);
 
-    // extensions
-    serializeExtensions(writer, sceMode);
-
-    // other, unknown extensions
-    QXmppStanza::extensionsToXml(writer);
-
-    writer->writeEndElement();
+            // other, unknown extensions
+            QXmppStanza::extensionsToXml(writer);
+        },
+    });
 }
 /// \endcond
 
@@ -1644,18 +1668,15 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             return true;
         }
         // XEP-0334: Message Processing Hints
-        if (element.namespaceURI() == ns_message_processing_hints &&
-            HINT_TYPES.contains(element.tagName())) {
-            if (const auto index = HINT_TYPES.indexOf(element.tagName()); index >= 0) {
-                addHint(Hint(1 << index));
+        if (element.namespaceURI() == ns_message_processing_hints) {
+            if (auto type = Enums::fromString<Hint>(element.tagName())) {
+                addHint(*type);
             }
             return true;
         }
         // XEP-0353: Jingle Message Initiation
         if (QXmppJingleMessageInitiationElement::isJingleMessageInitiationElement(element)) {
-            QXmppJingleMessageInitiationElement jingleMessageInitiationElement;
-            jingleMessageInitiationElement.parse(element);
-            d->jingleMessageInitiationElement = jingleMessageInitiationElement;
+            d->jingleMessageInitiationElement = parseOptionalElement<QXmppJingleMessageInitiationElement>(element);
             return true;
         }
         // XEP-0359: Unique and Stable Stanza IDs
@@ -1685,17 +1706,13 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
 #ifdef BUILD_OMEMO
         // XEP-0384: OMEMO Encryption
         if (QXmppOmemoElement::isOmemoElement(element)) {
-            QXmppOmemoElement omemoElement;
-            omemoElement.parse(element);
-            d->omemoElement = omemoElement;
+            d->omemoElement = parseOptionalElement<QXmppOmemoElement>(element);
             return true;
         }
 #endif
         // XEP-0482: Call Invites
         if (QXmppCallInviteElement::isCallInviteElement(element)) {
-            QXmppCallInviteElement callInviteElement;
-            callInviteElement.parse(element);
-            d->callInviteElement = callInviteElement;
+            d->callInviteElement = parseOptionalElement<QXmppCallInviteElement>(element);
             return true;
         }
     }
@@ -1722,7 +1739,11 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
                     d->stamp = QDateTime::fromString(
                         element.attribute(u"stamp"_s),
                         u"yyyyMMddThh:mm:ss"_s);
-                    d->stamp.setTimeSpec(Qt::UTC);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+                    d->stamp.setTimeZone(QTimeZone::Initialization::UTC);
+#else
+                    d->stamp.setTimeZone(QTimeZone(0));
+#endif
                     d->stampType = LegacyDelayedDelivery;
                 }
                 return true;
@@ -1760,7 +1781,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         // XEP-0085: Chat State Notifications
         if (element.namespaceURI() == ns_chat_states) {
-            d->state = enumFromString<State>(CHAT_STATES, element.tagName()).value_or(None);
+            d->state = Enums::fromString<State>(element.tagName()).value_or(None);
             return true;
         }
         // XEP-0184: Message Delivery Receipts
@@ -1806,7 +1827,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             if (element.tagName() == u"markable") {
                 d->markable = true;
             } else {
-                if (auto marker = enumFromString<Marker>(MARKER_TYPES, element.tagName())) {
+                if (auto marker = Enums::fromString<Marker>(element.tagName())) {
                     d->marker = *marker;
                     d->markedId = element.attribute(u"id"_s);
                     d->markedThread = element.attribute(u"thread"_s);
@@ -1827,23 +1848,17 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
         if (checkElement(element, u"invitation", ns_mix_misc)) {
-            QXmppMixInvitation mixInvitation;
-            mixInvitation.parse(element);
-            d->mixInvitation = mixInvitation;
+            d->mixInvitation = parseOptionalElement<QXmppMixInvitation>(element);
             return true;
         }
         // XEP-0434: Trust Messages (TM)
         if (QXmppTrustMessageElement::isTrustMessageElement(element)) {
-            QXmppTrustMessageElement trustMessageElement;
-            trustMessageElement.parse(element);
-            d->trustMessageElement = trustMessageElement;
+            d->trustMessageElement = parseOptionalElement<QXmppTrustMessageElement>(element);
             return true;
         }
         // XEP-0444: Message Reactions
         if (QXmppMessageReaction::isMessageReaction(element)) {
-            QXmppMessageReaction reaction;
-            reaction.parse(element);
-            d->reaction = std::move(reaction);
+            d->reaction = parseOptionalElement<QXmppMessageReaction>(element);
             return true;
         }
         // XEP-0447: Stateless file sharing
@@ -1895,134 +1910,116 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
 ///
 void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode sceMode, const QString &baseNamespace) const
 {
+    XmlWriter w(writer);
     if (sceMode & QXmpp::ScePublic) {
         if (sceMode == QXmpp::ScePublic && !d->e2eeFallbackBody.isEmpty()) {
-            writer->writeTextElement(QSL65("body"), d->e2eeFallbackBody);
+            w.write(TextElement { u"body", d->e2eeFallbackBody });
         }
 
         // XEP-0280: Message Carbons
         if (d->privatemsg) {
-            writer->writeStartElement(QSL65("private"));
-            writer->writeDefaultNamespace(toString65(ns_carbons));
-            writer->writeEndElement();
+            w.write(Element { { u"private", ns_carbons } });
         }
 
         // XEP-0334: Message Processing Hints
-        for (quint8 i = 0; i < HINT_TYPES.size(); i++) {
-            if (hasHint(Hint(1 << i))) {
-                writer->writeStartElement(toString65(HINT_TYPES.at(i)));
-                writer->writeDefaultNamespace(toString65(ns_message_processing_hints));
-                writer->writeEndElement();
-            }
+        for (auto hint : Enums::toStrings(d->hints)) {
+            w.write(Element { { hint, ns_message_processing_hints } });
         }
 
         // XEP-0359: Unique and Stable Stanza IDs
         for (const auto &stanzaId : d->stanzaIds) {
-            writer->writeStartElement(QSL65("stanza-id"));
-            writer->writeDefaultNamespace(toString65(ns_sid));
-            writer->writeAttribute(QSL65("id"), stanzaId.id);
-            writeOptionalXmlAttribute(writer, u"by", stanzaId.by);
-            writer->writeEndElement();
+            w.write(Element {
+                { u"stanza-id", ns_sid },
+                Attribute { u"id", stanzaId.id },
+                OptionalAttribute { u"by", stanzaId.by },
+            });
         }
 
         if (!d->originId.isNull()) {
-            writer->writeStartElement(QSL65("origin-id"));
-            writer->writeDefaultNamespace(toString65(ns_sid));
-            writer->writeAttribute(QSL65("id"), d->originId);
-            writer->writeEndElement();
+            w.write(Element {
+                { u"origin-id", ns_sid },
+                Attribute { u"id", d->originId },
+            });
         }
 
         // XEP-0369: Mediated Information eXchange (MIX)
         if (!d->mixUserJid.isEmpty() || !d->mixUserNick.isEmpty()) {
-            writer->writeStartElement(QSL65("mix"));
-            writer->writeDefaultNamespace(toString65(ns_mix));
-            writeXmlTextElement(writer, u"jid", d->mixUserJid);
-            writeXmlTextElement(writer, u"nick", d->mixUserNick);
-            writer->writeEndElement();
+            w.write(Element {
+                { u"mix", ns_mix },
+                OptionalTextElement { u"jid", d->mixUserJid },
+                OptionalTextElement { u"nick", d->mixUserNick },
+            });
         }
 
         // XEP-0380: Explicit Message Encryption
         if (!d->encryptionMethod.isEmpty()) {
-            writer->writeStartElement(QSL65("encryption"));
-            writer->writeDefaultNamespace(toString65(ns_eme));
-            writer->writeAttribute(QSL65("namespace"), d->encryptionMethod);
-            writeOptionalXmlAttribute(writer, u"name", encryptionName());
-            writer->writeEndElement();
+            w.write(Element {
+                { u"encryption", ns_eme },
+                Attribute { u"namespace", d->encryptionMethod },
+                OptionalAttribute { u"name", d->encryptionName },
+            });
         }
 
 #ifdef BUILD_OMEMO
         // XEP-0384: OMEMO Encryption
-        if (d->omemoElement) {
-            d->omemoElement->toXml(writer);
-        }
+        w.write(d->omemoElement);
 #endif
     }
 
     if (sceMode & QXmpp::SceSensitive) {
-        const auto writeTextElement = [writer, &baseNamespace](const auto &tagName, const auto &text) {
-            if (!text.isEmpty()) {
-                writer->writeStartElement(tagName);
-                if (!baseNamespace.isNull()) {
-                    writer->writeDefaultNamespace(baseNamespace);
-                }
-                writer->writeCharacters(text);
-                writer->writeEndElement();
-            }
-        };
-
         // XMPP-Core
-        writeTextElement(QSL65("subject"), d->subject);
-        writeTextElement(QSL65("body"), d->body);
-
-        if (!d->thread.isEmpty()) {
-            writer->writeStartElement(QSL65("thread"));
-            if (!baseNamespace.isNull()) {
-                writer->writeDefaultNamespace(baseNamespace);
+        if (baseNamespace.isEmpty()) {
+            w.write(OptionalTextElement { u"subject", d->subject });
+            w.write(OptionalTextElement { u"body", d->body });
+            if (!d->thread.isEmpty()) {
+                w.write(Element {
+                    u"thread",
+                    OptionalAttribute { u"parent", d->parentThread },
+                    Characters { d->thread },
+                });
             }
-            writeOptionalXmlAttribute(writer, u"parent", d->parentThread);
-            writer->writeCharacters(d->thread);
-            writer->writeEndElement();
+        } else {
+            w.write(OptionalTextElement { { u"subject", baseNamespace }, d->subject });
+            w.write(OptionalTextElement { { u"body", baseNamespace }, d->body });
+            if (!d->thread.isEmpty()) {
+                w.write(Element {
+                    { u"thread", baseNamespace },
+                    OptionalAttribute { u"parent", d->parentThread },
+                    Characters { d->thread },
+                });
+            }
         }
 
         // XEP-0066: Out of Band Data
-        for (const auto &url : d->outOfBandUrls) {
-            url.toXml(writer);
-        }
+        w.write(d->outOfBandUrls);
 
         // XEP-0071: XHTML-IM
         if (!d->xhtml.isEmpty()) {
-            writer->writeStartElement(QSL65("html"));
-            writer->writeDefaultNamespace(toString65(ns_xhtml_im));
-            writer->writeStartElement(QSL65("body"));
-            writer->writeDefaultNamespace(toString65(ns_xhtml));
-            writer->writeCharacters(QString());
-            writer->device()->write(d->xhtml.toUtf8());
-            writer->writeEndElement();
-            writer->writeEndElement();
+            w.write(Element {
+                { u"html", ns_xhtml_im },
+                Element {
+                    { u"body", ns_xhtml },
+                    Characters { QStringView() },
+                    [&] { writer->device()->write(d->xhtml.toUtf8()); },
+                },
+            });
         }
 
         // XEP-0085: Chat State Notifications
-        if (d->state > None && d->state <= Paused) {
-            writer->writeStartElement(toString65(CHAT_STATES.at(d->state)));
-            writer->writeDefaultNamespace(toString65(ns_chat_states));
-            writer->writeEndElement();
-        }
+        w.write(OptionalEnumElement { d->state, ns_chat_states });
 
         // XEP-0091: Legacy Delayed Delivery | XEP-0203: Delayed Delivery
         if (d->stamp.isValid()) {
             QDateTime utcStamp = d->stamp.toUTC();
             if (d->stampType == DelayedDelivery) {
                 // XEP-0203: Delayed Delivery
-                writer->writeStartElement(QSL65("delay"));
-                writer->writeDefaultNamespace(toString65(ns_delayed_delivery));
-                writeOptionalXmlAttribute(writer, u"stamp", QXmppUtils::datetimeToString(utcStamp));
-                writer->writeEndElement();
+                w.write(Element { { u"delay", ns_delayed_delivery }, Attribute { u"stamp", utcStamp } });
             } else {
                 // XEP-0091: Legacy Delayed Delivery
-                writer->writeStartElement(QSL65("x"));
-                writer->writeDefaultNamespace(toString65(ns_legacy_delayed_delivery));
-                writeOptionalXmlAttribute(writer, u"stamp", utcStamp.toString(u"yyyyMMddThh:mm:ss"));
-                writer->writeEndElement();
+                w.write(Element {
+                    { u"x", ns_legacy_delayed_delivery },
+                    Attribute { u"stamp", utcStamp.toString(u"yyyyMMddThh:mm:ss") },
+                });
             }
         }
 
@@ -2031,35 +2028,24 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         // include a receipt request ("request" element) in order to prevent
         // looping.
         if (!d->receiptId.isEmpty()) {
-            writer->writeStartElement(QSL65("received"));
-            writer->writeDefaultNamespace(toString65(ns_message_receipts));
-            writer->writeAttribute(QSL65("id"), d->receiptId);
-            writer->writeEndElement();
+            w.write(Element { { u"received", ns_message_receipts }, Attribute { u"id", d->receiptId } });
         } else if (d->receiptRequested) {
-            writer->writeStartElement(QSL65("request"));
-            writer->writeDefaultNamespace(toString65(ns_message_receipts));
-            writer->writeEndElement();
+            w.write(Element { { u"request", ns_message_receipts } });
         }
 
         // XEP-0224: Attention
         if (d->attentionRequested) {
-            writer->writeStartElement(QSL65("attention"));
-            writer->writeDefaultNamespace(toString65(ns_attention));
-            writer->writeEndElement();
+            w.write(Element { { u"attention", ns_attention } });
         }
 
         // XEP-0249: Direct MUC Invitations
         if (!d->mucInvitationJid.isEmpty()) {
-            writer->writeStartElement(QSL65("x"));
-            writer->writeDefaultNamespace(toString65(ns_conference));
-            writer->writeAttribute(QSL65("jid"), d->mucInvitationJid);
-            if (!d->mucInvitationPassword.isEmpty()) {
-                writer->writeAttribute(QSL65("password"), d->mucInvitationPassword);
-            }
-            if (!d->mucInvitationReason.isEmpty()) {
-                writer->writeAttribute(QSL65("reason"), d->mucInvitationReason);
-            }
-            writer->writeEndElement();
+            w.write(Element {
+                { u"x", ns_conference },
+                Attribute { u"jid", d->mucInvitationJid },
+                OptionalAttribute { u"password", d->mucInvitationPassword },
+                OptionalAttribute { u"reason", d->mucInvitationReason },
+            });
         }
 
         // XEP-0231: Bits of Binary
@@ -2069,85 +2055,58 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
 
         // XEP-0308: Last Message Correction
         if (!d->replaceId.isEmpty()) {
-            writer->writeStartElement(QSL65("replace"));
-            writer->writeDefaultNamespace(toString65(ns_message_correct));
-            writer->writeAttribute(QSL65("id"), d->replaceId);
-            writer->writeEndElement();
+            w.write(Element { { u"replace", ns_message_correct }, Attribute { u"id", d->replaceId } });
         }
 
         // XEP-0333: Chat Markers
         if (d->markable) {
-            writer->writeStartElement(QSL65("markable"));
-            writer->writeDefaultNamespace(toString65(ns_chat_markers));
-            writer->writeEndElement();
+            w.write(Element { { u"markable", ns_chat_markers } });
         }
         if (d->marker != NoMarker) {
-            writer->writeStartElement(toString65(MARKER_TYPES.at(d->marker)));
-            writer->writeDefaultNamespace(toString65(ns_chat_markers));
-            writer->writeAttribute(QSL65("id"), d->markedId);
-            if (!d->markedThread.isNull() && !d->markedThread.isEmpty()) {
-                writer->writeAttribute(QSL65("thread"), d->markedThread);
-            }
-            writer->writeEndElement();
+            w.write(Element {
+                Tag { d->marker, ns_chat_markers },
+                Attribute { u"id", d->markedId },
+                OptionalAttribute { u"thread", d->markedThread },
+            });
         }
 
         // XEP-0353: Jingle Message Initiation
-        if (d->jingleMessageInitiationElement) {
-            d->jingleMessageInitiationElement->toXml(writer);
-        }
+        w.write(d->jingleMessageInitiationElement);
 
         // XEP-0367: Message Attaching
         if (!d->attachId.isEmpty()) {
-            writer->writeStartElement(QSL65("attach-to"));
-            writer->writeDefaultNamespace(toString65(ns_message_attaching));
-            writer->writeAttribute(QSL65("id"), d->attachId);
-            writer->writeEndElement();
+            w.write(Element { { u"attach-to", ns_message_attaching }, Attribute { u"id", d->attachId } });
         }
 
         // XEP-0382: Spoiler messages
         if (d->isSpoiler) {
-            writer->writeStartElement(QSL65("spoiler"));
-            writer->writeDefaultNamespace(toString65(ns_spoiler));
-            writer->writeCharacters(d->spoilerHint);
-            writer->writeEndElement();
+            w.write(TextElement { { u"spoiler", ns_spoiler }, d->spoilerHint });
         }
 
         // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
-        if (d->mixInvitation) {
-            d->mixInvitation->toXml(writer);
-        }
+        w.write(d->mixInvitation);
 
         // XEP-0434: Trust Messages (TM)
-        if (d->trustMessageElement) {
-            d->trustMessageElement->toXml(writer);
-        }
+        w.write(d->trustMessageElement);
 
         // XEP-0444: Message Reactions
-        if (d->reaction) {
-            d->reaction->toXml(writer);
-        }
+        w.write(d->reaction);
 
         // XEP-0447: Stateless file sharing
-        for (const auto &fileShare : d->sharedFiles) {
-            fileShare.toXml(writer);
-        }
-        for (const auto &fileSources : d->fileSourcesAttachments) {
-            fileSources.toXml(writer);
-        }
+        w.write(d->sharedFiles);
+        w.write(d->fileSourcesAttachments);
 
         // XEP-0461: Message Replies
         if (d->reply) {
-            writer->writeStartElement(QSL65("reply"));
-            writer->writeDefaultNamespace(toString65(ns_reply));
-            writeOptionalXmlAttribute(writer, u"to", d->reply->to);
-            writer->writeAttribute(QSL65("id"), d->reply->id);
-            writer->writeEndElement();
+            w.write(Element {
+                { u"reply", ns_reply },
+                OptionalAttribute { u"to", d->reply->to },
+                Attribute { u"id", d->reply->id },
+            });
         }
 
         // XEP-0482: Call Invites
-        if (d->callInviteElement) {
-            d->callInviteElement->toXml(writer);
-        }
+        w.write(d->callInviteElement);
     }
 
     // serialize in private and in public part
@@ -2155,9 +2114,7 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
     // XEP-0428: Fallback Indication
     // fallback markers may be used in the private part (e.g. message replies) but also in the
     // public part (e.g. the fallback body for e2ee messages)
-    for (const auto &fallback : d->fallbackMarkers) {
-        fallback.toXml(writer);
-    }
+    w.write(d->fallbackMarkers);
 }
 
 struct QXmppFallbackPrivate : QSharedData {
@@ -2270,16 +2227,22 @@ std::optional<QXmppFallback> QXmppFallback::fromDom(const QDomElement &el)
 ///
 void QXmppFallback::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("fallback"));
-    writer->writeDefaultNamespace(toString65(ns_fallback_indication));
-    writeOptionalXmlAttribute(writer, u"for", d->forNamespace);
-    for (const auto &reference : d->references) {
-        writer->writeStartElement(reference.element == Body ? QSL65("body") : QSL65("subject"));
-        if (reference.range) {
-            writer->writeAttribute(QSL65("start"), serializeInt(reference.range->start));
-            writer->writeAttribute(QSL65("end"), serializeInt(reference.range->end));
-        }
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
+    XmlWriter w(writer);
+    w.write(::Element {
+        { u"fallback", ns_fallback_indication },
+        OptionalAttribute { u"for", d->forNamespace },
+        [&] {
+            for (const auto &reference : d->references) {
+                w.write(::Element {
+                    QStringView(reference.element == Body ? u"body" : u"subject"),
+                    [&] {
+                        if (reference.range) {
+                            w.write(Attribute { u"start", reference.range->start });
+                            w.write(Attribute { u"end", reference.range->end });
+                        }
+                    },
+                });
+            }
+        },
+    });
 }

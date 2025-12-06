@@ -9,7 +9,9 @@
 #include "QXmppHttpFileSource.h"
 #include "QXmppUtils_p.h"
 
+#include "Enums.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <optional>
 
@@ -19,7 +21,15 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-/// \cond
+template<>
+struct Enums::Data<Cipher> {
+    static constexpr auto Values = makeValues<Cipher>({
+        { Aes128GcmNoPad, u"urn:xmpp:ciphers:aes-128-gcm-nopadding:0" },
+        { Aes256GcmNoPad, u"urn:xmpp:ciphers:aes-256-gcm-nopadding:0" },
+        { Aes256CbcPkcs7, u"urn:xmpp:ciphers:aes-256-cbc-pkcs7:0" },
+    });
+};
+
 class QXmppEncryptedFileSourcePrivate : public QSharedData
 {
 public:
@@ -31,32 +41,6 @@ public:
 };
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppEncryptedFileSource)
-
-static QString cipherToString(Cipher cipher)
-{
-    switch (cipher) {
-    case Aes128GcmNoPad:
-        return u"urn:xmpp:ciphers:aes-128-gcm-nopadding:0"_s;
-    case Aes256GcmNoPad:
-        return u"urn:xmpp:ciphers:aes-256-gcm-nopadding:0"_s;
-    case Aes256CbcPkcs7:
-        return u"urn:xmpp:ciphers:aes-256-cbc-pkcs7:0"_s;
-    }
-    Q_UNREACHABLE();
-}
-
-static std::optional<Cipher> cipherFromString(const QString &cipher)
-{
-    if (cipher == u"urn:xmpp:ciphers:aes-128-gcm-nopadding:0") {
-        return Aes128GcmNoPad;
-    } else if (cipher == u"urn:xmpp:ciphers:aes-256-gcm-nopadding:0") {
-        return Aes256GcmNoPad;
-    } else if (cipher == u"urn:xmpp:ciphers:aes-256-cbc-pkcs7:0") {
-        return Aes256CbcPkcs7;
-    }
-    return {};
-}
-/// \endcond
 
 ///
 /// \class QXmppEncryptedFileSource
@@ -134,8 +118,7 @@ void QXmppEncryptedFileSource::setHttpSources(const QVector<QXmppHttpFileSource>
 /// \cond
 bool QXmppEncryptedFileSource::parse(const QDomElement &el)
 {
-    QString cipher = el.attribute(u"cipher"_s);
-    if (auto parsedCipher = cipherFromString(cipher)) {
+    if (auto parsedCipher = Enums::fromString<Cipher>(el.attribute(u"cipher"_s))) {
         d->cipher = *parsedCipher;
     } else {
         return false;
@@ -145,56 +128,44 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
     if (keyEl.isNull()) {
         return false;
     }
-    d->key = QByteArray::fromBase64(keyEl.text().toUtf8());
+    if (auto data = parseBase64(keyEl.text())) {
+        d->key = std::move(*data);
+    } else {
+        return false;
+    }
 
     auto ivEl = el.firstChildElement(u"iv"_s);
     if (ivEl.isNull()) {
         return false;
     }
-    d->iv = QByteArray::fromBase64(ivEl.text().toUtf8());
-
-    for (const auto &childEl : iterChildElements(el, u"hash", ns_hashes)) {
-        QXmppHash hash;
-        if (!hash.parse(childEl)) {
-            return false;
-        }
-        d->hashes.push_back(std::move(hash));
+    if (auto data = parseBase64(ivEl.text())) {
+        d->iv = std::move(*data);
+    } else {
+        return false;
     }
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
 
     auto sourcesEl = el.firstChildElement(u"sources"_s);
     if (sourcesEl.isNull()) {
         return false;
     }
-    for (const auto &childEl : iterChildElements(sourcesEl, u"url-data", ns_url_data)) {
-        QXmppHttpFileSource source;
-        source.parse(childEl);
-        d->httpSources.push_back(std::move(source));
-    }
+    d->httpSources = parseChildElements<QVector<QXmppHttpFileSource>>(sourcesEl);
 
     return true;
 }
 
 void QXmppEncryptedFileSource::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("encrypted"));
-    writer->writeDefaultNamespace(toString65(ns_esfs));
-    writer->writeAttribute(QSL65("cipher"), cipherToString(d->cipher));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeTextElement("key", d->key.toBase64());
-    writer->writeTextElement("iv", d->iv.toBase64());
-#else
-    writer->writeTextElement(u"key"_s, QString::fromUtf8(d->key.toBase64()));
-    writer->writeTextElement(u"iv"_s, QString::fromUtf8(d->iv.toBase64()));
-#endif
-    for (const auto &hash : d->hashes) {
-        hash.toXml(writer);
-    }
-    writer->writeStartElement(QSL65("sources"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    for (const auto &source : d->httpSources) {
-        source.toXml(writer);
-    }
-    writer->writeEndElement();
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"cipher", d->cipher },
+        TextElement { u"key"_s, Base64 { d->key } },
+        TextElement { u"iv"_s, Base64 { d->iv } },
+        d->hashes,
+        Element {
+            { u"sources", ns_sfs },
+            d->httpSources,
+        },
+    });
 }
 /// \endcond

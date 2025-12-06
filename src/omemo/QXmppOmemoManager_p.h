@@ -128,7 +128,7 @@ public:
 
     QXmppOmemoManager *q;
 
-    bool isStarted = false;
+    bool initialized = false;
     bool isNewDeviceAutoSessionBuildingEnabled = false;
 
     QXmppOmemoStorage *omemoStorage;
@@ -166,7 +166,7 @@ public:
 
     QXmppOmemoManagerPrivate(QXmppOmemoManager *parent, QXmppOmemoStorage *omemoStorage);
 
-    void init();
+    void initOmemoLibrary();
     // exports for unit tests
     QXMPP_EXPORT bool initGlobalContext();
     QXMPP_EXPORT bool initLocking();
@@ -319,6 +319,7 @@ public:
     QXmppTask<bool> resetOwnDevice();
     QXmppTask<void> resetOwnDeviceLocally();
     QXmppTask<bool> resetAll();
+    void resetCachedData();
 
     QXmppTask<bool> buildSessionForNewDevice(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device);
     QXmppTask<bool> buildSessionWithDeviceBundle(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device);

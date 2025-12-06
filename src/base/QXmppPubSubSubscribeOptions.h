@@ -30,8 +30,6 @@ public:
         ExtendedAway = 0x10
     };
     Q_DECLARE_FLAGS(PresenceStates, PresenceState)
-    static PresenceStates presenceStatesFromStringList(const QStringList &);
-    static QStringList presenceStatesToStringList(PresenceStates);
 
     enum SubscriptionType : uint8_t {
         Items,

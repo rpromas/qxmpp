@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -98,10 +99,7 @@ void QXmppMessageReaction::setEmojis(const QVector<QString> &emojis)
 void QXmppMessageReaction::parse(const QDomElement &element)
 {
     d->messageId = element.attribute(u"id"_s);
-
-    for (const auto &childElement : iterChildElements(element)) {
-        d->emojis.append(childElement.text());
-    }
+    d->emojis = parseTextElements<QVector<QString>>(element, u"reaction", ns_reactions);
 
     // Remove duplicate emojis.
     std::sort(d->emojis.begin(), d->emojis.end());
@@ -110,14 +108,11 @@ void QXmppMessageReaction::parse(const QDomElement &element)
 
 void QXmppMessageReaction::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("reactions"));
-    writer->writeDefaultNamespace(toString65(ns_reactions));
-    writer->writeAttribute(QSL65("id"), d->messageId);
-
-    for (const auto &reaction : d->emojis) {
-        writeXmlTextElement(writer, u"reaction", reaction);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"reactions", ns_reactions },
+        Attribute { u"id", d->messageId },
+        TextElements { u"reaction", d->emojis },
+    });
 }
 /// \endcond
 

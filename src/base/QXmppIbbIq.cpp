@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -65,11 +66,6 @@ void QXmppIbbOpenIq::setSid(const QString &sid)
 }
 
 /// \cond
-bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
-{
-    return isIqType(element, u"open", ns_ibb);
-}
-
 void QXmppIbbOpenIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement openElement = firstChildElement(element, u"open");
@@ -79,11 +75,11 @@ void QXmppIbbOpenIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppIbbOpenIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("open"));
-    writer->writeDefaultNamespace(toString65(ns_ibb));
-    writer->writeAttribute(QSL65("sid"), m_sid);
-    writer->writeAttribute(QSL65("block-size"), QString::number(m_block_size));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        Attribute { u"sid", m_sid },
+        Attribute { u"block-size", m_block_size },
+    });
 }
 /// \endcond
 
@@ -119,11 +115,6 @@ void QXmppIbbCloseIq::setSid(const QString &sid)
 }
 
 /// \cond
-bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
-{
-    return isIqType(element, u"close", ns_ibb);
-}
-
 void QXmppIbbCloseIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement openElement = firstChildElement(element, u"close");
@@ -132,10 +123,7 @@ void QXmppIbbCloseIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppIbbCloseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("close"));
-    writer->writeDefaultNamespace(toString65(ns_ibb));
-    writer->writeAttribute(QSL65("sid"), m_sid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { PayloadXmlTag, Attribute { u"sid", m_sid } });
 }
 /// \endcond
 
@@ -211,11 +199,6 @@ void QXmppIbbDataIq::setPayload(const QByteArray &data)
 }
 
 /// \cond
-bool QXmppIbbDataIq::isIbbDataIq(const QDomElement &element)
-{
-    return isIqType(element, u"data", ns_ibb);
-}
-
 void QXmppIbbDataIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement dataElement = firstChildElement(element, u"data");
@@ -226,15 +209,11 @@ void QXmppIbbDataIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppIbbDataIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("data"));
-    writer->writeDefaultNamespace(toString65(ns_ibb));
-    writer->writeAttribute(QSL65("sid"), m_sid);
-    writer->writeAttribute(QSL65("seq"), QString::number(m_seq));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(m_payload.toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(m_payload.toBase64()));
-#endif
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        Attribute { u"sid", m_sid },
+        Attribute { u"seq", m_seq },
+        Characters { Base64 { m_payload } },
+    });
 }
 /// \endcond

@@ -63,6 +63,7 @@ public:
     void setType(Type type);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"ADR", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
     /// \endcond
@@ -103,6 +104,7 @@ public:
     void setType(Type type);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"EMAIL", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
     /// \endcond
@@ -151,6 +153,7 @@ public:
     void setType(Type type);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"TEL", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
     /// \endcond
@@ -265,7 +268,10 @@ public:
     void setOrganization(const QXmppVCardOrganization &);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"vCard", QXmpp::Private::ns_vcard };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isVCard(const QDomElement &element);
+    [[deprecated]]
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
     /// \endcond
 

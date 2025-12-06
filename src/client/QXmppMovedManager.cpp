@@ -15,7 +15,9 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QUrl>
 
@@ -50,10 +52,10 @@ void QXmppMovedItem::serializePayload(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(QSL65("moved"));
-    writer->writeDefaultNamespace(toString65(ns_moved));
-    writer->writeTextElement(QSL65("new-jid"), m_newJid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"moved", ns_moved },
+        TextElement { u"new-jid", m_newJid },
+    });
 }
 
 class QXmppMovedManagerPrivate
@@ -253,41 +255,38 @@ void QXmppMovedManager::onUnregistered(QXmppClient *client)
 /// \endcond
 
 ///
-/// Checks for moved elements in incoming subscription requests and verifies them.
+/// Verifies an old JID in a received presence subscription request and removes it if it is invalid.
 ///
 /// This requires the QXmppRosterManager to be registered with the client.
 ///
-/// \returns a task for the verification result if the subscription request contains a moved
-/// element with an 'old-jid' that is already in the account's roster.
+/// \param presence presence subscription request to be processed containing a non-empty old JID.
 ///
-std::optional<QXmppTask<bool>> QXmppMovedManager::handleSubscriptionRequest(const QXmppPresence &presence)
+/// \returns the processed presence subscription request
+///
+QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPresence presence)
 {
-    // check for moved element
-    if (presence.oldJid().isEmpty()) {
-        return {};
-    }
+    Q_ASSERT(!presence.oldJid().isEmpty());
 
-    // find roster manager
     auto *rosterManager = client()->findExtension<QXmppRosterManager>();
     Q_ASSERT(rosterManager);
 
-    // check subscription state of old-jid
     const auto entry = rosterManager->getRosterEntry(presence.oldJid());
 
     switch (entry.subscriptionType()) {
     case QXmppRosterIq::Item::From:
     case QXmppRosterIq::Item::Both:
-        break;
-    default:
-        // The subscription state of the old JID needs to be either from or both, else ignore
-        // the moved element
-        return {};
-    }
+        return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](Result &&result) mutable {
+            if (std::holds_alternative<QXmppError>(result)) {
+                warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
+                presence.setOldJid({});
+            }
 
-    // return verification result
-    return chain<bool>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this](Result &&result) mutable {
-        return std::holds_alternative<Success>(result);
-    });
+            return presence;
+        });
+    default:
+        presence.setOldJid({});
+        return makeReadyTask(std::move(presence));
+    }
 }
 
 ///

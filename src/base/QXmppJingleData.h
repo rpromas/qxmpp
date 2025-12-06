@@ -7,6 +7,7 @@
 #ifndef QXMPPJINGLEIQ_H
 #define QXMPPJINGLEIQ_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppIq.h"
 
 #include <variant>
@@ -71,6 +72,7 @@ public:
     void setSessionParams(const QString &sessionParams);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"crypto", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -95,6 +97,7 @@ public:
     void setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"encryption", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -122,6 +125,7 @@ public:
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtcp-fb", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -143,6 +147,7 @@ public:
     void setValue(uint64_t value);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtcp-fb-trr-int", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -182,6 +187,7 @@ public:
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtp-hdrext", QXmpp::Private::ns_jingle_rtp_hdrext };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -194,7 +200,7 @@ private:
 
 ///
 /// \brief The QXmppJinglePayloadType class represents a payload type
-/// as specified by \xep{0167}: Jingle RTP Sessions and RFC 5245.
+/// as specified by \xep{0167, Jingle RTP Sessions} and RFC 5245.
 ///
 class QXMPP_EXPORT QXmppJinglePayloadType
 {
@@ -231,6 +237,7 @@ public:
     void setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"payload-type", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -262,6 +269,7 @@ public:
     void setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"description", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -272,7 +280,7 @@ private:
 
 ///
 /// \brief The QXmppJingleCandidate class represents a transport candidate
-/// as specified by \xep{0176}: Jingle ICE-UDP Transport Method.
+/// as specified by \xep{0176, Jingle ICE-UDP Transport Method}.
 ///
 class QXMPP_EXPORT QXmppJingleCandidate
 {
@@ -329,11 +337,9 @@ public:
     bool isNull() const;
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"candidate", QXmpp::Private::ns_jingle_ice_udp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-
-    static QXmppJingleCandidate::Type typeFromString(const QString &typeStr, bool *ok = nullptr);
-    static QString typeToString(QXmppJingleCandidate::Type type);
     /// \endcond
 
 private:
@@ -377,6 +383,8 @@ public:
     };
 
     QXmppJingleReason();
+    QXmppJingleReason(Type, const QString &, std::optional<RtpErrorCondition>);
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleReason)
 
     QString text() const;
     void setText(const QString &text);
@@ -388,12 +396,10 @@ public:
     void setRtpErrorCondition(RtpErrorCondition rtpErrorCondition);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"reason", QXmpp::Private::ns_jingle };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-
     /// \endcond
-
-    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleReason)
 
 private:
     QSharedDataPointer<QXmppJingleIqReasonPrivate> d;
@@ -440,7 +446,7 @@ public:
     struct RtpSessionStateMuting {
         /// True when temporarily not sending media to the other party but continuing to accept
         /// media from it, false for ending mute state
-        bool isMute = true;
+        bool isMute;
         /// Creator of the corresponding session
         Creator creator;
         /// Session to be muted (e.g., only audio or video)
@@ -533,6 +539,7 @@ public:
         void setTransportFingerprintSetup(const QString &setup);
 
         /// \cond
+        static constexpr std::tuple XmlTag = { u"content", QXmpp::Private::ns_jingle };
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
 
@@ -562,8 +569,15 @@ public:
     QString initiator() const;
     void setInitiator(const QString &initiator);
 
+    std::optional<QXmppJingleReason> actionReason() const;
+    void setActionReason(const std::optional<QXmppJingleReason> &);
+
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+    [[deprecated("Use actionReason() instead.")]]
     QXmppJingleReason &reason();
+    [[deprecated("Use actionReason() instead.")]]
     const QXmppJingleReason &reason() const;
+#endif
 
     QString responder() const;
     void setResponder(const QString &responder);
@@ -638,8 +652,6 @@ public:
     /// \endcond
 
     static bool isJingleMessageInitiationElement(const QDomElement &);
-    static QString jmiElementTypeToString(Type type);
-    static std::optional<Type> stringToJmiElementType(const QString &typeStr);
 
 private:
     QSharedDataPointer<QXmppJingleMessageInitiationElementPrivate> d;
@@ -672,6 +684,8 @@ public:
 
         bool operator==(const External &other) const { return other.uri == uri; }
 
+        static constexpr std::tuple XmlTag = { u"external", QXmpp::Private::ns_call_invites };
+        void parse(const QDomElement &el);
         void toXml(QXmlStreamWriter *writer) const;
     };
 
@@ -704,9 +718,6 @@ public:
     static bool isCallInviteElement(const QDomElement &);
 
 private:
-    static QString callInviteElementTypeToString(Type type);
-    static std::optional<Type> stringToCallInviteElementType(const QString &typeStr);
-
     QSharedDataPointer<QXmppCallInviteElementPrivate> d;
 };
 

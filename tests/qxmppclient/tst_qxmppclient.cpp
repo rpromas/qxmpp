@@ -7,7 +7,6 @@
 #include "QXmppColorGeneration.h"
 #include "QXmppCredentials.h"
 #include "QXmppE2eeExtension.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppOutgoingClient.h"
@@ -19,6 +18,8 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
+#include "Async.h"
+#include "Iq.h"
 #include "TestClient.h"
 #include "util.h"
 
@@ -36,7 +37,11 @@ private:
     Q_SLOT void testE2eeExtension();
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
+    Q_SLOT void taskMultipleThen();
     Q_SLOT void colorGeneration();
+#if QT_GUI_LIB
+    Q_SLOT void colorGenerationQColor();
+#endif
 
     // outgoing client
 #if BUILD_INTERNAL_TESTS
@@ -65,9 +70,10 @@ void tst_QXmppClient::testSendMessage()
         QCOMPARE(msg.body(), u"implement XEP-* plz"_s);
     });
 
-    client->sendMessage(
-        u"support@qxmpp.org"_s,
-        u"implement XEP-* plz"_s);
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    client->sendMessage(u"support@qxmpp.org"_s, u"implement XEP-* plz"_s);
+    QT_WARNING_POP
 
     // see handleMessageSent()
 
@@ -145,11 +151,9 @@ void tst_QXmppClient::testE2eeExtension()
     QVERIFY(!encrypter.iqCalled);
 
     auto createRequest = []() {
-        QXmppDiscoveryIq request;
-        request.setType(QXmppIq::Get);
-        request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-        request.setTo("component.qxmpp.org");
-        return request;
+        CompatIq iq { QXmppIq::Get, QXmppDiscoInfo {} };
+        iq.setTo(u"component.qxmpp.org"_s);
+        return iq;
     };
 
     client.sendSensitive(createRequest());
@@ -232,6 +236,29 @@ void tst_QXmppClient::testTaskStore()
     QVERIFY(!p.task().hasResult());
 }
 
+void tst_QXmppClient::taskMultipleThen()
+{
+    bool exec1 = false, exec2 = false, exec3 = false, exec4 = false;
+    QString called;
+
+    auto context1 = std::make_unique<QObject>();
+
+    QXmppPromise<QString> p;
+    p.task().then(this, [&](QString) {
+        called.append(u'1');
+    });
+    p.task().then(context1.get(), [&](QString) {
+        called.append(u'2');
+    });
+    p.task().then(this, [&](QString) {
+        called.append(u'3');
+    });
+    QVERIFY(called.isEmpty());
+    context1.reset();
+    p.finish(u"test"_s);
+    QCOMPARE(called, u"3"_s);
+}
+
 void tst_QXmppClient::colorGeneration()
 {
 #ifdef BUILD_INTERNAL_TESTS
@@ -243,6 +270,14 @@ void tst_QXmppClient::colorGeneration()
     QCOMPARE(rgb.green, 0);
     QCOMPARE(rgb.blue, quint8(0.686 * 255));
 }
+
+#if QT_GUI_LIB
+void tst_QXmppClient::colorGenerationQColor()
+{
+    auto color = QXmppColorGeneration::generateColor(u"Romeo");
+    QCOMPARE(color.red(), quint8(0.865 * 255));
+}
+#endif
 
 #if BUILD_INTERNAL_TESTS
 void tst_QXmppClient::csiManager()
@@ -299,5 +334,5 @@ void tst_QXmppClient::credentialsSerialization()
     QCOMPARE(output, xml);
 }
 
-QTEST_MAIN(tst_QXmppClient)
+QTEST_GUILESS_MAIN(tst_QXmppClient)
 #include "tst_qxmppclient.moc"

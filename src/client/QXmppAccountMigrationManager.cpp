@@ -13,6 +13,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -32,7 +33,8 @@ struct XmlElementId {
         return tagName == other.tagName && xmlns == other.xmlns;
     }
 
-    bool operator<(const XmlElementId &other) const {
+    bool operator<(const XmlElementId &other) const
+    {
         const auto result = xmlns.compare(other.xmlns);
 
         if (result == 0) {
@@ -131,28 +133,30 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer) const
         return keys;
     }();
 
+    XmlWriter w(writer);
+
     writer->writeStartDocument();
-    writer->writeStartElement(QSL65("account-data"));
-    writer->writeDefaultNamespace(toString65(ns_qxmpp_export));
-    writer->writeAttribute(QSL65("jid"), d->accountJid);
+    w.write(Element {
+        { u"account-data", ns_qxmpp_export },
+        Attribute { u"jid", d->accountJid },
+        [&] {
+            const auto &serializers = accountDataSerializers();
+            for (const auto &sortedKey : sortedExtensionsKeys) {
+                const auto &typeIndex = sortedKey.first;
 
-    const auto &serializers = accountDataSerializers();
-    for (const auto &sortedKey : sortedExtensionsKeys) {
-        const auto &typeIndex = sortedKey.first;
+                if (!d->extensions.contains(typeIndex)) {
+                    continue;
+                }
 
-        if (!d->extensions.contains(typeIndex)) {
-            continue;
-        }
+                const auto serializer = serializers.find(typeIndex);
+                if (serializer != serializers.end()) {
+                    const auto &[_, serialize] = *serializer;
 
-        const auto serializer = serializers.find(typeIndex);
-        if (serializer != serializers.end()) {
-            const auto &[_, serialize] = *serializer;
-
-            serialize(d->extensions.at(typeIndex), *writer);
-        }
-    }
-
-    writer->writeEndElement();
+                    serialize(d->extensions.at(typeIndex), *writer);
+                }
+            }
+        },
+    });
     writer->writeEndDocument();
 }
 
@@ -317,7 +321,7 @@ QXmppTask<QXmppAccountMigrationManager::Result<QXmppExportData>> QXmppAccountMig
     struct State {
         QXmppPromise<Result<QXmppExportData>> p;
         QXmppExportData data;
-        uint counter = 0;
+        size_t counter = 0;
     };
 
     auto state = std::make_shared<State>();

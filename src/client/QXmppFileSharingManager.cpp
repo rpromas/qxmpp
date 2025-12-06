@@ -9,13 +9,13 @@
 #include "QXmppBitsOfBinaryData.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppFileShare.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHashing_p.h"
 #include "QXmppThumbnail.h"
 #include "QXmppUploadRequestManager.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <any>
@@ -466,8 +466,7 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
                 await(upload->d->hashesFuture, this, [upload](auto hashResult) mutable {
                     auto &hashValue = hashResult->result;
                     if (std::holds_alternative<std::vector<QXmppHash>>(hashValue)) {
-                        const auto &hashesVector = std::get<std::vector<QXmppHash>>(hashValue);
-                        auto hashes = transform<QVector<QXmppHash>>(hashesVector, [](auto &&hash) {
+                        auto hashes = transform<QVector<QXmppHash>>(std::get<std::vector<QXmppHash>>(std::move(hashValue)), [](auto &&hash) {
                             return hash;
                         });
                         upload->d->metadata.setHashes(hashes);
@@ -574,7 +573,7 @@ std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
                     };
                 }
             };
-            download->reportFinished(visitForward<QXmppFileDownload::Result>(hashResult->result, convert));
+            download->reportFinished(map<QXmppFileDownload::Result>(convert, hashResult->result));
         });
     };
 

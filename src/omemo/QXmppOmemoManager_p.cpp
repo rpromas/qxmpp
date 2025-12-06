@@ -20,6 +20,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "OmemoCryptoProvider.h"
 #include "StringLiterals.h"
 
@@ -191,7 +192,7 @@ QXmppOmemoManagerPrivate::QXmppOmemoManagerPrivate(Manager *parent, QXmppOmemoSt
 //
 // Initializes the OMEMO library.
 //
-void ManagerPrivate::init()
+void ManagerPrivate::initOmemoLibrary()
 {
     if (initGlobalContext() &&
         initLocking() &&
@@ -952,9 +953,9 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
 {
     QXmppPromise<QXmppE2eeExtension::MessageEncryptResult> interface;
 
-    if (!isStarted) {
+    if (!initialized) {
         QXmppError error {
-            u"OMEMO manager must be started before encrypting"_s,
+            u"OMEMO manager must be initialized before encrypting"_s,
             SendError::EncryptionError
         };
         interface.finish(std::move(error));
@@ -1116,7 +1117,7 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
                             QXmppOmemoEnvelope omemoEnvelope;
                             omemoEnvelope.setRecipientDeviceId(deviceId);
                             if (isKeyExchange) {
-                                omemoEnvelope.setIsUsedForKeyExchange(true);
+                                omemoEnvelope.setUsedForKeyExchange(true);
                             }
                             omemoEnvelope.setData(data);
                             omemoElement->addEnvelope(jid, omemoEnvelope);
@@ -1489,7 +1490,11 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
             interface.finish(std::nullopt);
         } else {
             QDomDocument document;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+            document.setContent(serializedSceEnvelope, QDomDocument::ParseOption::UseNamespaceProcessing);
+#else
             document.setContent(serializedSceEnvelope, true);
+#endif
             QXmppSceEnvelopeReader sceEnvelopeReader(document.documentElement());
 
             if (sceEnvelopeReader.from() != senderJid) {
@@ -2960,19 +2965,20 @@ void QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> futur
 // See QXmppOmemoManager for documentation
 QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 {
+    Q_ASSERT_X(initialized, "Changing device label", "The device label could not be changed because the OMEMO manager must be initialized");
+
     QXmppPromise<bool> interface;
 
-    ownDevice.label = deviceLabel;
-
-    if (isStarted) {
-        auto future = omemoStorage->setOwnDevice(ownDevice);
-        future.then(q, [=, this]() mutable {
-            publishDeviceListItem(true, [=](bool isPublished) mutable {
+    if (q->client()->isAuthenticated()) {
+        omemoStorage->setOwnDevice(ownDevice).then(q, [=, this]() mutable {
+            publishDeviceListItem(true, [this, interface, deviceLabel](bool isPublished) mutable {
+                ownDevice.label = deviceLabel;
                 interface.finish(std::move(isPublished));
             });
         });
     } else {
-        interface.finish(true);
+        warning(QStringLiteral("Device label could not be changed because the user is not logged in"));
+        interface.finish(false);
     }
 
     return interface.task();
@@ -3133,20 +3139,14 @@ QXmppTask<bool> ManagerPrivate::resetOwnDevice()
 {
     QXmppPromise<bool> interface;
 
-    isStarted = false;
+    initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
         deleteDeviceElement([=, this](bool isDeviceElementDeleted) mutable {
             if (isDeviceElementDeleted) {
                 deleteDeviceBundle([=, this](bool isDeviceBundleDeleted) mutable {
                     if (isDeviceBundleDeleted) {
-                        ownDevice = {};
-                        preKeyPairs.clear();
-                        signedPreKeyPairs.clear();
-                        deviceBundle = {};
-                        devices.clear();
-
-                        Q_EMIT q->allDevicesRemoved();
+                        resetCachedData();
                     }
 
                     interface.finish(std::move(isDeviceBundleDeleted));
@@ -3165,12 +3165,13 @@ QXmppTask<void> QXmppOmemoManagerPrivate::resetOwnDeviceLocally()
 {
     QXmppPromise<void> interface;
 
-    isStarted = false;
+    initialized = false;
 
     auto future = trustManager->resetAll(ns_omemo_2.toString());
     future.then(q, [this, interface]() mutable {
         auto future = omemoStorage->resetAll();
         future.then(q, [this, interface]() mutable {
+            resetCachedData();
             interface.finish();
         });
     });
@@ -3183,20 +3184,14 @@ QXmppTask<bool> ManagerPrivate::resetAll()
 {
     QXmppPromise<bool> interface;
 
-    isStarted = false;
+    initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
         deleteNode(ns_omemo_2_devices.toString(), [this, interface](bool isDevicesNodeDeleted) mutable {
             if (isDevicesNodeDeleted) {
                 deleteNode(ns_omemo_2_bundles.toString(), [this, interface](bool isBundlesNodeDeleted) mutable {
                     if (isBundlesNodeDeleted) {
-                        ownDevice = {};
-                        preKeyPairs.clear();
-                        signedPreKeyPairs.clear();
-                        deviceBundle = {};
-                        devices.clear();
-
-                        Q_EMIT q->allDevicesRemoved();
+                        resetCachedData();
                     }
 
                     interface.finish(std::move(isBundlesNodeDeleted));
@@ -3208,6 +3203,20 @@ QXmppTask<bool> ManagerPrivate::resetAll()
     });
 
     return interface.task();
+}
+
+//
+// Resets all cached OMEMO data.
+//
+void ManagerPrivate::resetCachedData()
+{
+    ownDevice = {};
+    preKeyPairs.clear();
+    signedPreKeyPairs.clear();
+    deviceBundle = {};
+    devices.clear();
+
+    Q_EMIT q->allDevicesRemoved();
 }
 
 //
@@ -3563,7 +3572,7 @@ QXmppTask<QXmpp::SendResult> ManagerPrivate::sendEmptyMessage(const QString &rec
         QXmppOmemoEnvelope omemoEnvelope;
         omemoEnvelope.setRecipientDeviceId(recipientDeviceId);
         if (isKeyExchange) {
-            omemoEnvelope.setIsUsedForKeyExchange(true);
+            omemoEnvelope.setUsedForKeyExchange(true);
         }
         omemoEnvelope.setData(data);
 

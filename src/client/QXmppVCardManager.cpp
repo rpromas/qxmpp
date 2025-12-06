@@ -8,14 +8,16 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppError.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 namespace QXmpp::Private {
@@ -39,17 +41,15 @@ struct VCardData {
         return d;
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("vcard"));
-        vCard.toXmlElementFromChild(&writer);
-        writer.writeEndElement();
+        w.write(Element { u"vcard", [&] { vCard.toXmlElementFromChild(w); } });
     }
 };
 
 void serializeVCardData(const VCardData &data, QXmlStreamWriter &writer)
 {
-    data.toXml(writer);
+    XmlWriter(&writer).write(data);
 }
 
 }  // namespace QXmpp::Private
@@ -101,12 +101,7 @@ QXmppTask<QXmppVCardManager::Result> QXmppVCardManager::setVCard(const QXmppVCar
 ///
 QString QXmppVCardManager::requestVCard(const QString &jid)
 {
-    QXmppVCardIq request(jid);
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(QXmppVCardIq(jid));
 }
 
 /// Returns the vCard of the connected client.
@@ -122,7 +117,8 @@ void QXmppVCardManager::setClientVCard(const QXmppVCardIq &clientVCard)
     d->clientVCard.setTo({});
     d->clientVCard.setFrom({});
     d->clientVCard.setType(QXmppIq::Set);
-    client()->sendPacket(d->clientVCard);
+    auto vcard = d->clientVCard;
+    client()->send(std::move(vcard));
 }
 
 ///
@@ -152,7 +148,7 @@ QStringList QXmppVCardManager::discoveryFeatures() const
 
 bool QXmppVCardManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() == u"iq" && QXmppVCardIq::isVCard(element)) {
+    if (isIqElement<QXmppVCardIq>(element)) {
         QXmppVCardIq vCardIq;
         vCardIq.parse(element);
 

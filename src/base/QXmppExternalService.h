@@ -5,6 +5,7 @@
 #ifndef QXMPPEXTERNALSERVICE_H
 #define QXMPPEXTERNALSERVICE_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <optional>
@@ -62,8 +63,8 @@ public:
     std::optional<QString> password() const;
     void setPassword(std::optional<QString>);
 
-    std::optional<int> port() const;
-    void setPort(std::optional<int>);
+    std::optional<quint16> port() const;
+    void setPort(std::optional<quint16>);
 
     std::optional<bool> restricted() const;
     void setRestricted(std::optional<bool>);
@@ -76,6 +77,9 @@ public:
 
     static bool isExternalService(const QDomElement &);
 
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"service", QXmpp::Private::ns_external_service_discovery };
+    /// \endcond
     void parse(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 

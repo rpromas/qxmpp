@@ -239,7 +239,7 @@ void tst_QXmppJingleData::testRtpEncryption_data()
     QTest::addColumn<int>("cryptoElementCount");
 
     QTest::newRow("required")
-        << QByteArrayLiteral("<encryption xmlns=\"urn:xmpp:jingle:apps:rtp:1\" required=\"1\">"
+        << QByteArrayLiteral("<encryption xmlns=\"urn:xmpp:jingle:apps:rtp:1\" required=\"true\">"
                              "<crypto"
                              " tag=\"1\""
                              " crypto-suite=\"AES_CM_128_HMAC_SHA1_80\""
@@ -600,18 +600,24 @@ void tst_QXmppJingleData::testContent()
         " ufrag=\"8hhy\""
         " pwd=\"asd88fgpdd777uzjYhagZg\">"
         "<candidate component=\"0\""
+        " foundation='1'"
         " generation=\"0\""
         " id=\"el0747fg11\""
+        " ip='10.10.7.1'"
         " network=\"0\""
         " port=\"0\""
         " priority=\"0\""
+        " protocol='udp'"
         " type=\"host\"/>"
         "<candidate component=\"0\""
+        " foundation='1'"
         " generation=\"0\""
         " id=\"y3s2b30v3r\""
+        " ip='10.10.7.7'"
         " network=\"0\""
         " port=\"0\""
         " priority=\"0\""
+        " protocol='udp'"
         " type=\"host\"/>"
         "</transport>"
         "</content>");
@@ -668,12 +674,17 @@ void tst_QXmppJingleData::testContent()
     content2.setDescription(content2desc);
     content2.setTransportUser(u"8hhy"_s);
     content2.setTransportPassword(u"asd88fgpdd777uzjYhagZg"_s);
-    QXmppJingleCandidate transportCandidate1;
-    transportCandidate1.setId(u"el0747fg11"_s);
-    content2.setTransportCandidates({ transportCandidate1 });
-    QXmppJingleCandidate transportCandidate2;
-    transportCandidate2.setId(u"y3s2b30v3r"_s);
-    content2.addTransportCandidate(transportCandidate2);
+    QXmppJingleCandidate candidate1;
+    candidate1.setId(u"el0747fg11"_s);
+    candidate1.setFoundation(u"1"_s);
+    candidate1.setHost(QHostAddress("10.10.7.1"));
+    candidate1.setProtocol(u"udp"_s);
+    QXmppJingleCandidate candidate2;
+    candidate2.setId(u"y3s2b30v3r"_s);
+    candidate2.setFoundation(u"1"_s);
+    candidate2.setHost(QHostAddress("10.10.7.7"));
+    candidate2.setProtocol(u"udp"_s);
+    content2.setTransportCandidates({ candidate1, candidate2 });
 
     QCOMPARE(content2.creator(), u"initiator"_s);
     QCOMPARE(content2.name(), u"voice"_s);
@@ -1055,10 +1066,7 @@ void tst_QXmppJingleData::testSession()
         " initiator=\"romeo@montague.lit/orchard\""
         " sid=\"a73sjjvkla37jfea\">"
         "<muji xmlns=\"urn:xmpp:jingle:muji:0\" room=\"darkcave@chat.shakespeare.lit\"/>"
-        "<content creator=\"initiator\" name=\"this-is-a-stub\">"
-        "<description xmlns=\"urn:xmpp:jingle:apps:stub:0\"/>"
-        "<transport xmlns=\"urn:xmpp:jingle:transports:stub:0\"/>"
-        "</content>"
+        "<content creator=\"initiator\" name=\"this-is-a-stub\"/>"
         "</jingle>"
         "</iq>");
 
@@ -1071,8 +1079,7 @@ void tst_QXmppJingleData::testSession()
     QCOMPARE(session.contents().size(), 1);
     QCOMPARE(session.contents()[0].creator(), QLatin1String("initiator"));
     QCOMPARE(session.contents()[0].name(), QLatin1String("this-is-a-stub"));
-    QCOMPARE(session.reason().text(), QString());
-    QCOMPARE(session.reason().type(), QXmppJingleReason::None);
+    QVERIFY(!session.actionReason().has_value());
     serializePacket(session, xml);
 }
 
@@ -1098,8 +1105,8 @@ void tst_QXmppJingleData::testTerminate()
     QCOMPARE(session.action(), QXmppJingleIq::SessionTerminate);
     QCOMPARE(session.initiator(), QString());
     QCOMPARE(session.sid(), QLatin1String("a73sjjvkla37jfea"));
-    QCOMPARE(session.reason().text(), QString());
-    QCOMPARE(session.reason().type(), QXmppJingleReason::Success);
+    QCOMPARE(session.actionReason()->text(), QString());
+    QCOMPARE(session.actionReason()->type(), QXmppJingleReason::Success);
     serializePacket(session, xml);
 }
 
@@ -1109,43 +1116,43 @@ void tst_QXmppJingleData::testRtpSessionState_data()
     QTest::addColumn<QString>("state");
 
     QTest::newRow("active")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<active xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/>"
                              "</jingle>"
                              "</iq>")
         << u"active"_s;
     QTest::newRow("hold")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<hold xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/>"
                              "</jingle>"
                              "</iq>")
         << u"hold"_s;
     QTest::newRow("unhold")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<unhold xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/>"
                              "</jingle>"
                              "</iq>")
         << u"unhold"_s;
     QTest::newRow("mute")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<mute xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\" creator=\"initiator\" name=\"voice\"/>"
                              "</jingle>"
                              "</iq>")
         << u"mute"_s;
     QTest::newRow("unmute")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<unmute xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\" creator=\"responder\"/>"
                              "</jingle>"
                              "</iq>")
         << u"unmute"_s;
     QTest::newRow("ringing")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=''>"
                              "<ringing xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/>"
                              "</jingle>"
                              "</iq>")
@@ -1335,8 +1342,8 @@ void tst_QXmppJingleData::testRtpErrorCondition_data()
     QTest::addColumn<QXmppJingleReason::RtpErrorCondition>("condition");
 
     QTest::newRow("NoErrorCondition")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\" sid=''>"
                              "<reason xmlns=\"urn:xmpp:jingle:1\">"
                              "<security-error/>"
                              "</reason>"
@@ -1344,8 +1351,8 @@ void tst_QXmppJingleData::testRtpErrorCondition_data()
                              "</iq>")
         << QXmppJingleReason::NoErrorCondition;
     QTest::newRow("InvalidCrypto")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\" sid=''>"
                              "<reason xmlns=\"urn:xmpp:jingle:1\">"
                              "<security-error/>"
                              "<invalid-crypto xmlns=\"urn:xmpp:jingle:apps:rtp:errors:1\"/>"
@@ -1354,8 +1361,8 @@ void tst_QXmppJingleData::testRtpErrorCondition_data()
                              "</iq>")
         << QXmppJingleReason::InvalidCrypto;
     QTest::newRow("CryptoRequired")
-        << QByteArrayLiteral("<iq type=\"set\">"
-                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\">"
+        << QByteArrayLiteral("<iq id='' type=\"set\">"
+                             "<jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-terminate\" sid=''>"
                              "<reason xmlns=\"urn:xmpp:jingle:1\">"
                              "<security-error/>"
                              "<crypto-required xmlns=\"urn:xmpp:jingle:apps:rtp:errors:1\"/>"
@@ -1371,21 +1378,9 @@ void tst_QXmppJingleData::testRtpErrorCondition()
     QFETCH(QXmppJingleReason::RtpErrorCondition, condition);
 
     QXmppJingleIq iq1;
-    QCOMPARE(iq1.reason().rtpErrorCondition(), QXmppJingleReason::NoErrorCondition);
     parsePacket(iq1, xml);
 
-    const auto rtpErrorCondition1 = iq1.reason().rtpErrorCondition();
-    switch (condition) {
-    case QXmppJingleReason::NoErrorCondition:
-        QVERIFY(rtpErrorCondition1 == QXmppJingleReason::NoErrorCondition);
-        break;
-    case QXmppJingleReason::InvalidCrypto:
-        QVERIFY(rtpErrorCondition1 == QXmppJingleReason::InvalidCrypto);
-        break;
-    case QXmppJingleReason::CryptoRequired:
-        QVERIFY(rtpErrorCondition1 == QXmppJingleReason::CryptoRequired);
-        break;
-    }
+    QCOMPARE(iq1.actionReason()->rtpErrorCondition(), condition);
 
     serializePacket(iq1, xml);
 
@@ -1393,33 +1388,10 @@ void tst_QXmppJingleData::testRtpErrorCondition()
     iq2.setType(QXmppIq::Set);
     iq2.setId({});
     iq2.setAction(QXmppJingleIq::SessionTerminate);
+    iq2.setActionReason(QXmppJingleReason(QXmppJingleReason::SecurityError, {}, condition));
 
-    switch (condition) {
-    case QXmppJingleReason::NoErrorCondition:
-        iq2.reason().setRtpErrorCondition(QXmppJingleReason::NoErrorCondition);
-        break;
-    case QXmppJingleReason::InvalidCrypto:
-        iq2.reason().setRtpErrorCondition(QXmppJingleReason::InvalidCrypto);
-        break;
-    case QXmppJingleReason::CryptoRequired:
-        iq2.reason().setRtpErrorCondition(QXmppJingleReason::CryptoRequired);
-        break;
-    }
-
-    iq2.reason().setType(QXmppJingleReason::SecurityError);
-
-    const auto rtpErrorCondition2 = iq2.reason().rtpErrorCondition();
-    switch (condition) {
-    case QXmppJingleReason::NoErrorCondition:
-        QVERIFY(rtpErrorCondition2 == QXmppJingleReason::NoErrorCondition);
-        break;
-    case QXmppJingleReason::InvalidCrypto:
-        QVERIFY(rtpErrorCondition2 == QXmppJingleReason::InvalidCrypto);
-        break;
-    case QXmppJingleReason::CryptoRequired:
-        QVERIFY(rtpErrorCondition2 == QXmppJingleReason::CryptoRequired);
-        break;
-    }
+    // test getter
+    QCOMPARE(iq2.actionReason()->rtpErrorCondition(), condition);
 
     serializePacket(iq2, xml);
 }

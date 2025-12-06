@@ -4,10 +4,11 @@
 
 #include "QXmppTrustManager.h"
 
-#include "QXmppFutureUtils_p.h"
 #include "QXmppPromise.h"
 #include "QXmppTask.h"
 #include "QXmppTrustStorage.h"
+
+#include "Async.h"
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -16,8 +17,6 @@ using namespace QXmpp::Private;
 /// \class QXmppTrustManager
 ///
 /// \brief The QXmppTrustManager manages end-to-end encryption trust decisions.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \ingroup Managers
 ///

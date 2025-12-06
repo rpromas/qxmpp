@@ -11,11 +11,13 @@
 #include "QXmppSocks.h"
 #include "QXmppStreamInitiationIq_p.h"
 #include "QXmppStun.h"
+#include "QXmppTask.h"
 #include "QXmppTransferManager_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCryptographicHash>
 #include <QDomElement>
@@ -183,24 +185,14 @@ void QXmppTransferFileInfo::parse(const QDomElement &element)
 
 void QXmppTransferFileInfo::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file"));
-    writer->writeDefaultNamespace(toString65(ns_stream_initiation_file_transfer));
-    if (d->date.isValid()) {
-        writer->writeAttribute(QSL65("date"), QXmppUtils::datetimeToString(d->date));
-    }
-    if (!d->hash.isEmpty()) {
-        writer->writeAttribute(QSL65("hash"), QString::fromUtf8(d->hash.toHex()));
-    }
-    if (!d->name.isEmpty()) {
-        writer->writeAttribute(QSL65("name"), d->name);
-    }
-    if (d->size > 0) {
-        writer->writeAttribute(QSL65("size"), QString::number(d->size));
-    }
-    if (!d->description.isEmpty()) {
-        writer->writeTextElement(QSL65("desc"), d->description);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"file", ns_stream_initiation_file_transfer },
+        OptionalAttribute { u"date", d->date },
+        OptionalAttribute { u"hash", d->hash.toHex() },
+        OptionalAttribute { u"name", d->name },
+        OptionalAttribute { u"size", d->size > 0 ? std::make_optional(d->size) : std::nullopt },
+        OptionalTextElement { u"desc", d->description },
+    });
 }
 /// \endcond
 
@@ -484,7 +476,7 @@ void QXmppTransferIncomingJob::connectToNextHost()
         error.setCode(404);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        d->client->sendPacket(response);
+        d->client->send(std::move(response));
 
         terminate(QXmppTransferJob::ProtocolError);
         return;
@@ -560,7 +552,7 @@ void QXmppTransferIncomingJob::_q_candidateReady()
     ackIq.setType(QXmppIq::Result);
     ackIq.setSid(d->sid);
     ackIq.setStreamHostUsed(m_candidateHost.jid());
-    d->client->sendPacket(ackIq);
+    d->client->send(std::move(ackIq));
 }
 
 void QXmppTransferIncomingJob::_q_candidateDisconnected()
@@ -661,7 +653,7 @@ void QXmppTransferOutgoingJob::_q_proxyReady()
     streamIq.setSid(d->sid);
     streamIq.setActivate(d->jid);
     d->requestId = streamIq.id();
-    d->client->sendPacket(streamIq);
+    d->client->send(std::move(streamIq));
 }
 
 void QXmppTransferOutgoingJob::_q_sendData()
@@ -887,7 +879,7 @@ void QXmppTransferManager::byteStreamSetReceived(const QXmppByteStreamIq &iq)
         error.setCode(406);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -907,36 +899,34 @@ QStringList QXmppTransferManager::discoveryFeatures() const
 
 bool QXmppTransferManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq") {
-        return false;
-    }
+    auto tag = iqPayloadXmlTag(element);
 
     // XEP-0047 In-Band Bytestreams
-    if (QXmppIbbCloseIq::isIbbCloseIq(element)) {
+    if (tag == PayloadXmlTag<QXmppIbbCloseIq>) {
         QXmppIbbCloseIq ibbCloseIq;
         ibbCloseIq.parse(element);
         ibbCloseIqReceived(ibbCloseIq);
         return true;
-    } else if (QXmppIbbDataIq::isIbbDataIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppIbbDataIq>) {
         QXmppIbbDataIq ibbDataIq;
         ibbDataIq.parse(element);
         ibbDataIqReceived(ibbDataIq);
         return true;
-    } else if (QXmppIbbOpenIq::isIbbOpenIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppIbbOpenIq>) {
         QXmppIbbOpenIq ibbOpenIq;
         ibbOpenIq.parse(element);
         ibbOpenIqReceived(ibbOpenIq);
         return true;
     }
     // XEP-0065: SOCKS5 Bytestreams
-    else if (QXmppByteStreamIq::isByteStreamIq(element)) {
+    else if (tag == PayloadXmlTag<QXmppByteStreamIq>) {
         QXmppByteStreamIq byteStreamIq;
         byteStreamIq.parse(element);
         byteStreamIqReceived(byteStreamIq);
         return true;
     }
     // XEP-0095: Stream Initiation
-    else if (QXmppStreamInitiationIq::isStreamInitiationIq(element)) {
+    else if (tag == PayloadXmlTag<QXmppStreamInitiationIq>) {
         QXmppStreamInitiationIq siIq;
         siIq.parse(element);
         streamInitiationIqReceived(siIq);
@@ -971,13 +961,13 @@ void QXmppTransferManager::ibbCloseIqReceived(const QXmppIbbCloseIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
     // acknowledge the packet
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 
     // check received data
     job->checkData();
@@ -997,7 +987,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1006,7 +996,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::UnexpectedRequest);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1016,7 +1006,7 @@ void QXmppTransferManager::ibbDataIqReceived(const QXmppIbbDataIq &iq)
 
     // acknowledge the packet
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 }
 
 void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
@@ -1032,7 +1022,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Cancel, QXmppStanza::Error::ItemNotFound);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1041,7 +1031,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
         QXmppStanza::Error error(QXmppStanza::Error::Modify, QXmppStanza::Error::ResourceConstraint);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1050,7 +1040,7 @@ void QXmppTransferManager::ibbOpenIqReceived(const QXmppIbbOpenIq &iq)
 
     // accept transfer
     response.setType(QXmppIq::Result);
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 }
 
 void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
@@ -1078,7 +1068,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
             dataIq.setSequence(job->d->ibbSequence++);
             dataIq.setPayload(buffer);
             job->d->requestId = dataIq.id();
-            client()->sendPacket(dataIq);
+            client()->send(std::move(dataIq));
 
             job->d->done += buffer.size();
             Q_EMIT job->progress(job->d->done, job->fileSize());
@@ -1088,7 +1078,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
             closeIq.setTo(job->d->jid);
             closeIq.setSid(job->d->sid);
             job->d->requestId = closeIq.id();
-            client()->sendPacket(closeIq);
+            client()->send(std::move(closeIq));
 
             job->terminate(QXmppTransferJob::NoError);
         }
@@ -1098,7 +1088,7 @@ void QXmppTransferManager::ibbResponseReceived(const QXmppIq &iq)
         closeIq.setTo(job->d->jid);
         closeIq.setSid(job->d->sid);
         job->d->requestId = closeIq.id();
-        client()->sendPacket(closeIq);
+        client()->send(std::move(closeIq));
 
         job->terminate(QXmppTransferJob::ProtocolError);
     }
@@ -1170,7 +1160,7 @@ void QXmppTransferManager::_q_jobError(QXmppTransferJob::Error error)
         closeIq.setTo(job->d->jid);
         closeIq.setSid(job->d->sid);
         job->d->requestId = closeIq.id();
-        client()->sendPacket(closeIq);
+        client()->send(std::move(closeIq));
     }
 }
 
@@ -1209,7 +1199,7 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
         response.setId(job->d->offerId);
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
 
         job->terminate(QXmppTransferJob::AbortError);
         return;
@@ -1237,7 +1227,7 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
     response.setProfile(QXmppStreamInitiationIq::FileTransfer);
     response.setFeatureForm(form);
 
-    client()->sendPacket(response);
+    client()->send(std::move(response));
 
     // notify user
     Q_EMIT jobStarted(job);
@@ -1360,7 +1350,7 @@ QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, QIODevice *
     request.setFeatureForm(form);
     request.setSiId(job->d->sid);
     job->d->requestId = request.id();
-    client()->sendPacket(request);
+    client()->send(std::move(request));
 
     // notify user
     Q_EMIT jobStarted(job);
@@ -1417,7 +1407,7 @@ void QXmppTransferManager::socksServerSendOffer(QXmppTransferJob *job)
     streamIq.setSid(job->d->sid);
     streamIq.setStreamHosts(streamHosts);
     job->d->requestId = streamIq.id();
-    client()->sendPacket(streamIq);
+    client()->send(std::move(streamIq));
 }
 
 void QXmppTransferManager::streamInitiationIqReceived(const QXmppStreamInitiationIq &iq)
@@ -1464,7 +1454,7 @@ void QXmppTransferManager::streamInitiationResultReceived(const QXmppStreamIniti
         openIq.setSid(job->d->sid);
         openIq.setBlockSize(job->d->blockSize);
         job->d->requestId = openIq.id();
-        client()->sendPacket(openIq);
+        client()->send(std::move(openIq));
     } else if (job->method() == QXmppTransferJob::SocksMethod) {
         if (!d->proxy.isEmpty()) {
             job->d->socksProxy.setJid(d->proxy);
@@ -1475,7 +1465,7 @@ void QXmppTransferManager::streamInitiationResultReceived(const QXmppStreamIniti
             streamIq.setTo(job->d->socksProxy.jid());
             streamIq.setSid(job->d->sid);
             job->d->requestId = streamIq.id();
-            client()->sendPacket(streamIq);
+            client()->send(std::move(streamIq));
         } else {
             socksServerSendOffer(job);
         }
@@ -1500,7 +1490,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1511,7 +1501,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
         return;
     }
 
@@ -1553,7 +1543,7 @@ void QXmppTransferManager::streamInitiationSetReceived(const QXmppStreamInitiati
 
         response.setType(QXmppIq::Error);
         response.setError(error);
-        client()->sendPacket(response);
+        client()->send(std::move(response));
 
         delete job;
         return;

@@ -5,7 +5,10 @@
 #ifndef QXMPPHASH_H
 #define QXMPPHASH_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
+
+#include <tuple>
 
 #include <QByteArray>
 
@@ -39,6 +42,7 @@ public:
     QXmppHash();
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"hash", QXmpp::Private::ns_hashes };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -61,6 +65,7 @@ public:
     QXmppHashUsed(QXmpp::HashAlgorithm algorithm);
 
     /// \cond
+    static constexpr auto XmlTag = std::tuple { u"hash-used", QXmpp::Private::ns_hashes };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

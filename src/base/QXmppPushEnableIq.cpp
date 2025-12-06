@@ -8,9 +8,11 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -116,7 +118,8 @@ void QXmppPushEnableIq::setDataForm(const QXmppDataForm &form)
 ///
 bool QXmppPushEnableIq::isPushEnableIq(const QDomElement &element)
 {
-    return isIqType(element, u"enable", ns_push) || isIqType(element, u"disable", ns_push);
+    auto tag = iqPayloadXmlTag(element);
+    return tag == std::tuple { u"enable", ns_push } || tag == std::tuple { u"disable", ns_push };
 }
 
 /// \cond
@@ -143,22 +146,11 @@ void QXmppPushEnableIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPushEnableIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    switch (d->mode) {
-    case Enable:
-        writer->writeStartElement(QSL65("enable"));
-        break;
-    case Disable:
-        writer->writeStartElement(QSL65("disable"));
-        break;
-    }
-
-    writer->writeDefaultNamespace(toString65(ns_push));
-    writer->writeAttribute(QSL65("jid"), d->jid);
-    writer->writeAttribute(QSL65("node"), d->node);
-
-    if (d->mode == Enable) {
-        d->dataForm.toXml(writer);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { d->mode == Enable ? u"enable" : u"disable", ns_push },
+        Attribute { u"jid", d->jid },
+        Attribute { u"node", d->node },
+        OptionalContent { d->mode == Enable, d->dataForm },
+    });
 }
 /// \endcond

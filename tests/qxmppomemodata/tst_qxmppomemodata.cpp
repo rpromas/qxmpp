@@ -89,7 +89,11 @@ void tst_QXmppOmemoData::testIsOmemoDeviceElement()
     QFETCH(bool, isValid);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
     QVERIFY(doc.setContent(xml, true));
+#endif
     const QDomElement element = doc.documentElement();
     QCOMPARE(QXmppOmemoDeviceElement::isOmemoDeviceElement(element), isValid);
 }
@@ -152,7 +156,11 @@ void tst_QXmppOmemoData::testIsOmemoDeviceList()
     QFETCH(bool, isValid);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
     QVERIFY(doc.setContent(xml, true));
+#endif
     const QDomElement element = doc.documentElement();
     QCOMPARE(QXmppOmemoDeviceList::isOmemoDeviceList(element), isValid);
 }
@@ -210,7 +218,11 @@ void tst_QXmppOmemoData::testIsOmemoDeviceBundle()
     QFETCH(bool, isValid);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
     QVERIFY(doc.setContent(xml, true));
+#endif
     const QDomElement element = doc.documentElement();
     QCOMPARE(QXmppOmemoDeviceBundle::isOmemoDeviceBundle(element), isValid);
 }
@@ -310,7 +322,11 @@ void tst_QXmppOmemoData::testIsOmemoEnvelope()
     QFETCH(bool, isValid);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
     QVERIFY(doc.setContent(xml, true));
+#endif
     const QDomElement element = doc.documentElement();
     QCOMPARE(QXmppOmemoEnvelope::isOmemoEnvelope(element), isValid);
 }
@@ -350,7 +366,7 @@ void tst_QXmppOmemoData::testOmemoEnvelope()
 
     QXmppOmemoEnvelope omemoEnvelope2;
     omemoEnvelope2.setRecipientDeviceId(recipientDeviceId);
-    omemoEnvelope2.setIsUsedForKeyExchange(isUsedForKeyExchange);
+    omemoEnvelope2.setUsedForKeyExchange(isUsedForKeyExchange);
     omemoEnvelope2.setData(QByteArray::fromBase64(data));
     QCOMPARE(omemoEnvelope2.recipientDeviceId(), recipientDeviceId);
     QCOMPARE(omemoEnvelope2.isUsedForKeyExchange(), isUsedForKeyExchange);
@@ -380,7 +396,11 @@ void tst_QXmppOmemoData::testIsOmemoElement()
     QFETCH(bool, isValid);
 
     QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
     QVERIFY(doc.setContent(xml, true));
+#endif
     const QDomElement element = doc.documentElement();
     QCOMPARE(QXmppOmemoElement::isOmemoElement(element), isValid);
 }
@@ -501,7 +521,7 @@ void tst_QXmppOmemoData::testOmemoElement()
 
     QXmppOmemoEnvelope omemoEnvelope5;
     omemoEnvelope5.setRecipientDeviceId(12321);
-    omemoEnvelope5.setIsUsedForKeyExchange(true);
+    omemoEnvelope5.setUsedForKeyExchange(true);
     omemoEnvelope5.setData(QByteArray::fromBase64("a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK"));
     omemoElement2.addEnvelope(u"romeo@montague.lit"_s, omemoEnvelope5);
 
@@ -609,7 +629,7 @@ void tst_QXmppOmemoData::testMessageOmemoElement()
 void tst_QXmppOmemoData::testOmemoIq()
 {
     const QByteArray xmlOtherIq(
-        "<iq id=\"qxmpp2\" type=\"get\">"
+        "<iq id=\"qx2\" type=\"get\">"
         "<encrypted xmlns=\"urn:xmpp:encryption:stub:sce:1\">"
         "<payload>"
         "V2FpdCwgd2hhdD8gQXJlIHlvdSBzZXJpb3VzPyBEaWQgeW91IHJlYWxseSBqdXN0IGdyYWIgeW91"
@@ -621,7 +641,7 @@ void tst_QXmppOmemoData::testOmemoIq()
         "</iq>");
 
     const QByteArray xmlOmemoIq(
-        "<iq id=\"qxmpp2\" type=\"get\">"
+        "<iq id=\"qx2\" type=\"get\">"
         "<encrypted xmlns=\"urn:xmpp:omemo:2\">"
         "<header sid=\"27183\"/>"
         "<payload>"
@@ -640,11 +660,19 @@ void tst_QXmppOmemoData::testOmemoIq()
         "ZWVrIHdpdGggYSBiaW5hcnkgd3Jpc3Qgd2F0Y2g/");
 
     QDomDocument doc;
-    doc.setContent(xmlOtherIq, true);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xmlOtherIq, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
+    QVERIFY(doc.setContent(xmlOtherIq, true));
+#endif
     QDomElement element = doc.documentElement();
     QVERIFY(!QXmppOmemoIq::isOmemoIq(element));
 
-    doc.setContent(xmlOmemoIq, true);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    QVERIFY(doc.setContent(xmlOmemoIq, QDomDocument::ParseOption::UseNamespaceProcessing));
+#else
+    QVERIFY(doc.setContent(xmlOmemoIq, true));
+#endif
     element = doc.documentElement();
     QVERIFY(QXmppOmemoIq::isOmemoIq(element));
 

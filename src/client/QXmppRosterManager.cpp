@@ -10,7 +10,6 @@
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPresence.h"
 #include "QXmppRosterIq.h"
@@ -18,7 +17,9 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -38,30 +39,27 @@ struct RosterData {
             return QXmppError { u"Invalid element."_s, {} };
         }
 
-        RosterData d;
-
-        for (const auto &itemEl : iterChildElements(el, u"item", ns_roster)) {
-            QXmppRosterIq::Item item;
-            item.parse(itemEl);
-            d.items.push_back(std::move(item));
-        }
-
-        return d;
+        return RosterData {
+            parseChildElements<QList<QXmppRosterIq::Item>>(el),
+        };
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("roster"));
-        for (const auto &item : items) {
-            item.toXml(&writer, true);
-        }
-        writer.writeEndElement();
+        w.write(Element {
+            u"roster",
+            [&] {
+                for (const auto &item : items) {
+                    item.toXml(w, true);
+                }
+            },
+        });
     }
 };
 
 static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 {
-    d.toXml(writer);
+    XmlWriter(&writer).write(d);
 }
 
 }  // namespace QXmpp::Private
@@ -74,11 +72,16 @@ static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 /// The user can either accept the request by calling acceptSubscription() or refuse it
 /// by calling refuseSubscription().
 ///
+/// Since *QXmpp 1.10.2* only verified \xep{0283, Moved} old JIDs are passed in \a presence. If
+/// verification fails or the given old JID is not valid, the attribute is cleared in the
+/// QXmppPresence. See \ref rostermanager_moved "above" for more details.
+///
 /// \note If QXmppConfiguration::autoAcceptSubscriptions() is set to true or the subscription
 /// request is automatically accepted by the QXmppMovedManager, this signal will not be emitted.
 ///
 /// \param subscriberBareJid bare JID that wants to subscribe to the user's presence
-/// \param presence presence stanza containing the reason / message (presence.statusText())
+/// \param presence presence stanza, e.g. containing the message (presence.statusText()),
+/// \xep{0283, Moved} old JID or other information
 ///
 /// \since QXmpp 1.5
 ///
@@ -151,7 +154,7 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
     presence.setTo(bareJid);
     presence.setType(QXmppPresence::Subscribed);
     presence.setStatusText(reason);
-    return client()->sendPacket(presence);
+    return client()->sendLegacy(presence);
 }
 
 ///
@@ -193,7 +196,7 @@ void QXmppRosterManager::_q_disconnected()
 /// \cond
 bool QXmppRosterManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq" || !QXmppRosterIq::isRosterIq(element)) {
+    if (!isIqElement<QXmppRosterIq>(element)) {
         return false;
     }
 
@@ -212,7 +215,7 @@ bool QXmppRosterManager::handleStanza(const QDomElement &element)
         // send result iq
         QXmppIq returnIq(QXmppIq::Result);
         returnIq.setId(rosterIq.id());
-        client()->sendPacket(returnIq);
+        client()->send(std::move(returnIq));
 
         // store updated entries and notify changes
         const auto items = rosterIq.items();
@@ -265,23 +268,7 @@ void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
         Q_EMIT presenceChanged(bareJid, resource);
         break;
     case QXmppPresence::Subscribe: {
-        // accept all incoming subscription requests if enabled
-        if (client()->configuration().autoAcceptSubscriptions()) {
-            handleSubscriptionRequest(bareJid, presence, true);
-            break;
-        }
-
-        // check for XEP-0283: Moved subscription requests and verify them
-        if (auto *movedManager = client()->findExtension<QXmppMovedManager>()) {
-            if (auto verificationTask = movedManager->handleSubscriptionRequest(presence)) {
-                verificationTask->then(this, [this, presence, bareJid](bool valid) {
-                    handleSubscriptionRequest(bareJid, presence, valid);
-                });
-                break;
-            }
-        }
-
-        handleSubscriptionRequest(bareJid, presence, false);
+        handleSubscriptionRequest(bareJid, presence);
         break;
     }
     case QXmppPresence::Unsubscribe:
@@ -292,18 +279,30 @@ void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
     }
 }
 
-void QXmppRosterManager::handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence, bool accept)
+void QXmppRosterManager::handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence)
 {
-    if (accept) {
-        // accept subscription request
-        acceptSubscription(bareJid);
-
-        // ask for reciprocal subscription
-        subscribe(bareJid);
-    } else {
-        // let user decide whether to accept the subscription request
+    auto notifyOnSubscriptionRequest = [this, bareJid](const QXmppPresence &presence) {
         Q_EMIT subscriptionReceived(bareJid);
         Q_EMIT subscriptionRequestReceived(bareJid, presence);
+    };
+
+    // Automatically accept all incoming subscription requests if enabled.
+    if (client()->configuration().autoAcceptSubscriptions()) {
+        acceptSubscription(bareJid);
+        subscribe(bareJid);
+        return;
+    }
+
+    // check for XEP-0283: Moved subscription requests and verify them
+    if (auto *movedManager = client()->findExtension<QXmppMovedManager>(); movedManager && !presence.oldJid().isEmpty()) {
+        movedManager->processSubscriptionRequest(presence).then(this, [this, notifyOnSubscriptionRequest](QXmppPresence &&presence) mutable {
+            notifyOnSubscriptionRequest(presence);
+        });
+    } else {
+        auto safePresence = presence;
+        safePresence.setOldJid({});
+
+        notifyOnSubscriptionRequest(safePresence);
     }
 }
 
@@ -444,7 +443,7 @@ bool QXmppRosterManager::refuseSubscription(const QString &bareJid, const QStrin
     presence.setTo(bareJid);
     presence.setType(QXmppPresence::Unsubscribed);
     presence.setStatusText(reason);
-    return client()->sendPacket(presence);
+    return client()->sendLegacy(presence);
 }
 
 ///
@@ -468,7 +467,7 @@ bool QXmppRosterManager::addItem(const QString &bareJid, const QString &name, co
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -488,7 +487,7 @@ bool QXmppRosterManager::removeItem(const QString &bareJid)
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -517,7 +516,7 @@ bool QXmppRosterManager::renameItem(const QString &bareJid, const QString &name)
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Set);
     iq.addItem(item);
-    return client()->sendPacket(iq);
+    return client()->sendLegacy(iq);
 }
 
 ///
@@ -532,7 +531,7 @@ bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason
     packet.setTo(QXmppUtils::jidToBareJid(bareJid));
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
-    return client()->sendPacket(packet);
+    return client()->sendLegacy(packet);
 }
 
 ///
@@ -547,7 +546,7 @@ bool QXmppRosterManager::unsubscribe(const QString &bareJid, const QString &reas
     packet.setTo(QXmppUtils::jidToBareJid(bareJid));
     packet.setType(QXmppPresence::Unsubscribe);
     packet.setStatusText(reason);
-    return client()->sendPacket(packet);
+    return client()->sendLegacy(packet);
 }
 
 void QXmppRosterManager::onRegistered(QXmppClient *client)

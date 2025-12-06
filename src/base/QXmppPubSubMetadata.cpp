@@ -4,18 +4,14 @@
 
 #include "QXmppPubSubMetadata.h"
 
+#include "QXmppPubSubNodeConfig_p.h"
+#include "QXmppVisitHelper_p.h"
+
 #include "StringLiterals.h"
 
 #include <QDateTime>
 
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-// explicit deduction guide (not needed as of C++20)
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+using namespace QXmpp::Private;
 
 constexpr QStringView FORM_TYPE_METADATA = u"http://jabber.org/protocol/pubsub#metadata";
 
@@ -219,9 +215,9 @@ bool QXmppPubSubMetadata::parseField(const QXmppDataForm::Field &field)
     } else if (key == LANGUAGE) {
         d->language = value.toString();
     } else if (key == ACCESS_MODEL) {
-        d->accessModel = QXmppPubSubNodeConfig::accessModelFromString(value.toString());
+        d->accessModel = Enums::fromString<QXmppPubSubNodeConfig::AccessModel>(value.toString());
     } else if (key == PUBLISH_MODEL) {
-        d->publishModel = QXmppPubSubNodeConfig::publishModelFromString(value.toString());
+        d->publishModel = Enums::fromString<QXmppPubSubNodeConfig::PublishModel>(value.toString());
     } else if (key == SUBSCRIBER_COUNT) {
         d->subscriberCount = parseULongLong(value);
     } else if (key == OWNER_JIDS) {
@@ -255,14 +251,17 @@ void QXmppPubSubMetadata::serializeForm(QXmppDataForm &form) const
     const auto numberToString = [](quint64 value) {
         return QString::number(value);
     };
+    auto enumToString = [](auto value) {
+        return Enums::toString(value).toString();
+    };
 
     serializeEmptyable(form, Type::JidMultiField, CONTACT_JIDS, d->contactJids);
     serializeDatetime(form, CREATION_DATE.toString(), d->creationDate);
     serializeNullable(form, Type::JidSingleField, CREATOR_JID, d->creatorJid);
     serializeNullable(form, Type::TextSingleField, DESCRIPTION, d->description);
     serializeNullable(form, Type::TextSingleField, LANGUAGE, d->language);
-    serializeOptional(form, Type::ListSingleField, ACCESS_MODEL, d->accessModel, QXmppPubSubNodeConfig::accessModelToString);
-    serializeOptional(form, Type::ListSingleField, PUBLISH_MODEL, d->publishModel, QXmppPubSubNodeConfig::publishModelToString);
+    serializeOptional(form, Type::ListSingleField, ACCESS_MODEL, d->accessModel, enumToString);
+    serializeOptional(form, Type::ListSingleField, PUBLISH_MODEL, d->publishModel, enumToString);
     serializeOptional(form, Type::TextSingleField, SUBSCRIBER_COUNT, d->subscriberCount, numberToString);
     serializeEmptyable(form, Type::JidMultiField, OWNER_JIDS, d->ownerJids);
     serializeEmptyable(form, Type::JidMultiField, PUBLISHER_JIDS, d->publisherJids);

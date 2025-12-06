@@ -12,6 +12,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <utility>
 
@@ -68,18 +69,6 @@ QXmppFileMetadata::QXmppFileMetadata()
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileMetadata)
 
 /// \cond
-template<typename ElementType>
-QVector<ElementType> parseChildElements(const QDomElement &el, QStringView tagName, QStringView namespaceUri)
-{
-    QVector<ElementType> vec;
-    for (const auto &subEl : iterChildElements(el, tagName, namespaceUri)) {
-        ElementType parsedElement;
-        parsedElement.parse(subEl);
-        vec.push_back(std::move(parsedElement));
-    }
-    return vec;
-}
-
 bool QXmppFileMetadata::parse(const QDomElement &el)
 {
     if (el.isNull()) {
@@ -94,7 +83,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
         d->desc = descEl.text();
     }
 
-    d->hashes = parseChildElements<QXmppHash>(el, u"hash", ns_hashes);
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
 
     if (auto heightEl = firstChildElement(el, u"height"); !heightEl.isNull()) {
         d->height = firstChildElement(el, u"height").text().toUInt();
@@ -111,12 +100,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
     if (auto sizeEl = firstChildElement(el, u"size"); !sizeEl.isNull()) {
         d->size = sizeEl.text().toULong();
     }
-    for (const auto &thumbEl : iterChildElements(el, u"thumbnail")) {
-        QXmppThumbnail thumbnail;
-        if (thumbnail.parse(thumbEl)) {
-            d->thumbnails.append(std::move(thumbnail));
-        }
-    }
+    d->thumbnails = parseChildElements<QVector<QXmppThumbnail>>(el);
     if (auto widthEl = firstChildElement(el, u"width"); !widthEl.isNull()) {
         d->width = widthEl.text().toUInt();
     }
@@ -125,42 +109,19 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
 
 void QXmppFileMetadata::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file"));
-    writer->writeDefaultNamespace(toString65(ns_file_metadata));
-    if (d->date) {
-        writer->writeTextElement(QSL65("date"), QXmppUtils::datetimeToString(*d->date));
-    }
-
-    if (d->desc) {
-        writer->writeTextElement(QSL65("desc"), *d->desc);
-    }
-
-    for (const auto &hash : d->hashes) {
-        hash.toXml(writer);
-    }
-
-    if (d->height) {
-        writer->writeTextElement(QSL65("height"), QString::number(*d->height));
-    }
-    if (d->length) {
-        writer->writeTextElement(QSL65("length"), QString::number(*d->length));
-    }
-    if (d->mediaType) {
-        writer->writeTextElement(QSL65("media-type"), d->mediaType->name());
-    }
-    if (d->name) {
-        writer->writeTextElement(QSL65("name"), *d->name);
-    }
-    if (d->size) {
-        writer->writeTextElement(QSL65("size"), QString::number(*d->size));
-    }
-    for (const auto &thumbnail : d->thumbnails) {
-        thumbnail.toXml(writer);
-    }
-    if (d->width) {
-        writer->writeTextElement(QSL65("width"), QString::number(*d->width));
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"file", ns_file_metadata },
+        OptionalTextElement { u"date", d->date },
+        OptionalTextElement { u"desc", d->desc },
+        d->hashes,
+        OptionalTextElement { u"height", d->height },
+        OptionalTextElement { u"length", d->length },
+        OptionalTextElement { u"media-type", d->mediaType },
+        OptionalTextElement { u"name", d->name },
+        OptionalTextElement { u"size", d->size },
+        d->thumbnails,
+        OptionalTextElement { u"width", d->width },
+    });
 }
 /// \endcond
 

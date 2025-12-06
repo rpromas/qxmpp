@@ -64,7 +64,7 @@ endif()
 
 target_include_directories(${QXMPPOMEMO_TARGET}
     INTERFACE
-    ${OMEMO_HEADER_DIR}
+    $<INSTALL_INTERFACE:include/${QXMPP_TARGET}/Omemo>
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}

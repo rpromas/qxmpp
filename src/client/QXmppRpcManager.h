@@ -16,9 +16,15 @@ class QXmppRpcErrorIq;
 class QXmppRpcInvokeIq;
 class QXmppRpcResponseIq;
 
+/// \cond
+#if QXMPP_DEPRECATED_SINCE(1, 12)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+///
 /// \brief The QXmppRpcManager class make it possible to invoke remote methods
 /// and to expose local interfaces for remote procedure calls, as specified by
-/// \xep{0009}: Jabber-RPC.
+/// \xep{0009, Jabber-RPC}.
 ///
 /// To make use of this manager, you need to instantiate it and load it into
 /// the QXmppClient instance as follows:
@@ -28,11 +34,11 @@ class QXmppRpcResponseIq;
 /// client->addExtension(manager);
 /// \endcode
 ///
-/// \note THIS API IS NOT FINALIZED YET
-///
 /// \ingroup Managers
-
-class QXMPP_EXPORT QXmppRpcManager : public QXmppClientExtension
+///
+/// \deprecated
+///
+class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API (unmaintained)") QXmppRpcManager : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -53,22 +59,21 @@ public:
                                              const QVariant &arg9 = QVariant(),
                                              const QVariant &arg10 = QVariant());
 
-    /// \cond
     QStringList discoveryFeatures() const override;
-    QList<QXmppDiscoveryIq::Identity> discoveryIdentities() const override;
+    QList<QXmppDiscoIdentity> discoveryIdentities() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
-Q_SIGNALS:
-    /// \cond
-    void rpcCallResponse(const QXmppRpcResponseIq &result);
-    void rpcCallError(const QXmppRpcErrorIq &err);
-    /// \endcond
+    Q_SIGNAL void rpcCallResponse(const QXmppRpcResponseIq &result);
+    Q_SIGNAL void rpcCallError(const QXmppRpcErrorIq &err);
 
 private:
     void invokeInterfaceMethod(const QXmppRpcInvokeIq &iq);
 
     QMap<QString, QXmppInvokable *> m_interfaces;
 };
+
+QT_WARNING_POP
+#endif
+/// \endcond
 
 #endif

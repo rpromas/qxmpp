@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 #include <QDomElement>
@@ -28,13 +29,18 @@ using namespace QXmpp::Private;
 /// \since QXmpp 1.5
 ///
 
-constexpr auto SUBSCRIPTION_STATES = to_array<QStringView>({
-    {},
-    u"none",
-    u"pending",
-    u"subscribed",
-    u"unconfigured",
-});
+template<>
+struct Enums::Data<QXmppPubSubSubscription::State> {
+    using enum QXmppPubSubSubscription::State;
+    static constexpr auto NullValue = Invalid;
+    static constexpr auto Values = makeValues<QXmppPubSubSubscription::State>({
+        { Invalid, {} },
+        { None, u"none" },
+        { Pending, u"pending" },
+        { Subscribed, u"subscribed" },
+        { Unconfigured, u"unconfigured" },
+    });
+};
 
 class QXmppPubSubSubscriptionPrivate : public QSharedData
 {
@@ -67,22 +73,6 @@ QXmppPubSubSubscriptionPrivate::QXmppPubSubSubscriptionPrivate(const QString &ji
       state(state),
       configurationSupport(configurationSupport)
 {
-}
-
-///
-/// Converts a subscription state to string.
-///
-QString QXmppPubSubSubscription::stateToString(State state)
-{
-    return SUBSCRIPTION_STATES.at(size_t(state)).toString();
-}
-
-///
-/// Converts a string with a subscription state to the enum value.
-///
-QXmppPubSubSubscription::State QXmppPubSubSubscription::stateFromString(const QString &str)
-{
-    return enumFromString<State>(SUBSCRIPTION_STATES, str).value_or(Invalid);
 }
 
 ///
@@ -245,7 +235,7 @@ bool QXmppPubSubSubscription::isSubscription(const QDomElement &element)
 
     if (element.hasAttribute(u"subscription"_s)) {
         const auto subStateStr = element.attribute(u"subscription"_s);
-        if (!enumFromString<State>(SUBSCRIPTION_STATES, subStateStr)) {
+        if (!Enums::fromString<State>(subStateStr)) {
             return false;
         }
     }
@@ -267,7 +257,7 @@ void QXmppPubSubSubscription::parse(const QDomElement &element)
     bool isPubSubEvent = !isPubSub && element.namespaceURI() == ns_pubsub_event;
 
     d->jid = element.attribute(u"jid"_s);
-    d->state = stateFromString(element.attribute(u"subscription"_s));
+    d->state = Enums::fromString<State>(element.attribute(u"subscription"_s)).value_or(Invalid);
 
     if (isPubSub || isPubSubEvent) {
         d->node = element.attribute(u"node"_s);
@@ -295,26 +285,20 @@ void QXmppPubSubSubscription::parse(const QDomElement &element)
 
 void QXmppPubSubSubscription::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("subscription"));
-
-    // jid is required
-    writer->writeAttribute(QSL65("jid"), d->jid);
-    writeOptionalXmlAttribute(writer, u"node", d->node);
-    writeOptionalXmlAttribute(writer, u"subscription", stateToString(d->state));
-    writeOptionalXmlAttribute(writer, u"subid", d->subId);
-    if (d->expiry.isValid()) {
-        writer->writeAttribute(QSL65("expiry"),
-                               QXmppUtils::datetimeToString(d->expiry));
-    }
-
-    if (d->configurationSupport > Unavailable) {
-        writer->writeStartElement(QSL65("subscribe-options"));
-        if (d->configurationSupport == Required) {
-            writer->writeEmptyElement(u"required"_s);
-        }
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"subscription",
+        Attribute { u"jid", d->jid },
+        OptionalAttribute { u"node", d->node },
+        OptionalAttribute { u"subscription", d->state },
+        OptionalAttribute { u"subid", d->subId },
+        OptionalAttribute { u"expiry", d->expiry },
+        OptionalContent {
+            d->configurationSupport != Unavailable,
+            Element {
+                u"subscribe-options",
+                OptionalContent { d->configurationSupport == Required, Element { u"required" } },
+            },
+        },
+    });
 }
 /// \endcond

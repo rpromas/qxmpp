@@ -13,6 +13,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 #include <protocol.h>
 #include <signal_protocol.h>
@@ -295,6 +296,9 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 /// Once the future is finished and the result is "true", the manager is ready for use.
 /// Otherwise, check the logging output for details.
 ///
+/// The OMEMO manager is initialized after a successful call (i.e., the result is "true") of load()
+/// or setUp().
+///
 /// By default, stanzas are only sent to devices having keys with the following trust levels:
 /// \code
 /// QXmpp::TrustLevel::AutomaticallyTrusted | QXmpp::TrustLevel::ManuallyTrusted
@@ -314,8 +318,6 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 /// params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
 /// client->send(stanza, params);
 /// \endcode
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \ingroup Managers
 ///
@@ -337,7 +339,7 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     : d(new ManagerPrivate(this, omemoStorage))
 {
     d->ownDevice.label = DEVICE_LABEL;
-    d->init();
+    d->initOmemoLibrary();
     d->schedulePeriodicTasks();
 }
 
@@ -360,65 +362,68 @@ QXmppTask<bool> Manager::load()
 {
     QXmppPromise<bool> interface;
 
-    auto future = d->omemoStorage->allData();
-    future.then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
-        const auto &optionalOwnDevice = omemoData.ownDevice;
-        if (optionalOwnDevice) {
-            d->ownDevice = *optionalOwnDevice;
-            d->deviceBundle.setPublicIdentityKey(d->ownDevice.publicIdentityKey);
-        } else {
-            debug(u"Device could not be loaded because it is not stored"_s);
-            interface.finish(false);
-            return;
-        }
-
-        const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
-        if (signedPreKeyPairs.isEmpty()) {
-            warning(u"Signed Pre keys could not be loaded because none is stored"_s);
-            interface.finish(false);
-            return;
-        } else {
-            d->signedPreKeyPairs = signedPreKeyPairs;
-
-            const auto keyId = d->signedPreKeyPairs.keys().first();
-            d->deviceBundle.setSignedPublicPreKeyId(keyId);
-
-            const auto& signedPreKeyData = d->signedPreKeyPairs[keyId];
-
-            session_signed_pre_key* sessionSignedPreKey;
-            session_signed_pre_key_deserialize(&sessionSignedPreKey, reinterpret_cast<const uint8_t*>(signedPreKeyData.data.data()), signedPreKeyData.data.size(), d->globalContext.get());
-
-            BufferPtr signedPublicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_signed_pre_key_get_key_pair(sessionSignedPreKey))));
-            const auto signedPublicPreKeyByteArray = signedPublicPreKeyBuffer.toByteArray();
-
-            d->deviceBundle.setSignedPublicPreKey(signedPublicPreKeyByteArray);
-            d->deviceBundle.setSignedPublicPreKeySignature(QByteArray(reinterpret_cast<const char *>(session_signed_pre_key_get_signature_omemo(sessionSignedPreKey)), session_signed_pre_key_get_signature_omemo_len(sessionSignedPreKey)));
-        }
-
-        const auto &preKeyPairs = omemoData.preKeyPairs;
-        if (preKeyPairs.isEmpty()) {
-            warning(u"Pre keys could not be loaded because none is stored"_s);
-            interface.finish(false);
-            return;
-        } else {
-            d->preKeyPairs = preKeyPairs;
-            for (const uint32_t key : d->preKeyPairs.keys())
-            {
-                session_pre_key* preKey;
-                session_pre_key_deserialize(&preKey, reinterpret_cast<const uint8_t*>(preKeyPairs[key].data()), preKeyPairs[key].size(), d->globalContext.get());
-                BufferPtr publicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_pre_key_get_key_pair(preKey))));
-                const auto serializedPublicPreKey = publicPreKeyBuffer.toByteArray();
-                d->deviceBundle.addPublicPreKey(key, serializedPublicPreKey);
-            }
-            qDebug() << "Did load prekey pairs:" << d->preKeyPairs.size();
-        }
-
-        d->devices = omemoData.devices;
-        d->removeDevicesRemovedFromServer();
-
-        d->isStarted = true;
+    if (d->initialized) {
         interface.finish(true);
-    });
+    } else {
+        d->omemoStorage->allData().then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
+            const auto &optionalOwnDevice = omemoData.ownDevice;
+            if (optionalOwnDevice) {
+                d->ownDevice = *optionalOwnDevice;
+                d->deviceBundle.setPublicIdentityKey(d->ownDevice.publicIdentityKey);
+            } else {
+                debug(u"Device could not be loaded because it is not stored"_s);
+                interface.finish(false);
+                return;
+            }
+
+            const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
+            if (signedPreKeyPairs.isEmpty()) {
+                warning(u"Signed Pre keys could not be loaded because none is stored"_s);
+                interface.finish(false);
+                return;
+            } else {
+                d->signedPreKeyPairs = signedPreKeyPairs;
+
+                const auto keyId = d->signedPreKeyPairs.keys().first();
+                d->deviceBundle.setSignedPublicPreKeyId(keyId);
+
+                const auto& signedPreKeyData = d->signedPreKeyPairs[keyId];
+
+                session_signed_pre_key* sessionSignedPreKey;
+                session_signed_pre_key_deserialize(&sessionSignedPreKey, reinterpret_cast<const uint8_t*>(signedPreKeyData.data.data()), signedPreKeyData.data.size(), d->globalContext.get());
+
+                BufferPtr signedPublicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_signed_pre_key_get_key_pair(sessionSignedPreKey))));
+                const auto signedPublicPreKeyByteArray = signedPublicPreKeyBuffer.toByteArray();
+
+                d->deviceBundle.setSignedPublicPreKey(signedPublicPreKeyByteArray);
+                d->deviceBundle.setSignedPublicPreKeySignature(QByteArray(reinterpret_cast<const char *>(session_signed_pre_key_get_signature_omemo(sessionSignedPreKey)), session_signed_pre_key_get_signature_omemo_len(sessionSignedPreKey)));
+            }
+
+            const auto &preKeyPairs = omemoData.preKeyPairs;
+            if (preKeyPairs.isEmpty()) {
+                warning(u"Pre keys could not be loaded because none is stored"_s);
+                interface.finish(false);
+                return;
+            } else {
+                d->preKeyPairs = preKeyPairs;
+                for (const uint32_t key : d->preKeyPairs.keys())
+                {
+                    session_pre_key* preKey;
+                    session_pre_key_deserialize(&preKey, reinterpret_cast<const uint8_t*>(preKeyPairs[key].data()), preKeyPairs[key].size(), d->globalContext.get());
+                    BufferPtr publicPreKeyBuffer(ec_public_key_get_mont(ec_key_pair_get_public(session_pre_key_get_key_pair(preKey))));
+                    const auto serializedPublicPreKey = publicPreKeyBuffer.toByteArray();
+                    d->deviceBundle.addPublicPreKey(key, serializedPublicPreKey);
+                }
+                qDebug() << "Did load prekey pairs:" << d->preKeyPairs.size();
+            }
+
+            d->devices = omemoData.devices;
+            d->removeDevicesRemovedFromServer();
+
+            d->initialized = true;
+            interface.finish(true);
+        });
+    }
 
     return interface.task();
 }
@@ -428,9 +433,11 @@ QXmppTask<bool> Manager::load()
 ///
 /// The user must be logged in while calling this.
 ///
+/// \param deviceLabel human-readable string used to identify the own device
+///
 /// \return whether everything is set up successfully
 ///
-QXmppTask<bool> Manager::setUp()
+QXmppTask<bool> Manager::setUp(const QString &deviceLabel)
 {
     QXmppPromise<bool> interface;
 
@@ -445,11 +452,12 @@ QXmppTask<bool> Manager::setUp()
             if (d->setUpIdentityKeyPair(identityKeyPair.ptrRef()) &&
                 d->updateSignedPreKeyPair(identityKeyPair.get()) &&
                 d->updatePreKeyPairs(PRE_KEY_INITIAL_CREATION_COUNT)) {
-                auto future = d->omemoStorage->setOwnDevice(d->ownDevice);
-                future.then(this, [=, this]() mutable {
+                d->ownDevice.label = deviceLabel;
+
+                d->omemoStorage->setOwnDevice(d->ownDevice).then(this, [=, this]() mutable {
                     auto future = d->publishOmemoData();
                     future.then(this, [=, this](bool isPublished) mutable {
-                        d->isStarted = isPublished;
+                        d->initialized = isPublished;
                         interface.finish(std::move(isPublished));
                     });
                 });
@@ -518,11 +526,6 @@ QXmppTask<QHash<QString, QHash<QByteArray, QXmpp::TrustLevel>>> Manager::keys(co
 /// Changes the label of the own (this client instance's current user's) device.
 ///
 /// The label is a human-readable string used to identify the device by users.
-///
-/// If the OMEMO manager is not started yet, the device label is only changed
-/// locally in memory.
-/// It is stored persistently in the OMEMO storage and updated on the
-/// server if the OMEMO manager is already started or once it is.
 ///
 /// \param deviceLabel own device's label
 ///
@@ -1067,9 +1070,9 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmp
 
 QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMessage(QXmppMessage &&message)
 {
-    if (!d->isStarted) {
+    if (!d->initialized) {
         return makeReadyTask<MessageDecryptResult>(QXmppError {
-            u"OMEMO manager must be started before decrypting"_s,
+            u"OMEMO manager must be initialized before decrypting"_s,
             SendError::EncryptionError });
     }
 
@@ -1092,9 +1095,9 @@ QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, 
 {
     QXmppPromise<QXmppE2eeExtension::IqEncryptResult> interface;
 
-    if (!d->isStarted) {
+    if (!d->initialized) {
         interface.finish(QXmppError {
-            u"OMEMO manager must be started before encrypting"_s,
+            u"OMEMO manager must be initialized before encrypting"_s,
             SendError::EncryptionError });
     } else {
         std::optional<TrustLevels> acceptedTrustLevels;
@@ -1133,10 +1136,10 @@ QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, 
 
 QXmppTask<QXmppE2eeExtension::IqDecryptResult> Manager::decryptIq(const QDomElement &element)
 {
-    if (!d->isStarted) {
+    if (!d->initialized) {
         // TODO: Add decryption queue to avoid this error
         return makeReadyTask<IqDecryptResult>(QXmppError {
-            u"OMEMO manager must be started before decrypting"_s,
+            u"OMEMO manager must be initialized before decrypting"_s,
             SendError::EncryptionError });
     }
 
@@ -1180,7 +1183,7 @@ bool Manager::handleStanza(const QDomElement &stanza)
     }
 
     // TODO: Queue incoming IQs until OMEMO is initialized
-    if (!d->isStarted) {
+    if (!d->initialized) {
         warning(u"Couldn't decrypt incoming IQ because the manager isn't initialized yet."_s);
         return false;
     }
@@ -1203,13 +1206,13 @@ bool Manager::handleStanza(const QDomElement &stanza)
 
 bool Manager::handleMessage(const QXmppMessage &message)
 {
-    if (d->isStarted && message.omemoElement()) {
+    if (d->initialized && message.omemoElement()) {
         auto future = d->decryptMessage(message);
         future.then(this, [this, message](std::optional<QXmppMessage> optionalDecryptedMessage) {
             if (optionalDecryptedMessage) {
                 injectMessage(std::move(*optionalDecryptedMessage));
             } else {
-                Q_EMIT client() -> messageReceived(message);
+                Q_EMIT client()->messageReceived(message);
             }
         });
 

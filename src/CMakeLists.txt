@@ -20,6 +20,8 @@ set(INSTALL_HEADER_FILES
     base/QXmppBookmarkSet.h
     base/QXmppByteStreamIq.h
     base/QXmppColorGeneration.h
+    base/QXmppConstants_p.h
+    base/QXmppContactAddresses.h
     base/QXmppDataForm.h
     base/QXmppDataFormBase.h
     base/QXmppDiscoveryIq.h
@@ -34,7 +36,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppFallback.h
     base/QXmppFileMetadata.h
     base/QXmppFileShare.h
-    base/QXmppFutureUtils_p.h
+    base/QXmppAsync_p.h
     base/QXmppGeolocItem.h
     base/QXmppGlobal.h
     base/QXmppHash.h
@@ -90,9 +92,12 @@ set(INSTALL_HEADER_FILES
     base/QXmppTrustMessages.h
     base/QXmppUserTuneItem.h
     base/QXmppUtils.h
+    base/QXmppUtils_p.h
     base/QXmppUri.h
     base/QXmppVCardIq.h
     base/QXmppVersionIq.h
+    base/QXmppVisitHelper_p.h
+    base/QXmppXmlTags_p.h
     base/compat/QXmppSessionIq.h
     base/compat/QXmppStartTlsPacket.h
     base/compat/QXmppPubSubIq.h
@@ -169,13 +174,11 @@ set(SOURCE_FILES
     # Base
     base/Stream.cpp
     base/QXmppArchiveIq.cpp
-    base/QXmppBindIq.cpp
-    base/QXmppBitsOfBinaryContentId.cpp
-    base/QXmppBitsOfBinaryData.cpp
-    base/QXmppBitsOfBinaryIq.cpp
+    base/QXmppBitsOfBinary.cpp
     base/QXmppBookmarkSet.cpp
     base/QXmppByteStreamIq.cpp
     base/QXmppColorGeneration.cpp
+    base/QXmppContactAddresses.cpp
     base/QXmppDataForm.cpp
     base/QXmppDataFormBase.cpp
     base/QXmppDiscoveryIq.cpp
@@ -187,7 +190,6 @@ set(SOURCE_FILES
     base/QXmppFileMetadata.cpp
     base/QXmppFileShare.cpp
     base/QXmppGeolocItem.cpp
-    base/QXmppGlobal.cpp
     base/QXmppHash.cpp
     base/QXmppHashing.cpp
     base/QXmppHttpFileSource.cpp
@@ -230,7 +232,6 @@ set(SOURCE_FILES
     base/QXmppStreamInitiationIq.cpp
     base/QXmppStreamManagement.cpp
     base/QXmppStun.cpp
-    base/QXmppTask.cpp
     base/QXmppThumbnail.cpp
     base/QXmppTrustMessages.cpp
     base/QXmppUri.cpp
@@ -240,6 +241,7 @@ set(SOURCE_FILES
     base/QXmppVersionIq.cpp
     base/compat/removed_api.cpp
     base/hsluv/hsluv.c
+    base/XmlWriter.cpp
     # to trigger MOC
     base/XmppSocket.h
 
@@ -277,8 +279,6 @@ set(SOURCE_FILES
     client/QXmppRosterManager.cpp
     client/QXmppRegistrationManager.cpp
     client/QXmppPubSubManager.cpp
-    client/QXmppRemoteMethod.cpp
-    client/QXmppRpcManager.cpp
     client/QXmppSaslManager.cpp
     client/QXmppSendStanzaParams.cpp
     client/QXmppTransferManager.cpp
@@ -307,6 +307,7 @@ if(WITH_GSTREAMER)
     set(SOURCE_FILES
     ${SOURCE_FILES}
     #modified addind call manager here
+    client/GstWrapper.cpp
     client/QXmppCall.cpp
     client/QXmppCallManager.cpp
     client/QXmppCallStream.cpp

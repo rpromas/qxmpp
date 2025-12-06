@@ -22,7 +22,10 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
+#include "Enums.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -46,16 +49,21 @@ struct MixData {
         QString jid;
         QString nick;
 
-        void parse(const QDomElement &element) {
+        static constexpr std::tuple XmlTag = { u"item", ns_qxmpp_export };
+
+        void parse(const QDomElement &element)
+        {
             jid = element.attribute(u"jid"_s);
             nick = element.attribute(u"nick"_s);
         }
 
-        void toXml(QXmlStreamWriter *writer) const {
-            writer->writeStartElement(QSL65("item"));
-            writeOptionalXmlAttribute(writer, u"jid", jid);
-            writeOptionalXmlAttribute(writer, u"nick", nick);
-            writer->writeEndElement();
+        void toXml(XmlWriter &w) const
+        {
+            w.write(Element {
+                u"item",
+                OptionalAttribute { u"jid", jid },
+                OptionalAttribute { u"nick", nick },
+            });
         }
     };
 
@@ -69,30 +77,20 @@ struct MixData {
             return QXmppError { u"Invalid element."_s, {} };
         }
 
-        MixData d;
-
-        for (const auto &itemEl : iterChildElements(el, u"item")) {
-            Item item;
-            item.parse(itemEl);
-            d.items.push_back(std::move(item));
-        }
-
-        return d;
+        return MixData {
+            parseChildElements<QList<Item>>(el),
+        };
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("mix"));
-        for (const auto &item : items) {
-            item.toXml(&writer);
-        }
-        writer.writeEndElement();
+        w.write(Element { u"mix", items });
     }
 };
 
 static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 {
-    d.toXml(writer);
+    XmlWriter(&writer).write(d);
 }
 
 }  // namespace QXmpp::Private
@@ -549,10 +547,8 @@ QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const 
 ///
 QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids(const QString &serviceJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(serviceJid), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
-        return transform<QVector<ChannelJid>>(items, [](const QXmppDiscoveryIq::Item &item) {
-            return item.jid();
-        });
+    return chainMapSuccess(d->discoveryManager->items(serviceJid), this, [](QList<QXmppDiscoItem> &&items) {
+        return transform<QVector<ChannelJid>>(items, &QXmppDiscoItem::jid);
     });
 }
 
@@ -565,10 +561,8 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
 ///
 QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNodes(const QString &channelJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
-        return listToMixNodes(transform<QVector<QString>>(items, [](const QXmppDiscoveryIq::Item &item) {
-            return item.node();
-        }));
+    return chainMapSuccess(d->discoveryManager->items(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoItem> &&items) {
+        return Enums::fromStrings<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoItem::node));
     });
 }
 
@@ -1142,7 +1136,7 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
                         } else {
                             const auto participants = std::get<QVector<QXmppMixParticipantItem>>(participantsResult);
 
-                            for (const QXmppMixParticipantItem &participant: participants) {
+                            for (const QXmppMixParticipantItem &participant : participants) {
                                 if (participant.id() == participantId) {
                                     result->items.append({ channelId, participant.nick() });
                                     break;
@@ -1437,7 +1431,7 @@ void QXmppMixManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
     const auto identities = iq.identities();
 
     // Search for MIX features provided by the determined MIX service.
-    for (const QXmppDiscoveryIq::Identity &identity : identities) {
+    for (const auto &identity : identities) {
         // ' || identity.type() == u"text"' is a workaround for older ejabberd versions.
         if (identity.category() == u"conference" && (identity.type() == MIX_SERVICE_DISCOVERY_NODE || identity.type() == u"text")) {
             Service service;

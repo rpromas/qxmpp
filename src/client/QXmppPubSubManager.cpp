@@ -8,6 +8,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppPubSubAffiliation.h"
 #include "QXmppPubSubBaseItem.h"
 #include "QXmppPubSubEventHandler.h"
@@ -18,6 +19,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>
@@ -209,22 +211,22 @@ QXmppPubSubManager::~QXmppPubSubManager()
 /// The features are only returned if the service is of type serviceType,
 /// otherwise InvalidServiceType is returned.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the entity hosting the pubsub service
 /// \param serviceType type of service to retrieve features for
 ///
 QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeatures(const QString &serviceJid, ServiceType serviceType)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    request.setTo(serviceJid);
+    auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
+    Q_ASSERT(discoManager);
 
-    return chainIq(client()->sendIq(std::move(request)), this, [=](QXmppDiscoveryIq &&iq) -> FeaturesResult {
-        const auto identities = iq.identities();
+    return chain<FeaturesResult>(discoManager->info(serviceJid), this, [=](auto &&result) -> FeaturesResult {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            return std::move(*error);
+        }
 
-        const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoveryIq::Identity &identity) {
+        auto &info = std::get<QXmppDiscoInfo>(result);
+        const auto &identities = info.identities();
+        const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoIdentity &identity) {
             if (identity.category() == u"pubsub") {
                 const auto identityType = identity.type();
 
@@ -242,9 +244,9 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
 
         if (isPubSubServiceFound) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-            return iq.features();
+            return info.features();
 #else
-            return iq.features().toVector();
+            return info.features().toVector();
 #endif
         }
 
@@ -260,19 +262,15 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
 /// nodes.
 ///
 /// \param jid Jabber ID of the entity hosting the pubsub service
-/// \return
 ///
 QXmppTask<QXmppPubSubManager::NodesResult> QXmppPubSubManager::requestNodes(const QString &jid)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setTo(jid);
+    auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
+    Q_ASSERT(discoManager);
 
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppDiscoveryIq &&iq) -> NodesResult {
-        const auto items = iq.items();
+    return chainMapSuccess(discoManager->items(jid), this, [](QList<QXmppDiscoItem> &&items) {
         QVector<QString> nodes;
-        for (const auto &item : items) {
+        for (const auto &item : std::as_const(items)) {
             // only accept non-empty nodes
             if (const auto node = item.node(); !node.isEmpty()) {
                 nodes << node;
@@ -408,20 +406,13 @@ auto QXmppPubSubManager::deleteNode(const QString &jid, const QString &nodeName)
 ///
 QXmppTask<QXmppPubSubManager::ItemIdsResult> QXmppPubSubManager::requestItemIds(const QString &serviceJid, const QString &nodeName)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setQueryNode(nodeName);
-    request.setTo(serviceJid);
+    auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
+    Q_ASSERT(discoManager);
 
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppDiscoveryIq &&iq) -> ItemIdsResult {
-        const auto queryItems = iq.items();
-        QVector<QString> itemIds;
-        itemIds.reserve(queryItems.size());
-        for (const auto &queryItem : queryItems) {
-            itemIds << queryItem.name();
-        }
-        return itemIds;
+    return chainMapSuccess(discoManager->items(serviceJid, nodeName), this, [](QList<QXmppDiscoItem> &&items) {
+        return transform<QVector<QString>>(std::move(items), [](const auto &item) {
+            return item.name();
+        });
     });
 }
 
@@ -431,15 +422,18 @@ QXmppTask<QXmppPubSubManager::ItemIdsResult> QXmppPubSubManager::requestItemIds(
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to delete the item from
 /// \param itemId the ID of the item to delete
-/// \return
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.11,
+/// default: false)
 ///
-auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, const QString &itemId) -> QXmppTask<Result>
+auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify)
+    -> QXmppTask<Result>
 {
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setQueryType(PubSubIq<>::Retract);
     request.setQueryNode(nodeName);
     request.setItems({ QXmppPubSubBaseItem(itemId) });
+    request.setRetractNotify(notify);
     request.setTo(jid);
 
     return client()->sendGenericIq(std::move(request));
@@ -451,10 +445,13 @@ auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.11,
+/// default: false)
 ///
-auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId) -> QXmppTask<Result>
+auto QXmppPubSubManager::retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify)
+    -> QXmppTask<Result>
 {
-    return retractItem(jid, nodeName, standardItemIdToString(itemId));
+    return retractItem(jid, nodeName, standardItemIdToString(itemId), notify);
 }
 
 ///
@@ -720,14 +717,13 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::cancelNodeConfiguratio
 ///
 /// Subscribes to a node.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the pubsub service
 /// \param nodeName name of the pubsub node being subscribed
 /// \param subscriberJid bare or full JID of the subscriber
 ///
 QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::subscribeToNode(const QString &serviceJid, const QString &nodeName, const QString &subscriberJid)
 {
+    // TODO: Return subscription
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setTo(serviceJid);
@@ -740,14 +736,13 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::subscribeToNode(const 
 ///
 /// Unsubscribes from a node.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \param serviceJid JID of the pubsub service
 /// \param nodeName name of the pubsub node being subscribed
 /// \param subscriberJid bare or full JID of the subscriber
 ///
 QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(const QString &serviceJid, const QString &nodeName, const QString &subscriberJid)
 {
+    // TODO: Return subscription
     PubSubIq request;
     request.setType(QXmppIq::Set);
     request.setTo(serviceJid);
@@ -757,7 +752,6 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
     return client()->sendGenericIq(std::move(request));
 }
 
-/// \cond
 ///
 /// \fn QXmppPubSubManager::requestOwnPepFeatures()
 ///
@@ -766,11 +760,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 /// This is a convenience method equivalent to calling
 /// QXmppPubSubManager::requestFeatures on the current account's bare JID.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
-/// \endcond
 
-///
 ///
 /// \fn QXmppPubSubManager::requestOwnPepNodes()
 ///

@@ -7,6 +7,7 @@
 #include "QXmppStun_p.h"
 #include "QXmppUtils.h"
 
+#include "Enums.h"
 #include "StringLiterals.h"
 
 #include <QCryptographicHash>
@@ -17,6 +18,8 @@
 #include <QUdpSocket>
 #include <QVariant>
 
+using namespace QXmpp::Private;
+
 #define STUN_ID_SIZE 12
 #define STUN_RTO_INTERVAL 500
 #define STUN_RTO_MAX 7
@@ -26,10 +29,14 @@ static const quint16 STUN_HEADER = 20;
 static const quint8 STUN_IPV4 = 0x01;
 static const quint8 STUN_IPV6 = 0x02;
 
-static const char *gathering_states[] = {
-    "new",
-    "gathering",
-    "complete"
+template<>
+struct Enums::Data<QXmppIceConnection::GatheringState> {
+    using enum QXmppIceConnection::GatheringState;
+    static constexpr auto Values = makeValues<QXmppIceConnection::GatheringState>({
+        { NewGatheringState, u"new" },
+        { BusyGatheringState, u"gathering" },
+        { CompleteGatheringState, u"complete" },
+    });
 };
 
 static const char *pair_states[] = {
@@ -2901,8 +2908,7 @@ void QXmppIceConnection::slotGatheringStateChanged()
 
     if (newGatheringState != d->gatheringState) {
         info(u"ICE gathering state changed from '%1' to '%2'"_s
-                 .arg(QString::fromUtf8(gathering_states[d->gatheringState]),
-                      QString::fromUtf8(gathering_states[newGatheringState])));
+                 .arg(d->gatheringState, newGatheringState));
         d->gatheringState = newGatheringState;
         Q_EMIT gatheringStateChanged();
     }

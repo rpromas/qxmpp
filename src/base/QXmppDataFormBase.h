@@ -43,7 +43,11 @@ protected:
 
     std::optional<bool> parseBool(const QVariant &variant)
     {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        if (variant.typeId() == QMetaType::Type::Bool) {
+#else
         if (variant.type() == QVariant::Bool) {
+#endif
             return variant.toBool();
         }
         return std::nullopt;
@@ -52,7 +56,7 @@ protected:
     template<typename T>
     static void serializeValue(QXmppDataForm &form, QXmppDataForm::Field::Type type, const QString &name, const T &value)
     {
-        form.fields() << QXmppDataForm::Field(type, name, value);
+        form.appendField(QXmppDataForm::Field(type, name, value));
     }
 
     template<typename T>
@@ -118,5 +122,18 @@ protected:
 private:
     QSharedDataPointer<QXmppExtensibleDataFormBasePrivate> d;
 };
+
+namespace QXmpp::Private {
+
+template<typename T>
+concept DataFormConvertible = requires(const QXmppDataForm &form) {
+    { T::DataFormType };
+    { T::fromDataForm(form) } -> std::same_as<std::optional<T>>;
+};
+
+template<DataFormConvertible T>
+inline constexpr auto DataFormType = T::DataFormType;
+
+}  // namespace QXmpp::Private
 
 #endif  // QXMPPDATAFORMBASED_H

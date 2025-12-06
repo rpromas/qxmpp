@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include "QXmppFutureUtils_p.h"
 #include "QXmppHash.h"
 #include "QXmppHashing_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QCryptographicHash>
@@ -44,6 +44,9 @@ static HashAlgorithm toHashAlgorithm(QCryptographicHash::Algorithm algorithm)
     case QCryptographicHash::Blake2s_160:
     case QCryptographicHash::Blake2s_224:
     case QCryptographicHash::Blake2s_256:
+#endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    case QCryptographicHash::NumAlgorithms:
 #endif
         return HashAlgorithm::Unknown;
     case QCryptographicHash::Md5:
@@ -382,7 +385,7 @@ public:
 
     void finish()
     {
-        auto hashes = transform<std::vector<QXmppHash>>(m_hashProcessors, [](auto &processor) {
+        auto hashes = transform<std::vector<QXmppHash>>(m_hashProcessors, [](const auto &processor) {
             QXmppHash hash;
             hash.setAlgorithm(toHashAlgorithm(processor.algorithm));
             hash.setHash(processor.hash->result());

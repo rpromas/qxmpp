@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
-#include "QXmppStreamError_p.h"
 
 #include "Stream.h"
+#include "StreamError.h"
 #include "XmppSocket.h"
+#include "compat/QXmppSessionIq.h"
 #include "compat/QXmppStartTlsPacket.h"
 #include "util.h"
 
@@ -31,11 +33,18 @@ private:
     // parsing
     Q_SLOT void testStartTlsPacket_data();
     Q_SLOT void testStartTlsPacket();
+
+    Q_SLOT void testNoResource();
+    Q_SLOT void testResource();
+    Q_SLOT void testResult();
+
+    Q_SLOT void testSessionIq();
 };
 
 void tst_QXmppStream::initTestCase()
 {
     qRegisterMetaType<QDomElement>();
+    qRegisterMetaType<QXmpp::Private::StreamOpen>();
 }
 
 void tst_QXmppStream::testProcessData()
@@ -61,16 +70,12 @@ void tst_QXmppStream::testProcessData()
     QCOMPARE(onStarted.size(), 0);
 
     // check stream information
-    const auto streamElement = onStreamReceived[0][0].value<QDomElement>();
-    QCOMPARE(streamElement.tagName(), u"stream"_s);
-    QCOMPARE(streamElement.namespaceURI(), u"http://etherx.jabber.org/streams"_s);
-    QCOMPARE(streamElement.attribute("from"), u"juliet@im.example.com"_s);
-    QCOMPARE(streamElement.attribute("to"), u"im.example.com"_s);
-    QCOMPARE(streamElement.attribute("version"), u"1.0"_s);
-    QCOMPARE(streamElement.attribute("lang"), u"en"_s);
+    const auto stream = onStreamReceived[0][0].value<StreamOpen>();
+    QCOMPARE(stream.from, u"juliet@im.example.com"_s);
+    QCOMPARE(stream.to, u"im.example.com"_s);
+    QCOMPARE(stream.version, u"1.0"_s);
 
-    socket.processData(R"(
-        <stream:features>
+    socket.processData(R"(<stream:features>
             <starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'>
                 <required/>
             </starttls>
@@ -106,9 +111,26 @@ void tst_QXmppStream::testProcessData()
 #ifdef BUILD_INTERNAL_TESTS
 void tst_QXmppStream::streamOpen()
 {
-    auto xml = "<?xml version='1.0' encoding='UTF-8'?><stream:stream from='juliet@im.example.com' to='im.example.com' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>";
-    StreamOpen s { "im.example.com", "juliet@im.example.com", ns_client };
+    auto xml = "<?xml version='1.0' encoding='UTF-8'?><stream:stream from='juliet@im.example.com' to='im.example.com' id='abcdefg' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>";
+
+    StreamOpen s {
+        .to = "im.example.com",
+        .from = "juliet@im.example.com",
+        .id = "abcdefg",
+        .version = "1.0",
+        .xmlns = ns_client.toString(),
+    };
     serializePacket(s, xml);
+
+    QXmlStreamReader r(xml);
+    QCOMPARE(r.readNext(), QXmlStreamReader::StartDocument);
+    QCOMPARE(r.readNext(), QXmlStreamReader::StartElement);
+    auto streamOpen = StreamOpen::fromXml(r);
+    QCOMPARE(streamOpen.from, "juliet@im.example.com");
+    QCOMPARE(streamOpen.to, "im.example.com");
+    QCOMPARE(streamOpen.id, "abcdefg");
+    QCOMPARE(streamOpen.version, "1.0");
+    QCOMPARE(streamOpen.xmlns, ns_client);
 }
 
 void tst_QXmppStream::testStreamError()
@@ -159,10 +181,11 @@ void tst_QXmppStream::starttlsPackets()
 }
 #endif
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 void tst_QXmppStream::testStartTlsPacket_data()
 {
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
     QTest::addColumn<QByteArray>("xml");
     QTest::addColumn<bool>("valid");
     QTest::addColumn<QXmppStartTlsPacket::Type>("type");
@@ -180,14 +203,10 @@ void tst_QXmppStream::testStartTlsPacket_data()
     ROW("invalid-tag", R"(<invalid-tag-name xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>)", false, QXmppStartTlsPacket::StartTls);
 
 #undef ROW
-    QT_WARNING_POP
 }
 
 void tst_QXmppStream::testStartTlsPacket()
 {
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-
     QFETCH(QByteArray, xml);
     QFETCH(bool, valid);
     QFETCH(QXmppStartTlsPacket::Type, type);
@@ -216,7 +235,75 @@ void tst_QXmppStream::testStartTlsPacket()
         packet3.setType(type);
         serializePacket(packet2, xml);
     }
+}
+
+void tst_QXmppStream::testNoResource()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_1\" type=\"set\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\"/>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Set);
+    QCOMPARE(bind.id(), u"bind_1"_s);
+    QCOMPARE(bind.jid(), QString());
+    QCOMPARE(bind.resource(), QString());
+    serializePacket(bind, xml);
+}
+
+void tst_QXmppStream::testResource()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_2\" type=\"set\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\">"
+        "<resource>someresource</resource>"
+        "</bind>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Set);
+    QCOMPARE(bind.id(), u"bind_2"_s);
+    QCOMPARE(bind.jid(), QString());
+    QCOMPARE(bind.resource(), u"someresource"_s);
+    serializePacket(bind, xml);
+}
+
+void tst_QXmppStream::testResult()
+{
+    const QByteArray xml(
+        "<iq id=\"bind_2\" type=\"result\">"
+        "<bind xmlns=\"urn:ietf:params:xml:ns:xmpp-bind\">"
+        "<jid>somenode@example.com/someresource</jid>"
+        "</bind>"
+        "</iq>");
+
+    QXmppBindIq bind;
+    parsePacket(bind, xml);
+    QCOMPARE(bind.type(), QXmppIq::Result);
+    QCOMPARE(bind.id(), u"bind_2"_s);
+    QCOMPARE(bind.jid(), u"somenode@example.com/someresource"_s);
+    QCOMPARE(bind.resource(), QString());
+    serializePacket(bind, xml);
+}
+QT_WARNING_POP
+
+void tst_QXmppStream::testSessionIq()
+{
+    const QByteArray xml(
+        "<iq id=\"session_1\" to=\"example.com\" type=\"set\">"
+        "<session xmlns=\"urn:ietf:params:xml:ns:xmpp-session\"/>"
+        "</iq>");
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QXmppSessionIq session;
     QT_WARNING_POP
+
+    parsePacket(session, xml);
+    serializePacket(session, xml);
 }
 
 QTEST_MAIN(tst_QXmppStream)

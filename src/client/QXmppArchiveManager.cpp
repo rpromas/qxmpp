@@ -7,8 +7,12 @@
 #include "QXmppArchiveIq.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppTask.h"
+#include "QXmppUtils.h"
 
 #include <QDomElement>
+
+using namespace QXmpp::Private;
 
 /// \cond
 QStringList QXmppArchiveManager::discoveryFeatures() const
@@ -19,22 +23,19 @@ QStringList QXmppArchiveManager::discoveryFeatures() const
 
 bool QXmppArchiveManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq") {
-        return false;
-    }
+    auto tag = iqPayloadXmlTag(element);
 
-    // XEP-0136: Message Archiving
-    if (QXmppArchiveChatIq::isArchiveChatIq(element)) {
+    if (tag == PayloadXmlTag<QXmppArchiveChatIq>) {
         QXmppArchiveChatIq archiveIq;
         archiveIq.parse(element);
         Q_EMIT archiveChatReceived(archiveIq.chat(), archiveIq.resultSetReply());
         return true;
-    } else if (QXmppArchiveListIq::isArchiveListIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppArchiveListIq>) {
         QXmppArchiveListIq archiveIq;
         archiveIq.parse(element);
         Q_EMIT archiveListReceived(archiveIq.chats(), archiveIq.resultSetReply());
         return true;
-    } else if (QXmppArchivePrefIq::isArchivePrefIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppArchivePrefIq>) {
         // TODO: handle preference iq
         QXmppArchivePrefIq archiveIq;
         archiveIq.parse(element);
@@ -62,7 +63,7 @@ void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &s
     packet.setWith(jid);
     packet.setStart(start);
     packet.setEnd(end);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 /// \overload
@@ -96,7 +97,7 @@ void QXmppArchiveManager::removeCollections(const QString &jid, const QDateTime 
     packet.setWith(jid);
     packet.setStart(start);
     packet.setEnd(end);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 ///
@@ -113,7 +114,7 @@ void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime
     packet.setResultSetQuery(rsm);
     packet.setStart(start);
     packet.setWith(jid);
-    client()->sendPacket(packet);
+    client()->send(std::move(packet));
 }
 
 /// \overload
@@ -131,11 +132,3 @@ void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime
     rsm.setMax(max);
     retrieveCollection(jid, start, rsm);
 }
-
-#if 0
-void QXmppArchiveManager::getPreferences()
-{
-    QXmppArchivePrefIq packet;
-    client()->sendPacket(packet);
-}
-#endif

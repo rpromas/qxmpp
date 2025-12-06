@@ -161,7 +161,7 @@ bool QXmppMamManager::handleStanza(const QDomElement &element)
             }
             return true;
         }
-    } else if (QXmppMamResultIq::isMamResultIq(element)) {
+    } else if (isIqElement<QXmppMamResultIq>(element)) {
         QXmppMamResultIq result;
         result.parse(element);
         Q_EMIT resultsRecieved(result.id(), result.resultSetReply(), result.complete());
@@ -252,8 +252,9 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QXmppResultSetQuery &resultSetQuery)
 {
     auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);
-    client()->sendPacket(queryIq);
-    return queryIq.id();
+    auto id = queryIq.id();
+    client()->send(std::move(queryIq));
+    return id;
 }
 
 ///

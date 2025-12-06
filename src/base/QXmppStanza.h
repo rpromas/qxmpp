@@ -18,6 +18,7 @@
 // include the whole header.
 // See http://lists.trolltech.com/qt-interest/2008-07/thread00798-0.html
 // for an explanation.
+#include "QXmppConstants_p.h"
 #include "QXmppElement.h"
 #include "QXmppNonza.h"
 
@@ -27,12 +28,12 @@ class QXmppE2eeMetadata;
 class QXmppExtendedAddressPrivate;
 
 ///
-/// \brief Represents an extended address as defined by \xep{0033}: Extended
-/// Stanza Addressing.
+/// \brief Represents an extended address as defined by \xep{0033, Extended
+/// Stanza Addressing}.
 ///
 /// Extended addresses maybe of different types: some are defined by \xep{0033},
-/// others are defined in separate XEPs (for instance \xep{0146}: Remote
-/// Controlling Clients). That is why the "type" property is a string rather
+/// others are defined in separate XEPs (for instance \xep{0146, Remote
+/// Controlling Clients}). That is why the "type" property is a string rather
 /// than an enumerated type.
 ///
 class QXMPP_EXPORT QXmppExtendedAddress
@@ -61,6 +62,7 @@ public:
     bool isValid() const;
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"address", QXmpp::Private::ns_extended_addressing };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -234,7 +236,6 @@ protected:
 
 private:
     QSharedDataPointer<QXmppStanzaPrivate> d;
-    static uint s_uniqeIdNo;
     friend class TestClient;
 };
 

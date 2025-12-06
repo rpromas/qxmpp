@@ -8,8 +8,6 @@
 /// \brief The QXmppAtmTrustStorage class stores trust data for
 /// \xep{0450, Automatic Trust Management (ATM)}.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

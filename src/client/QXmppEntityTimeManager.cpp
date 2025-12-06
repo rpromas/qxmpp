@@ -7,15 +7,17 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppEntityTimeIq.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QDateTime>
 #include <QDomElement>
+#include <QTimeZone>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 ///
@@ -39,21 +41,13 @@ QString QXmppEntityTimeManager::requestTime(const QString &jid)
     QXmppEntityTimeIq request;
     request.setType(QXmppIq::Get);
     request.setTo(jid);
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(request);
 }
 
 ///
 /// Requests the time from an XMPP entity and reports it via a QFuture.
 ///
 /// The timeReceived() signal is not emitted.
-///
-/// \param jid
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \since QXmpp 1.5
 ///
@@ -74,11 +68,11 @@ QStringList QXmppEntityTimeManager::discoveryFeatures() const
 
 bool QXmppEntityTimeManager::handleStanza(const QDomElement &element)
 {
-    if (QXmpp::handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
+    if (handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppEntityTimeIq::isEntityTimeIq(element)) {
+    if (isIqElement<QXmppEntityTimeIq>(element)) {
         QXmppEntityTimeIq entityTime;
         entityTime.parse(element);
         Q_EMIT timeReceived(entityTime);
@@ -100,7 +94,11 @@ std::variant<QXmppEntityTimeIq, QXmppStanza::Error> QXmppEntityTimeManager::hand
     QDateTime utc = currentTime.toUTC();
     responseIq.setUtc(utc);
 
-    currentTime.setTimeSpec(Qt::UTC);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    currentTime.setTimeZone(QTimeZone::Initialization::UTC);
+#else
+    currentTime.setTimeZone(QTimeZone(0));
+#endif
     responseIq.setTzo(utc.secsTo(currentTime));
     return responseIq;
 }

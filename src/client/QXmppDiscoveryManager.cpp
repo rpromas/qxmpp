@@ -1,256 +1,216 @@
 // SPDX-FileCopyrightText: 2010 Manjeet Dahiya <manjeetdahiya@gmail.com>
+// SPDX-FileCopyrightText: 2021 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
-
-#include "QXmppDiscoveryManager.h"
 
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
-#include "QXmppFutureUtils_p.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppUtils.h"
 
+#include "Async.h"
+#include "Iq.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
-#include <QDomElement>
 
-using namespace QXmpp::Private;
+using namespace QXmpp;
 
-class QXmppDiscoveryManagerPrivate
+template<typename... Ts>
+inline uint qHash(const std::tuple<Ts...> &t, uint seed = 0) noexcept
 {
-public:
-    QString clientCapabilitiesNode;
-    QString clientCategory;
-    QString clientType;
-    QString clientName;
-    QXmppDataForm clientInfoForm;
-};
+    return std::apply([&](auto const &...args) {
+        ((seed = qHash(args, seed ^ 0x9e3779b9u + (seed << 6) + (seed >> 2))), ...);
+        return seed;
+    },
+                      t);
+}
+
+template<typename Response, typename Payload>
+static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, const QString &to, Payload &&payload)
+{
+    return chain<std::variant<Response, QXmppError>>(
+        client->sendIq(CompatIq { GetIq<Payload> { generateSequentialStanzaId(), {}, to, {}, std::move(payload) } }),
+        client,
+        parseIqResponseFlat<Response>);
+}
 
 ///
-/// \typedef QXmppDiscoveryManager::InfoResult
+/// \class QXmppDiscoveryManager
 ///
-/// Contains the discovery information result in the form of an QXmppDiscoveryIq
-/// or (in case the request did not succeed) a QXmppStanza::Error.
+/// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
+/// entities as defined by \xep{0030, Service Discovery}.
 ///
-/// \since QXmpp 1.5
+/// Since QXmpp 1.12 info and items queries are cached per session by default.
 ///
-
-///
-/// \typedef QXmppDiscoveryManager::ItemsResult
-///
-/// Contains a list of service discovery items or (in case the request did not
-/// succeed) a QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
+/// \ingroup Managers
 ///
 
 QXmppDiscoveryManager::QXmppDiscoveryManager()
-    : d(new QXmppDiscoveryManagerPrivate)
+    : d(new QXmppDiscoveryManagerPrivate(this))
 {
-    d->clientCapabilitiesNode = u"https://github.com/qxmpp-project/qxmpp"_s;
-    d->clientCategory = u"client"_s;
-#if defined Q_OS_ANDROID || defined Q_OS_BLACKBERRY || defined Q_OS_IOS || defined Q_OS_WP
-    d->clientType = u"phone"_s;
-#else
-    d->clientType = u"pc"_s;
-#endif
-    if (qApp->applicationName().isEmpty() && qApp->applicationVersion().isEmpty()) {
-        d->clientName = u"%1 %2"_s.arg(u"Based on QXmpp", QXmppVersion());
-    } else {
-        d->clientName = u"%1 %2"_s.arg(qApp->applicationName(), qApp->applicationVersion());
-    }
+    d->infoCache.setMaxCost(50);
+    d->itemsCache.setMaxCost(50);
+    d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
+    d->identities = { d->defaultIdentity() };
 }
 
 QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 
 ///
-/// Requests information from the specified XMPP entity.
+/// Fetches discovery info from the specified XMPP entity.
 ///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
+/// \since QXmpp 1.12
 ///
-QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &node)
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
+    if (cachePolicy == CachePolicy::Relaxed) {
+        if (auto *cachedInfo = d->infoCache[{ jid, node }]) {
+            return makeReadyTask<Result<QXmppDiscoInfo>>(*cachedInfo);
+        }
     }
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+
+    return d->infoRequests.produce(
+        { jid, node },
+        [this](const auto &key) {
+            auto &[jid, node] = key;
+            return chain<Result<QXmppDiscoInfo>>(
+                get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node }),
+                this,
+                [this, jid, node](auto &&result) -> Result<QXmppDiscoInfo> {
+                    // only cache successful responses for now (permanent errors could also be cached)
+                    if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+                        d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { *info });
+                    }
+                    return result;
+                });
+        },
+        this);
 }
 
 ///
-/// Requests items from the specified XMPP entity.
+/// Fetches discovery items from the specified XMPP entity.
 ///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
+/// \since QXmpp 1.12
 ///
-QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &node)
+QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
+    if (cachePolicy == CachePolicy::Relaxed) {
+        if (auto *cachedItems = d->itemsCache[{ jid, node }]) {
+            return makeReadyTask<Result<QList<QXmppDiscoItem>>>(*cachedItems);
+        }
     }
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+
+    return d->itemsRequests.produce(
+        { jid, node },
+        [this](const auto &key) {
+            auto &[jid, node] = key;
+            return chain<Result<QList<QXmppDiscoItem>>>(
+                get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
+                this,
+                [this, jid, node](auto &&result) -> Result<QList<QXmppDiscoItem>> {
+                    if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
+                        d->itemsCache.insert({ jid, node }, new QList<QXmppDiscoItem> { itemsPayload->items() });
+                        return itemsPayload->items();
+                    } else {
+                        return std::get<QXmppError>(std::move(result));
+                    }
+                });
+        },
+        this);
 }
 
 ///
-/// Requests information from the specified XMPP entity.
+/// Returns the base identities of this client.
 ///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
+/// The identities are added to the service discovery information other entities can request.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
+/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
 ///
-/// \since QXmpp 1.5
+/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
 ///
-QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
+/// \since QXmpp 1.12
+///
+const QList<QXmppDiscoIdentity> &QXmppDiscoveryManager::identities() const
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-
-    return chainIq<InfoResult>(client()->sendIq(std::move(request)), this);
+    return d->identities;
 }
 
 ///
-/// Requests items from the specified XMPP entity.
+/// Sets the base identities of this client.
 ///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
+/// The identities are added to the service discovery information other entities can request.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
+/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
 ///
-/// \since QXmpp 1.5
+/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
 ///
-QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryManager::setIdentities(const QList<QXmppDiscoIdentity> &identities)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppDiscoveryIq &&iq) -> ItemsResult {
-        return iq.items();
-    });
+    d->identities = identities;
 }
 
 ///
-/// Returns the client's full capabilities.
+/// Returns the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
 ///
-QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
+/// The data forms are added to the service discovery information other entities can request.
+///
+/// \since QXmpp 1.12
+///
+const QList<QXmppDataForm> &QXmppDiscoveryManager::infoForms() const
 {
-    QXmppDiscoveryIq iq;
-    iq.setType(QXmppIq::Result);
-    iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
+    return d->dataForms;
+}
 
-    // features
-    QStringList features;
-    // add base features of the client
-    features << QXmppClientPrivate::discoveryFeatures();
+///
+/// Sets the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
+///
+/// The data forms are added to the service discovery information other entities can request.
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
+{
+    d->dataForms = dataForms;
+}
 
-    // add features of all registered extensions
+///
+/// Builds a full disco info element for this client.
+///
+/// Contains features and identities from all extensions and identities and data forms configured
+/// in this manager.
+///
+/// \since QXmpp 1.12
+///
+QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
+{
     const auto extensions = client()->extensions();
+
+    // collect features and identities
+    auto allFeatures = QXmppClientPrivate::discoveryFeatures();
+    auto allIdentities = d->identities;
     for (auto *extension : extensions) {
         if (extension) {
-            features << extension->discoveryFeatures();
+            allFeatures << extension->discoveryFeatures();
+            allIdentities << extension->discoveryIdentities();
         }
     }
 
-    iq.setFeatures(features);
+    std::sort(allFeatures.begin(), allFeatures.end());
 
-    // identities
-    QList<QXmppDiscoveryIq::Identity> identities;
-
-    QXmppDiscoveryIq::Identity identity;
-    identity.setCategory(clientCategory());
-    identity.setType(clientType());
-    identity.setName(clientName());
-    identities << identity;
-
-    for (auto *extension : client()->extensions()) {
-        if (extension) {
-            identities << extension->discoveryIdentities();
-        }
-    }
-
-    iq.setIdentities(identities);
-
-    // extended information
-    if (!d->clientInfoForm.isNull()) {
-        iq.setForm(d->clientInfoForm);
-    }
-
-    return iq;
-}
-
-///
-/// Sets the capabilities node of the local XMPP client.
-///
-/// \param node
-///
-void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
-{
-    d->clientCapabilitiesNode = node;
-}
-
-///
-/// Sets the category of the local XMPP client.
-///
-/// You can find a list of valid categories at:
-/// http://xmpp.org/registrar/disco-categories.html
-///
-/// \param category
-///
-void QXmppDiscoveryManager::setClientCategory(const QString &category)
-{
-    d->clientCategory = category;
-}
-
-///
-/// Sets the type of the local XMPP client.
-///
-/// You can find a list of valid types at:
-/// http://xmpp.org/registrar/disco-categories.html
-///
-void QXmppDiscoveryManager::setClientType(const QString &type)
-{
-    d->clientType = type;
-}
-
-/// Sets the name of the local XMPP client.
-void QXmppDiscoveryManager::setClientName(const QString &name)
-{
-    d->clientName = name;
+    return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
 
 ///
 /// Returns the capabilities node of the local XMPP client.
 ///
-/// By default this is "https://github.com/qxmpp-project/qxmpp".
+/// By default this is "org.qxmpp.caps".
 ///
 QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 {
@@ -258,52 +218,13 @@ QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 }
 
 ///
-/// Returns the category of the local XMPP client.
+/// Sets the capabilities node of the local XMPP client.
 ///
-/// By default this is "client".
+/// By default this is "org.qxmpp.caps".
 ///
-QString QXmppDiscoveryManager::clientCategory() const
+void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
 {
-    return d->clientCategory;
-}
-
-///
-/// Returns the type of the local XMPP client.
-///
-/// With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
-/// "phone", otherwise it defaults to "pc".
-///
-QString QXmppDiscoveryManager::clientType() const
-{
-    return d->clientType;
-}
-
-///
-/// Returns the name of the local XMPP client.
-///
-/// By default this is "Based on QXmpp x.y.z".
-///
-QString QXmppDiscoveryManager::clientName() const
-{
-    return d->clientName;
-}
-
-///
-/// Returns the client's extended information form, as defined
-/// by \xep{0128, Service Discovery Extensions}.
-///
-QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
-{
-    return d->clientInfoForm;
-}
-
-///
-/// Sets the client's extended information form, as defined
-/// by \xep{0128, Service Discovery Extensions}.
-///
-void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
-{
-    d->clientInfoForm = form;
+    d->clientCapabilitiesNode = node;
 }
 
 /// \cond
@@ -314,11 +235,13 @@ QStringList QXmppDiscoveryManager::discoveryFeatures() const
 
 bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
 {
-    if (QXmpp::handleIqRequests<QXmppDiscoveryIq>(element, client(), this)) {
+    if (handleIqRequests<GetIq<QXmppDiscoInfo>, GetIq<QXmppDiscoItems>>(element, client(), d.get())) {
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppDiscoveryIq::isDiscoveryIq(element)) {
+    if (isIqElement<QXmppDiscoveryIq>(element)) {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
         QXmppDiscoveryIq receivedIq;
         receivedIq.parse(element);
 
@@ -339,31 +262,65 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
             // let other manager handle "set" IQs
             return false;
         }
+        QT_WARNING_POP
     }
     return false;
 }
-
-std::variant<QXmppDiscoveryIq, QXmppStanza::Error> QXmppDiscoveryManager::handleIq(QXmppDiscoveryIq &&iq)
-{
-    using Error = QXmppStanza::Error;
-
-    if (!iq.queryNode().isEmpty() && !iq.queryNode().startsWith(d->clientCapabilitiesNode)) {
-        return Error(Error::Cancel, Error::ItemNotFound, u"Unknown node."_s);
-    }
-
-    switch (iq.queryType()) {
-    case QXmppDiscoveryIq::InfoQuery: {
-        // respond to info queries for the client itself
-        QXmppDiscoveryIq features = capabilities();
-        features.setQueryNode(iq.queryNode());
-        return features;
-    }
-    case QXmppDiscoveryIq::ItemsQuery: {
-        QXmppDiscoveryIq reply;
-        reply.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-        return reply;
-    }
-    }
-    Q_UNREACHABLE();
-}
 /// \endcond
+
+void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
+{
+    connect(client, &QXmppClient::connected, this, [this, client]() {
+        if (client->streamManagementState() != QXmppClient::ResumedStream) {
+            d->itemsCache.clear();
+            d->infoCache.clear();
+        }
+    });
+}
+
+void QXmppDiscoveryManager::onUnregistered(QXmppClient *client)
+{
+    disconnect(client, nullptr, this, nullptr);
+}
+
+QString QXmppDiscoveryManagerPrivate::defaultApplicationName()
+{
+    if (!qApp->applicationName().isEmpty()) {
+        if (!qApp->applicationVersion().isEmpty()) {
+            return qApp->applicationName() + u' ' + qApp->applicationVersion();
+        } else {
+            return qApp->applicationName();
+        }
+    } else {
+        return u"QXmpp " + QXmppVersion();
+    }
+}
+
+QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
+{
+    return QXmppDiscoIdentity {
+        u"client"_s,
+#if defined Q_OS_ANDROID || defined Q_OS_BLACKBERRY || defined Q_OS_IOS || defined Q_OS_WP
+        u"phone"_s,
+#else
+        u"pc"_s,
+#endif
+        defaultApplicationName(),
+    };
+}
+
+std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoInfo> &&iq)
+{
+    if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
+        return CompatIq { QXmppIq::Result, q->buildClientInfo() };
+    }
+    return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
+}
+
+std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoItems> &&iq)
+{
+    if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
+        return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
+    }
+    return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
+}

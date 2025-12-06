@@ -25,7 +25,7 @@ using namespace QXmpp::Private;
 class QXmppIncomingServerPrivate
 {
 public:
-    QXmppIncomingServerPrivate(QXmppIncomingServer *qq);
+    QXmppIncomingServerPrivate(QSslSocket *socket, QXmppIncomingServer *qq);
     QString origin() const;
 
     XmppSocket socket;
@@ -37,7 +37,7 @@ private:
     QXmppIncomingServer *q;
 };
 
-QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QXmppIncomingServer *qq)
+QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QSslSocket *socket, QXmppIncomingServer *qq)
     : q(qq),
       socket(qq)
 {
@@ -45,7 +45,7 @@ QXmppIncomingServerPrivate::QXmppIncomingServerPrivate(QXmppIncomingServer *qq)
 
 QString QXmppIncomingServerPrivate::origin() const
 {
-    auto *tcpSocket = socket.socket();
+    auto *tcpSocket = socket.internalSocket();
     if (tcpSocket) {
         return tcpSocket->peerAddress().toString() + u' ' + QString::number(tcpSocket->peerPort());
     } else {
@@ -62,21 +62,15 @@ QString QXmppIncomingServerPrivate::origin() const
 ///
 QXmppIncomingServer::QXmppIncomingServer(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
-      d(std::make_unique<QXmppIncomingServerPrivate>(this))
+      d(std::make_unique<QXmppIncomingServerPrivate>(socket, this))
 {
     connect(&d->socket, &XmppSocket::started, this, &QXmppIncomingServer::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppIncomingServer::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppIncomingServer::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppIncomingServer::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppIncomingServer::slotSocketDisconnected);
 
     d->domain = domain;
-
-    if (socket) {
-        connect(socket, &QAbstractSocket::disconnected,
-                this, &QXmppIncomingServer::slotSocketDisconnected);
-
-        d->socket.setSocket(socket);
-    }
 
     info(u"Incoming server connection from %1"_s.arg(d->origin()));
 }
@@ -120,11 +114,10 @@ void QXmppIncomingServer::handleStart()
 {
 }
 
-void QXmppIncomingServer::handleStream(const QDomElement &streamElement)
+void QXmppIncomingServer::handleStream(const StreamOpen &stream)
 {
-    const QString from = streamElement.attribute(u"from"_s);
-    if (!from.isEmpty()) {
-        info(u"Incoming server stream from %1 on %2"_s.arg(from, d->origin()));
+    if (!stream.from.isEmpty()) {
+        info(u"Incoming server stream from %1 on %2"_s.arg(stream.from, d->origin()));
     }
 
     // start stream
@@ -141,7 +134,7 @@ void QXmppIncomingServer::handleStream(const QDomElement &streamElement)
 
     // send stream features
     QXmppStreamFeatures features;
-    auto *socket = d->socket.socket();
+    auto *socket = d->socket.internalSocket();
     if (!socket->isEncrypted() && !socket->localCertificate().isNull() && !socket->privateKey().isNull()) {
         features.setTlsMode(QXmppStreamFeatures::Enabled);
     }
@@ -152,8 +145,8 @@ void QXmppIncomingServer::handleStanza(const QDomElement &stanza)
 {
     if (StarttlsRequest::fromDom(stanza)) {
         sendData(serializeXml(StarttlsProceed()));
-        d->socket.socket()->flush();
-        d->socket.socket()->startServerEncryption();
+        d->socket.internalSocket()->flush();
+        d->socket.internalSocket()->startServerEncryption();
         return;
     } else if (QXmppDialback::isDialback(stanza)) {
         QXmppDialback request;

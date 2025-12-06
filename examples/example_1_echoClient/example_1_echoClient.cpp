@@ -6,6 +6,7 @@
 
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
+#include "QXmppTask.h"
 
 #include <QCoreApplication>
 
@@ -15,16 +16,11 @@ echoClient::echoClient(QObject *parent)
     connect(this, &QXmppClient::messageReceived, this, &echoClient::messageReceived);
 }
 
-echoClient::~echoClient()
-{
-}
+echoClient::~echoClient() = default;
 
 void echoClient::messageReceived(const QXmppMessage &message)
 {
-    QString from = message.from();
-    QString msg = message.body();
-
-    sendPacket(QXmppMessage("", from, "Your message: " + msg));
+    send(QXmppMessage({}, message.from(), u"Your message: " + message.body()));
 }
 
 int main(int argc, char *argv[])

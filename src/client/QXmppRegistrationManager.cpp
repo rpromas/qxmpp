@@ -17,6 +17,9 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
+using namespace QXmpp::Private;
+
 class QXmppRegistrationManagerPrivate
 {
 public:
@@ -43,9 +46,7 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 {
 }
 
-///
 /// Default constructor.
-///
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {
@@ -77,7 +78,7 @@ void QXmppRegistrationManager::changePassword(const QString &newPassword)
     d->changePasswordIqId = iq.id();
     d->newPassword = newPassword;
 
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 ///
@@ -92,7 +93,7 @@ void QXmppRegistrationManager::deleteAccount()
     d->deleteAccountIqId = iq.id();
 
     client()->setIgnoredStreamErrors({ QXmpp::StreamError::Conflict, QXmpp::StreamError::NotAuthorized });
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 bool QXmppRegistrationManager::supportedByServer() const
@@ -111,7 +112,7 @@ void QXmppRegistrationManager::requestRegistrationForm(const QString &service)
     QXmppRegisterIq iq;
     iq.setType(QXmppIq::Get);
     iq.setTo(service);
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 ///
@@ -150,7 +151,7 @@ void QXmppRegistrationManager::sendCachedRegistrationForm()
 
     d->registrationFormToSend.setType(QXmppIq::Set);
 
-    client()->sendPacket(d->registrationFormToSend);
+    client()->send(std::move(d->registrationFormToSend));
     d->registrationIqId = d->registrationFormToSend.id();
 
     // clear cache
@@ -278,7 +279,7 @@ bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
 
             d->deleteAccountIqId.clear();
             return true;
-        } else if (QXmppRegisterIq::isRegisterIq(stanza)) {
+        } else if (isIqElement<QXmppRegisterIq>(stanza)) {
             QXmppRegisterIq iq;
             iq.parse(stanza);
 

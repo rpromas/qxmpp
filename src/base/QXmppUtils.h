@@ -11,6 +11,7 @@
 // See http://lists.trolltech.com/qt-interest/2008-07/thread00798-0.html
 // for an explanation.
 #include "QXmppGlobal.h"
+#include "QXmppXmlTags_p.h"
 
 #include <QXmlStreamWriter>
 
@@ -20,15 +21,11 @@ class QDomElement;
 class QString;
 
 /// \brief The QXmppUtils class contains static utility functions.
-///
 class QXMPP_EXPORT QXmppUtils
 {
 public:
     // XEP-0082: XMPP Date and Time Profiles
     static QDateTime datetimeFromString(QStringView str);
-    /// \cond
-    static QDateTime datetimeFromString(const QString &str);
-    /// \endcond
     static QString datetimeToString(const QDateTime &dt);
     static int timezoneOffsetFromString(const QString &str);
     static QString timezoneOffsetToString(int secs);
@@ -46,5 +43,26 @@ public:
     static QString generateStanzaUuid();
     static QString generateStanzaHash(int length = 36);
 };
+
+namespace QXmpp {
+
+namespace Private {
+
+QXMPP_EXPORT std::tuple<QString, QString> elementXmlTag(const QDomElement &el);
+QXMPP_EXPORT std::tuple<QString, QString> iqPayloadXmlTag(const QDomElement &el);
+
+}  // namespace Private
+
+QXMPP_EXPORT QString generateSequentialStanzaId();
+
+/// \brief Checks whether a QDomElement is an IQ stanza of a specific type T.
+template<typename T>
+bool isIqElement(const QDomElement &el) { return Private::isPayloadType<T>(Private::iqPayloadXmlTag(el)); }
+
+/// \brief Checks whether an XML element has the correct tag name and namespace URI for type T.
+template<Private::HasXmlTag T>
+bool isElement(const QDomElement &el) { return Private::elementXmlTag(el) == T::XmlTag; }
+
+}  // namespace QXmpp
 
 #endif  // QXMPPUTILS_H

@@ -12,6 +12,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QSharedData>
 
@@ -63,25 +64,29 @@ using namespace QXmpp::Private;
 /// &lt;item/&gt; is also checked.
 ///
 
-constexpr auto PUBSUB_QUERIES = to_array<QStringView>({
-    u"affiliations",
-    u"affiliations",
-    u"configure",
-    u"create",
-    u"default",
-    u"default",
-    u"delete",
-    u"items",
-    u"options",
-    u"publish",
-    u"purge",
-    u"retract",
-    u"subscribe",
-    u"subscription",
-    u"subscriptions",
-    u"subscriptions",
-    u"unsubscribe",
-});
+template<>
+struct Enums::Data<PubSubIqBase::QueryType> {
+    using enum PubSubIqBase::QueryType;
+    static constexpr auto Values = makeValues<PubSubIqBase::QueryType>({
+        { Affiliations, u"affiliations" },
+        { OwnerAffiliations, u"affiliations" },
+        { Configure, u"configure" },
+        { Create, u"create" },
+        { Default, u"default" },
+        { OwnerDefault, u"default" },
+        { Delete, u"delete" },
+        { Items, u"items" },
+        { Options, u"options" },
+        { Publish, u"publish" },
+        { Purge, u"purge" },
+        { Retract, u"retract" },
+        { Subscribe, u"subscribe" },
+        { Subscription, u"subscription" },
+        { Subscriptions, u"subscriptions" },
+        { OwnerSubscriptions, u"subscriptions" },
+        { Unsubscribe, u"unsubscribe" },
+    });
+};
 
 namespace QXmpp::Private {
 
@@ -95,6 +100,7 @@ public:
     QVector<QXmppPubSubSubscription> subscriptions;
     QVector<QXmppPubSubAffiliation> affiliations;
     uint32_t maxItems = 0;
+    bool retractNotify = false;
     std::optional<QXmppDataForm> dataForm;
     std::optional<QXmppResultSetReply> itemsContinuation;
 };
@@ -277,6 +283,20 @@ void PubSubIqBase::setMaxItems(std::optional<uint32_t> maxItems)
 }
 
 ///
+/// Returns whether to send notifications on retraction (default: false).
+///
+/// \since QXmpp 1.11
+///
+bool PubSubIqBase::retractNotify() const { return d->retractNotify; }
+
+///
+/// Sets whether to send notifications on retraction.
+///
+///  \since QXmpp 1.11
+///
+void PubSubIqBase::setRetractNotify(bool notify) { d->retractNotify = notify; }
+
+///
 /// Returns a data form if the IQ contains one.
 ///
 std::optional<QXmppDataForm> PubSubIqBase::dataForm() const
@@ -386,6 +406,7 @@ bool PubSubIqBase::isPubSubIq(const QDomElement &element, bool (*isItemValid)(co
         if (!QXmppPubSubSubscription::isSubscription(queryElement)) {
             return false;
         }
+        [[fallthrough]];
     case Delete:
     case Purge:
     case Configure:
@@ -445,6 +466,11 @@ void PubSubIqBase::parseElementFromChild(const QDomElement &element)
     d->queryJid = queryElement.attribute(u"jid"_s);
     d->queryNode = queryElement.attribute(u"node"_s);
 
+    // retract notify
+    if (d->queryType == Retract) {
+        d->retractNotify = parseBoolean(queryElement.attribute(u"notify"_s)).value_or(false);
+    }
+
     // parse subid
     switch (d->queryType) {
     case Items:
@@ -470,13 +496,7 @@ void PubSubIqBase::parseElementFromChild(const QDomElement &element)
         break;
     case Items:
         // Result Set Management (incomplete items result received)
-        for (const auto &rsmEl : iterChildElements(pubSubElement, u"set")) {
-            if (rsmEl.namespaceURI() == ns_rsm) {
-                QXmppResultSetReply reply;
-                reply.parse(rsmEl);
-                d->itemsContinuation = reply;
-            }
-        }
+        d->itemsContinuation = parseOptionalChildElement<QXmppResultSetReply>(pubSubElement);
         [[fallthrough]];
     case Publish:
     case Retract:
@@ -526,121 +546,113 @@ void PubSubIqBase::parseElementFromChild(const QDomElement &element)
 
 void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("pubsub"));
-    writer->writeDefaultNamespace(toString65(queryTypeIsOwnerIq(d->queryType) ? ns_pubsub_owner : ns_pubsub));
+    XmlWriter w(writer);
 
-    // The SubscriptionQuery is special here: The query element is directly
-    // handled by a QXmppPubSubSubscription.
     if (d->queryType == Subscription) {
-        subscription().value_or(QXmppPubSubSubscription()).toXml(writer);
+        w.write(Element { { u"pubsub", ns_pubsub }, subscription().value_or(QXmppPubSubSubscription()) });
     } else {
-        // write query type
-        writer->writeStartElement(toString65(PUBSUB_QUERIES.at(size_t(d->queryType))));
-        writeOptionalXmlAttribute(writer, u"jid", d->queryJid);
-        writeOptionalXmlAttribute(writer, u"node", d->queryNode);
-
-        // write subid
-        switch (d->queryType) {
-        case Items:
-        case Unsubscribe:
-        case Options:
-            writeOptionalXmlAttribute(writer, u"subid", d->subscriptionId);
-        default:
-            break;
-        }
-
-        // write contents
-        switch (d->queryType) {
-        case Affiliations:
-        case OwnerAffiliations:
-            for (const auto &affiliation : std::as_const(d->affiliations)) {
-                affiliation.toXml(writer);
-            }
-            break;
-        case Items:
-            if (d->maxItems > 0) {
-                writer->writeAttribute(QSL65("max_items"), QString::number(d->maxItems));
-            }
-            [[fallthrough]];
-        case Publish:
-        case Retract:
-            serializeItems(writer);
-            break;
-        case Subscriptions:
-        case OwnerSubscriptions:
-            for (const auto &sub : std::as_const(d->subscriptions)) {
-                sub.toXml(writer);
-            }
-            break;
-        case Configure:
-        case Default:
-        case OwnerDefault:
-        case Options:
-            if (auto form = d->dataForm) {
-                // make sure data form type is correct
-                switch (type()) {
-                case QXmppIq::Result:
-                    form->setType(QXmppDataForm::Result);
-                    break;
-                default:
-                    if (form->type() != QXmppDataForm::Cancel) {
-                        form->setType(QXmppDataForm::Submit);
+        w.write(Element {
+            { u"pubsub", queryTypeIsOwnerIq(d->queryType) ? ns_pubsub_owner : ns_pubsub },
+            Element {
+                d->queryType,
+                OptionalAttribute { u"jid", d->queryJid },
+                OptionalAttribute { u"node", d->queryNode },
+                OptionalContent {
+                    d->queryType == Retract && d->retractNotify,
+                    Attribute { u"notify", true },
+                },
+                // subid
+                [&] {
+                    switch (d->queryType) {
+                    case Items:
+                    case Unsubscribe:
+                    case Options:
+                        w.write(OptionalAttribute { u"subid", d->subscriptionId });
+                    default:
+                        break;
                     }
-                    break;
+                },
+                // content
+                [&] {
+                    switch (d->queryType) {
+                    case Affiliations:
+                    case OwnerAffiliations:
+                        w.write(d->affiliations);
+                        break;
+                    case Items:
+                        if (d->maxItems > 0) {
+                            w.write(Attribute { u"max_items", d->maxItems });
+                        }
+                        [[fallthrough]];
+                    case Publish:
+                    case Retract:
+                        serializeItems(writer);
+                        break;
+                    case Subscriptions:
+                    case OwnerSubscriptions:
+                        w.write(d->subscriptions);
+                        break;
+                    case Configure:
+                    case Default:
+                    case OwnerDefault:
+                    case Options:
+                        if (auto form = d->dataForm) {
+                            // make sure data form type is correct
+                            switch (type()) {
+                            case Result:
+                                form->setType(QXmppDataForm::Result);
+                                break;
+                            default:
+                                if (form->type() != QXmppDataForm::Cancel) {
+                                    form->setType(QXmppDataForm::Submit);
+                                }
+                                break;
+                            }
+                            w.write(*form);
+                        }
+                        break;
+                    case Create:
+                    case Delete:
+                    case Purge:
+                    case Subscribe:
+                    case Subscription:
+                    case Unsubscribe:
+                        break;
+                    }
+                },
+            },
+            // data form
+            [&] {
+                if (auto form = d->dataForm) {
+                    // make sure form type is 'submit'
+                    form->setType(type() == Result ? QXmppDataForm::Result : QXmppDataForm::Submit);
+
+                    switch (d->queryType) {
+                    case Create:
+                        w.write(Element { u"configure", *form });
+                        break;
+                    case Publish:
+                        w.write(Element { u"publish-options", *form });
+                        break;
+                    case Subscribe:
+                    case Subscription:
+                        w.write(Element { u"options", *form });
+                        break;
+                    default:
+                        break;
+                    }
                 }
-                form->toXml(writer);
-            }
-            break;
-        case Create:
-        case Delete:
-        case Purge:
-        case Subscribe:
-        case Subscription:
-        case Unsubscribe:
-            break;
-        }
-
-        writer->writeEndElement();  // query type
-
-        // add extra element with data form
-        if (auto form = d->dataForm) {
-            const auto writeForm = [](QXmlStreamWriter *writer, const QXmppDataForm &form, const QString &subElementName) {
-                writer->writeStartElement(subElementName);
-                form.toXml(writer);
-                writer->writeEndElement();
-            };
-
-            // make sure form type is 'submit'
-            form->setType(type() == QXmppIq::Result ? QXmppDataForm::Result : QXmppDataForm::Submit);
-
-            switch (d->queryType) {
-            case Create:
-                writeForm(writer, *form, u"configure"_s);
-                break;
-            case Publish:
-                writeForm(writer, *form, u"publish-options"_s);
-                break;
-            case Subscribe:
-            case Subscription:
-                writeForm(writer, *form, u"options"_s);
-                break;
-            default:
-                break;
-            }
-        }
-
-        // Result Set Management
-        if (d->queryType == Items && d->itemsContinuation.has_value()) {
-            d->itemsContinuation->toXml(writer);
-        }
+            },
+            // Result Set Management
+            OptionalContent { d->queryType == Items, d->itemsContinuation },
+        });
     }
-    writer->writeEndElement();  // pubsub
 }
 
 std::optional<PubSubIqBase::QueryType> PubSubIqBase::queryTypeFromDomElement(const QDomElement &element)
 {
     QueryType type;
-    if (auto queryType = enumFromString<QueryType>(PUBSUB_QUERIES, element.tagName())) {
+    if (auto queryType = Enums::fromString<QueryType>(element.tagName())) {
         type = *queryType;
     } else {
         return std::nullopt;

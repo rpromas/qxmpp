@@ -5,10 +5,14 @@
 #ifndef QXMPPIQHANDLING_H
 #define QXMPPIQHANDLING_H
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppE2eeMetadata.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppIq.h"
+#include "QXmppUtils_p.h"
+#include "QXmppXmlTags_p.h"
+
+#include "StringLiterals.h"
 
 #include <QDomElement>
 
@@ -16,93 +20,93 @@ namespace QXmpp {
 
 namespace Private {
 
-    QXMPP_EXPORT void sendIqReply(QXmppClient *client,
-                                  const QString &requestId,
-                                  const QString &requestFrom,
-                                  const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                                  QXmppIq &&iq);
+QXMPP_EXPORT void sendIqReply(QXmppClient *client,
+                              const QString &requestId,
+                              const QString &requestFrom,
+                              const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
+                              QXmppIq &&iq);
 
-    QXMPP_EXPORT std::tuple<bool, QString, QString> checkIsIqRequest(const QDomElement &el);
+QXMPP_EXPORT std::tuple<bool, QString, QString> checkIsIqRequest(const QDomElement &el);
 
-    template<typename... VariantTypes>
-    void processHandleIqResult(QXmppClient *client,
-                               const QString &requestId,
-                               const QString &requestFrom,
-                               const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                               std::variant<VariantTypes...> &&result)
-    {
-        std::visit([&](auto &&value) {
-            using T = std::decay_t<decltype(value)>;
+template<typename... VariantTypes>
+void processHandleIqResult(QXmppClient *client,
+                           const QString &requestId,
+                           const QString &requestFrom,
+                           const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
+                           std::variant<VariantTypes...> &&result)
+{
+    std::visit([&](auto &&value) {
+        using T = std::decay_t<decltype(value)>;
 
-            static_assert(
-                std::is_base_of_v<QXmppIq, T> || std::is_same_v<QXmppStanza::Error, T>,
-                "QXmppIq based type or QXmppStanza::Error required");
+        static_assert(
+            std::is_base_of_v<QXmppIq, T> || std::is_same_v<QXmppStanza::Error, T>,
+            "QXmppIq based type or QXmppStanza::Error required");
 
-            if constexpr (std::is_base_of_v<QXmppIq, T>) {
-                sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(value));
-            } else if constexpr (std::is_same_v<QXmppStanza::Error, T>) {
-                QXmppIq iq;
-                iq.setType(QXmppIq::Error);
-                iq.setError(value);
-                sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(iq));
-            }
-        },
-                   std::move(result));
-    }
-
-    template<typename T>
-    void processHandleIqResult(QXmppClient *client,
-                               const QString &requestId,
-                               const QString &requestFrom,
-                               const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                               QXmppTask<T> future)
-    {
-        future.then(client, [client, requestId, requestFrom, e2eeMetadata](T result) {
-            processHandleIqResult(client, requestId, requestFrom, e2eeMetadata, result);
-        });
-    }
-
-    template<typename T, typename = std::enable_if_t<std::is_base_of_v<QXmppIq, T>, void>>
-    void processHandleIqResult(QXmppClient *client,
-                               const QString &requestId,
-                               const QString &requestFrom,
-                               const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                               T &&result)
-    {
-        sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(result));
-    }
-
-    template<typename Handler, typename IqType>
-    auto invokeIqHandler(Handler handler, IqType &&iq)
-    {
-        if constexpr (std::is_invocable<Handler, IqType &&>()) {
-            return handler(std::move(iq));
-        } else {
-            return handler->handleIq(std::move(iq));
+        if constexpr (std::is_base_of_v<QXmppIq, T>) {
+            sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(value));
+        } else if constexpr (std::is_same_v<QXmppStanza::Error, T>) {
+            QXmppIq iq;
+            iq.setType(QXmppIq::Error);
+            iq.setError(value);
+            sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(iq));
         }
+    },
+               std::move(result));
+}
+
+template<typename T>
+void processHandleIqResult(QXmppClient *client,
+                           const QString &requestId,
+                           const QString &requestFrom,
+                           const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
+                           QXmppTask<T> future)
+{
+    future.then(client, [client, requestId, requestFrom, e2eeMetadata](T result) {
+        processHandleIqResult(client, requestId, requestFrom, e2eeMetadata, result);
+    });
+}
+
+template<typename T, typename = std::enable_if_t<std::is_base_of_v<QXmppIq, T>, void>>
+void processHandleIqResult(QXmppClient *client,
+                           const QString &requestId,
+                           const QString &requestFrom,
+                           const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
+                           T &&result)
+{
+    sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(result));
+}
+
+template<typename Handler, typename IqType>
+auto invokeIqHandler(Handler handler, IqType &&iq)
+{
+    if constexpr (std::is_invocable<Handler, IqType &&>()) {
+        return handler(std::move(iq));
+    } else {
+        return handler->handleIq(std::move(iq));
     }
+}
 
-    template<typename IqType, typename Handler>
-    bool handleIqType(Handler handler,
-                      QXmppClient *client,
-                      const QDomElement &element,
-                      const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                      const QString &tagName,
-                      const QString &xmlNamespace)
-    {
-        if (IqType::checkIqType(tagName, xmlNamespace)) {
-            IqType iq;
-            iq.parse(element);
-            iq.setE2eeMetadata(e2eeMetadata);
+template<typename IqType, typename Handler>
+bool handleIqType(Handler handler,
+                  QXmppClient *client,
+                  const QDomElement &element,
+                  const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
+                  const QString &tagName,
+                  const QString &xmlNamespace)
+{
+    if (isPayloadType<IqType>(std::tuple { tagName, xmlNamespace })) {
+        if (auto iq = parseElement<IqType>(element)) {
+            if constexpr (std::is_base_of_v<QXmppIq, IqType>) {
+                iq->setE2eeMetadata(e2eeMetadata);
+            }
 
-            auto id = iq.id(), from = iq.from();
-
-            processHandleIqResult(client, id, from, e2eeMetadata,
-                                  invokeIqHandler(std::forward<Handler>(handler), std::move(iq)));
+            processHandleIqResult(client, element.attribute(u"id"_s), element.attribute(u"from"_s), e2eeMetadata,
+                                  invokeIqHandler(std::forward<Handler>(handler), std::move(*iq)));
             return true;
         }
-        return false;
     }
+    return false;
+}
 
 }  // namespace Private
 

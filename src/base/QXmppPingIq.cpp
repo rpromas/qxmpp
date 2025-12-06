@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -27,19 +28,9 @@ QXmppPingIq::QXmppPingIq()
 {
 }
 
-///
-/// Returns true, if the element is a ping IQ.
-///
-bool QXmppPingIq::isPingIq(const QDomElement &element)
-{
-    return isIqType(element, u"ping", ns_ping) && element.attribute(u"type"_s) == u"get";
-}
-
 /// \cond
 void QXmppPingIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("ping"));
-    writer->writeDefaultNamespace(toString65(ns_ping));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { PayloadXmlTag });
 }
 /// \endcond

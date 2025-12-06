@@ -9,10 +9,23 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
 using namespace QXmpp::Private;
+
+struct TimezoneOffset {
+    int seconds;
+};
+
+template<>
+struct QXmpp::Private::StringSerializer<TimezoneOffset> {
+    static QString serialize(const TimezoneOffset &tzo)
+    {
+        return QXmppUtils::timezoneOffsetToString(tzo.seconds);
+    }
+};
 
 ///
 /// Returns the timezone offset in seconds.
@@ -50,20 +63,7 @@ void QXmppEntityTimeIq::setUtc(const QDateTime &utc)
     m_utc = utc;
 }
 
-///
-/// Returns true, if the element is a valid entity time IQ.
-///
-bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
-{
-    return isIqType(element, u"time", ns_entity_time);
-}
-
 /// \cond
-bool QXmppEntityTimeIq::checkIqType(const QString &tagName, const QString &xmlns)
-{
-    return tagName == u"time" && xmlns == ns_entity_time;
-}
-
 void QXmppEntityTimeIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement timeElement = firstChildElement(element, u"time");
@@ -73,13 +73,13 @@ void QXmppEntityTimeIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppEntityTimeIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("time"));
-    writer->writeDefaultNamespace(toString65(ns_entity_time));
-
-    if (m_utc.isValid()) {
-        writeXmlTextElement(writer, u"tzo", QXmppUtils::timezoneOffsetToString(m_tzo));
-        writeXmlTextElement(writer, u"utc", QXmppUtils::datetimeToString(m_utc));
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"time", ns_entity_time },
+        OptionalContent {
+            m_utc.isValid(),
+            TextElement { u"tzo", TimezoneOffset { m_tzo } },
+            TextElement { u"utc", m_utc },
+        },
+    });
 }
 /// \endcond

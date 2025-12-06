@@ -5,6 +5,7 @@
 #ifndef QXMPPTRUSTMESSAGEKEYOWNER_H
 #define QXMPPTRUSTMESSAGEKEYOWNER_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <QSharedDataPointer>
@@ -34,6 +35,7 @@ public:
     void setDistrustedKeys(const QList<QByteArray> &keyIds);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"key-owner", QXmpp::Private::ns_tm };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

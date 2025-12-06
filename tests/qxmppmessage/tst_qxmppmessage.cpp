@@ -309,13 +309,13 @@ void tst_QXmppMessage::testDelay_data()
         << QByteArray("<message type=\"normal\">"
                       "<delay xmlns=\"urn:xmpp:delay\" stamp=\"2010-06-29T08:23:06Z\"/>"
                       "</message>")
-        << QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6), Qt::UTC);
+        << QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6), TimeZoneUTC);
 
     QTest::newRow("legacy")
         << QByteArray("<message type=\"normal\">"
                       "<x xmlns=\"jabber:x:delay\" stamp=\"20100629T08:23:06\"/>"
                       "</message>")
-        << QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6), Qt::UTC);
+        << QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6), TimeZoneUTC);
 }
 
 void tst_QXmppMessage::testDelay()
@@ -345,7 +345,7 @@ void tst_QXmppMessage::testDelayWithMultipleStamp()
     QXmppMessage message;
     parsePacket(message, xml);
     qDebug() << message.stamp();
-    QCOMPARE(message.stamp(), QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6, 123), Qt::UTC));
+    QCOMPARE(message.stamp(), QDateTime(QDate(2010, 06, 29), QTime(8, 23, 6, 123), TimeZoneUTC));
     serializePacket(message, resultXml);
 }
 
@@ -465,9 +465,9 @@ void tst_QXmppMessage::testSubextensions()
 {
     const QByteArray xml = QByteArrayLiteral(
         "<message id=\"aeb214\" to=\"juliet@capulet.lit/chamber\" type=\"normal\">"
-        "<result xmlns=\"urn:xmpp:mam:tmp\" id=\"5d398-28273-f7382\" queryid=\"f27\">"
+        "<result id=\"5d398-28273-f7382\" queryid=\"f27\" xmlns=\"urn:xmpp:mam:tmp\">"
         "<forwarded xmlns=\"urn:xmpp:forward:0\">"
-        "<delay xmlns=\"urn:xmpp:delay\" stamp=\"2010-07-10T23:09:32Z\"/>"
+        "<delay stamp=\"2010-07-10T23:09:32Z\" xmlns=\"urn:xmpp:delay\"/>"
         "<message from=\"juliet@capulet.lit/balcony\" "
         "id=\"8a54s\" "
         "to=\"romeo@montague.lit/orchard\" "
@@ -871,7 +871,7 @@ void tst_QXmppMessage::testSpoiler()
     const QByteArray xmlWithoutHint(
         "<message to=\"foo@example.com/QXmpp\" from=\"bar@example.com/QXmpp\" type=\"normal\">"
         "<body>And at the end of the story, both of them die! It is so tragic!</body>"
-        "<spoiler xmlns=\"urn:xmpp:spoiler:0\"></spoiler>"
+        "<spoiler xmlns=\"urn:xmpp:spoiler:0\"/>"
         "</message>");
 
     QXmppMessage messageWithoutHint;
@@ -1080,7 +1080,7 @@ void tst_QXmppMessage::testFallbackIndication()
             "urn:xmpp:reply:0",
             { Fallback::Reference { Fallback::Body, Fallback::Range { 0, 33 } },
               Fallback::Reference { Fallback::Subject, Fallback::Range { 5, 10 } },
-              Fallback::Reference { Fallback::Body, {} } },
+              Fallback::Reference { Fallback::Body, std::nullopt } },
         },
     });
     serializePacket(message, xml);

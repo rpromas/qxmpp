@@ -8,13 +8,16 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIq.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 // The QXmppPrivateStorageIq class represents an XML private storage IQ
@@ -28,7 +31,7 @@ public:
     QXmppBookmarkSet bookmarks() const;
     void setBookmarks(const QXmppBookmarkSet &bookmark);
 
-    static bool isPrivateStorageIq(const QDomElement &element);
+    static constexpr std::tuple PayloadXmlTag = { u"query", ns_private };
 
 protected:
     void parseElementFromChild(const QDomElement &element) override;
@@ -48,12 +51,6 @@ void QXmppPrivateStorageIq::setBookmarks(const QXmppBookmarkSet &bookmarks)
     m_bookmarks = bookmarks;
 }
 
-bool QXmppPrivateStorageIq::isPrivateStorageIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_private) &&
-        QXmppBookmarkSet::isBookmarkSet(element.firstChildElement().firstChildElement());
-}
-
 void QXmppPrivateStorageIq::parseElementFromChild(const QDomElement &element)
 {
     const QDomElement queryElement = firstChildElement(element, u"query");
@@ -62,10 +59,7 @@ void QXmppPrivateStorageIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPrivateStorageIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_private));
-    m_bookmarks.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"query", ns_private }, m_bookmarks });
 }
 
 class QXmppBookmarkManagerPrivate
@@ -77,9 +71,7 @@ public:
     bool bookmarksReceived;
 };
 
-///
 /// Constructs a new bookmark manager.
-///
 QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
@@ -88,6 +80,7 @@ QXmppBookmarkManager::QXmppBookmarkManager()
 
 QXmppBookmarkManager::~QXmppBookmarkManager() = default;
 
+///
 /// Returns true if the bookmarks have been received from the server,
 /// false otherwise.
 ///
@@ -96,27 +89,25 @@ bool QXmppBookmarkManager::areBookmarksReceived() const
     return d->bookmarksReceived;
 }
 
+///
 /// Returns the bookmarks stored on the server.
 ///
 /// Before calling this method, check that the bookmarks
 /// have indeed been received by calling areBookmarksReceived().
 ///
-
 QXmppBookmarkSet QXmppBookmarkManager::bookmarks() const
 {
     return d->bookmarks;
 }
 
 /// Stores the bookmarks on the server.
-///
-/// \param bookmarks
-
 bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
 {
     QXmppPrivateStorageIq iq;
     iq.setType(QXmppIq::Set);
     iq.setBookmarks(bookmarks);
-    if (!client()->sendPacket(iq)) {
+
+    if (!client()->sendLegacy(iq)) {
         return false;
     }
 
@@ -129,7 +120,7 @@ bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
 bool QXmppBookmarkManager::handleStanza(const QDomElement &stanza)
 {
     if (stanza.tagName() == u"iq") {
-        if (QXmppPrivateStorageIq::isPrivateStorageIq(stanza)) {
+        if (isIqElement<QXmppPrivateStorageIq>(stanza)) {
             QXmppPrivateStorageIq iq;
             iq.parse(stanza);
 
@@ -176,7 +167,7 @@ void QXmppBookmarkManager::slotConnected()
 {
     QXmppPrivateStorageIq iq;
     iq.setType(QXmppIq::Get);
-    client()->sendPacket(iq);
+    client()->send(std::move(iq));
 }
 
 void QXmppBookmarkManager::slotDisconnected()

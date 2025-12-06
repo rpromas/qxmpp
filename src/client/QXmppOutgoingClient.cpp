@@ -6,9 +6,8 @@
 
 #include "QXmppOutgoingClient.h"
 
-#include "QXmppBindIq.h"
+#include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppOutgoingClient_p.h"
@@ -19,6 +18,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 
@@ -140,12 +140,12 @@ void QXmppOutgoingClientPrivate::connectToHost(const ServerAddress &address)
     sslConfig.setAllowedNextProtocols({ QByteArrayLiteral("xmpp-client") });
 
     // set new ssl config
-    q->socket()->setSslConfiguration(sslConfig);
+    socket.internalSocket()->setSslConfiguration(sslConfig);
 
     // respect proxy
-    q->socket()->setProxy(config.networkProxy());
+    socket.internalSocket()->setProxy(config.networkProxy());
     // set the name the SSL certificate should match
-    q->socket()->setPeerVerifyName(config.domain());
+    socket.internalSocket()->setPeerVerifyName(config.domain());
 
     socket.connectToHost(address);
 }
@@ -170,18 +170,13 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingClientPrivate>(this))
 {
-    // initialise socket
-    auto *socket = new QSslSocket(this);
-    d->socket.setSocket(socket);
-
-    connect(socket, &QAbstractSocket::disconnected, this, &QXmppOutgoingClient::_q_socketDisconnected);
-    connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingClient::socketSslErrors);
-    connect(socket, &QSslSocket::errorOccurred, this, &QXmppOutgoingClient::socketError);
-
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingClient::handleStart);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingClient::handleSocketDisconnected);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingClient::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingClient::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingClient::handleSocketError);
+    connect(&d->socket, &XmppSocket::sslErrorsOccurred, this, &QXmppOutgoingClient::handleSocketSslErrors);
 }
 
 QXmppOutgoingClient::~QXmppOutgoingClient()
@@ -341,16 +336,15 @@ QXmppTask<IqResult> QXmppOutgoingClient::sendIq(QXmppIq &&iq)
     return d->iqManager.sendIq(std::move(iq), to.isEmpty() ? d->config.jidBare() : to);
 }
 
-QSslSocket *QXmppOutgoingClient::socket() const
-{
-    return d->socket.socket();
-}
-
-void QXmppOutgoingClient::_q_socketDisconnected()
+void QXmppOutgoingClient::handleSocketDisconnected()
 {
     debug(u"Socket disconnected"_s);
     d->isAuthenticated = false;
     if (d->nextAddressState == QXmppOutgoingClientPrivate::TryNext) {
+        // Last connection attempt failed and the socket was already in connected state.
+        // To avoid race conditions with invalid socket states use new QSslSocket.
+        d->socket.resetInternalSocket();
+
         d->connectToNextAddress();
     } else if (d->redirect) {
         d->connectToHost({ ServerAddress::Tcp, d->redirect->host, d->redirect->port });
@@ -360,7 +354,7 @@ void QXmppOutgoingClient::_q_socketDisconnected()
     }
 }
 
-void QXmppOutgoingClient::socketSslErrors(const QList<QSslError> &errors)
+void QXmppOutgoingClient::handleSocketSslErrors(const QList<QSslError> &errors)
 {
     // log errors
     warning(u"SSL errors"_s);
@@ -373,7 +367,7 @@ void QXmppOutgoingClient::socketSslErrors(const QList<QSslError> &errors)
 
     // if configured, ignore the errors
     if (configuration().ignoreSslErrors()) {
-        socket()->ignoreSslErrors();
+        d->socket.internalSocket()->ignoreSslErrors();
     }
 }
 
@@ -433,7 +427,7 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
 
 void QXmppOutgoingClient::startNonSaslAuth()
 {
-    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->streamFrom, d->config.user()).then(this, [this](auto result) {
+    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->config.domain(), d->config.user()).then(this, [this](auto result) {
         if (auto *options = std::get_if<NonSaslAuthOptions>(&result)) {
             bool plainText = false;
 
@@ -498,7 +492,9 @@ void QXmppOutgoingClient::startSmResume()
 
 void QXmppOutgoingClient::startSmEnable()
 {
-    d->listener = &d->c2sStreamManager;
+    // sending <enable/> may happen after session establishment (bind1 completed)
+    // allow receiving both stanzas and stream management responses by using `this` as listener
+    d->listener = this;
     d->c2sStreamManager.requestEnable().then(this, [this] {
         // enabling of stream management may or may not have succeeded
         // we are connected now
@@ -603,7 +599,7 @@ void QXmppOutgoingClient::setError(const QString &text, ConnectionError &&detail
     Q_EMIT errorOccurred(d->error->text, d->error->details, clientError);
 }
 
-void QXmppOutgoingClient::socketError(QAbstractSocket::SocketError socketError)
+void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<StreamError, QAbstractSocket::SocketError> error)
 {
     if (!d->sessionStarted &&
         (d->serverAddresses.size() > d->nextServerAddressIndex)) {
@@ -616,16 +612,13 @@ void QXmppOutgoingClient::socketError(QAbstractSocket::SocketError socketError)
             d->connectToNextAddress();
         }
     } else {
-        setError(d->socket.socket()->errorString(), socketError);
+        setError(text, into<ConnectionError>(error));
     }
 }
 
 void QXmppOutgoingClient::handleStart()
 {
-    // reset stream information
     d->streamId.clear();
-    d->streamFrom.clear();
-    d->streamVersion.clear();
 
     // reset active manager (e.g. authentication)
     d->listener = this;
@@ -636,26 +629,42 @@ void QXmppOutgoingClient::handleStart()
     d->socket.sendData(serializeXml(StreamOpen {
         d->config.domain(),
         d->config.user().isEmpty() ? QString() : d->config.jidBare(),
-        ns_client,
+        {},
+        u"1.0"_s,
+        ns_client.toString(),
     }));
 }
 
-void QXmppOutgoingClient::handleStream(const QDomElement &streamElement)
+void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
-    if (d->streamId.isEmpty()) {
-        d->streamId = streamElement.attribute(u"id"_s);
+    if (stream.from != d->config.domain()) {
+        setError(u"Peer serves '%1' instead of '%2' as expected."_s.arg(stream.from, d->config.domain()),
+                 StreamError::HostUnknown);
+        disconnectFromHost();
+        return;
     }
-    if (d->streamFrom.isEmpty()) {
-        d->streamFrom = streamElement.attribute(u"from"_s);
+    // If we include a 'from' attribute, the server must respond with the same 'to' attribute.
+    if (!d->config.user().isEmpty() && stream.to != d->config.jidBare()) {
+        warning(u"Server did not include our JID in the stream 'to' attribute (violating RFC6120, allowed in RFC3920)."_s);
+        // do not treat as fatal error
     }
-    if (d->streamVersion.isEmpty()) {
-        d->streamVersion = streamElement.attribute(u"version"_s);
+    if (stream.id.isEmpty()) {
+        setError(u"Server did not respond with a stream ID."_s, StreamError::UndefinedCondition);
+        d->socket.sendData(serializeXml(StreamErrorElement {
+            StreamError::UndefinedCondition,
+            u"Stream ID missing."_s,
+        }));
+        disconnectFromHost();
+        return;
+    }
+    // TODO: Do numeric comparison of version number as defined in https://datatracker.ietf.org/doc/html/rfc6120#section-4.7.5
 
-        // no version specified, signals XMPP Version < 1.0.
-        // switch to old auth mechanism if enabled
-        if (d->streamVersion.isEmpty() && configuration().useNonSASLAuthentication()) {
-            startNonSaslAuth();
-        }
+    d->streamId = stream.id;
+
+    // no version specified, signals XMPP Version < 1.0.
+    // switch to old auth mechanism if enabled
+    if (stream.version.isEmpty() && configuration().useNonSASLAuthentication()) {
+        startNonSaslAuth();
     }
 }
 
@@ -673,10 +682,17 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
                   d->listener)) {
     case Accepted:
         return;
-    case Rejected:
-        setError(u"Unexpected element received."_s, StreamError::UndefinedCondition);
+    case Rejected: {
+        auto managerName = visit(
+            [](auto &&listener) {
+                using T = typename std::remove_reference_t<std::remove_pointer_t<std::decay_t<decltype(listener)>>>;
+                return T::TaskName;
+            },
+            d->listener);
+        setError(u"Unexpected element received while handling %1."_s.arg(managerName), StreamError::UndefinedCondition);
         disconnectFromHost();
         return;
+    }
     case Finished:
         // if the job is done, set OutgoingClient, but do not override a continuation job
         if (d->listener.index() == index) {
@@ -715,6 +731,10 @@ HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRe
         return Accepted;
     } else if (ns == ns_client) {
         return handleStanza(nodeRecv) ? Accepted : Rejected;
+    } else if (d->c2sStreamManager.hasOngoingRequest()) {
+        if (d->c2sStreamManager.handleElement(nodeRecv) != Rejected) {
+            return Accepted;
+        }
     }
     return Rejected;
 }
@@ -742,6 +762,7 @@ void QXmppOutgoingClient::handleStreamFeatures(const QXmppStreamFeatures &featur
                 debug(u"Authenticated"_s);
                 d->isAuthenticated = true;
                 d->authenticationMethod = AuthenticationMethod::Sasl;
+                d->socket.resetStream();
                 handleStart();
             } else {
                 auto [text, err] = std::get<SaslManager::AuthError>(std::move(result));
@@ -796,7 +817,7 @@ void QXmppOutgoingClient::handleStreamError(const QXmpp::Private::StreamErrorEle
     } else {
         auto condition = std::get<StreamError>(streamError.condition);
         auto text = u"Received stream error (%1): %2"_s
-                        .arg(StreamErrorElement::streamErrorToString(condition), streamError.text);
+                        .arg(Enums::toString(condition), streamError.text);
 
         setError(text, condition);
     }
@@ -848,7 +869,7 @@ bool QXmppOutgoingClient::handleStanza(const QDomElement &stanza)
 
 bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
 {
-    if (!socket()->isEncrypted()) {
+    if (!d->socket.internalSocket()->isEncrypted()) {
         // determine TLS mode to use
         auto localSecurity = configuration().streamSecurityMode();
         auto remoteSecurity = features.tlsMode();
@@ -874,7 +895,7 @@ bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
             // enable TLS as it is support by both parties
             d->socket.sendData(serializeXml(StarttlsRequest()));
             d->setListener<StarttlsManager>().task().then(this, [this] {
-                socket()->startClientEncryption();
+                d->socket.internalSocket()->startClientEncryption();
             });
             return true;
         }
@@ -926,57 +947,56 @@ QXmppTask<BindManager::Result> BindManager::bindAddress(const QString &resource)
     Q_ASSERT(m_iqId.isNull());
 
     m_promise = QXmppPromise<Result>();
-
-    const auto iq = QXmppBindIq::bindAddressIq(resource);
-    m_iqId = iq.id();
-    m_socket->sendData(serializeXml(iq));
+    m_iqId = generateSequentialStanzaId();
+    m_socket->sendData(serializeXml(SetIq<BindElement> {
+        m_iqId,
+        {},
+        {},
+        {},
+        BindElement { {}, resource },
+    }));
 
     return m_promise->task();
 }
 
 HandleElementResult BindManager::handleElement(const QDomElement &el)
 {
-    auto process = [](QXmppBindIq &&iq) -> Result {
-        if (iq.type() == QXmppIq::Result) {
-            if (iq.jid().isEmpty()) {
-                return ProtocolError { u"Server did not return JID upon resource binding."_s };
-            }
-
-            static const QRegularExpression jidRegex(u"^([^@/]+)@([^@/]+)/(.+)$"_s);
-            if (const auto match = jidRegex.match(iq.jid()); match.hasMatch()) {
-                return BoundAddress {
-                    match.captured(1),
-                    match.captured(2),
-                    match.captured(3),
-                };
-            }
-
-            return ProtocolError { u"Bind IQ received with invalid JID"_s };
-        }
-
-        return iq.error();
-    };
-
-    if (QXmppBindIq::isBindIq(el) && el.attribute(u"id"_s) == m_iqId) {
+    if (el.tagName() == u"iq" && isElement<BindElement>(el.firstChildElement()) && el.attribute(u"id"_s) == m_iqId) {
         Q_ASSERT(m_promise.has_value());
 
         auto p = std::move(*m_promise);
         m_iqId.clear();
         m_promise.reset();
 
-        QXmppBindIq bind;
-        bind.parse(el);
+        p.finish(map<Result>(
+            overloaded {
+                [](BindElement &&bind) -> Result {
+                    if (bind.jid.isEmpty()) {
+                        return ProtocolError { u"Server did not return JID upon resource binding."_s };
+                    }
 
-        // do not accept other IQ types than result and error
-        if (bind.type() == QXmppIq::Result || bind.type() == QXmppIq::Error) {
-            p.finish(process(std::move(bind)));
-            return Finished;
-        }
+                    static const QRegularExpression jidRegex(u"^([^@/]+)@([^@/]+)/(.+)$"_s);
+                    if (const auto match = jidRegex.match(bind.jid); match.hasMatch()) {
+                        return BoundAddress {
+                            match.captured(1),
+                            match.captured(2),
+                            match.captured(3),
+                        };
+                    }
+
+                    return ProtocolError { u"Bind IQ received with invalid JID"_s };
+                },
+                [](QXmppError &&error) -> Result {
+                    return ProtocolError { error.description };
+                },
+            },
+            parseIqResponse<BindElement>(el)));
+        return Finished;
     }
     return Rejected;
 }
 
-QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(const QString &streamFrom, const QString &username)
+QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(const QString &domain, const QString &username)
 {
     // no other running query
     Q_ASSERT(std::holds_alternative<NoQuery>(m_query));
@@ -986,7 +1006,7 @@ QXmppTask<NonSaslAuthManager::OptionsResult> NonSaslAuthManager::queryOptions(co
 
     QXmppNonSASLAuthIq authQuery;
     authQuery.setType(QXmppIq::Get);
-    authQuery.setTo(streamFrom);
+    authQuery.setTo(domain);
     // FIXME : why are we setting the username, XEP-0078 states we should
     // not attempt to guess the required fields?
     authQuery.setUsername(username);
@@ -1030,7 +1050,7 @@ HandleElementResult NonSaslAuthManager::handleElement(const QDomElement &el)
         m_query = {};
 
         auto iqType = el.attribute(u"type"_s);
-        if (QXmppNonSASLAuthIq::isNonSASLAuthIq(el) && iqType == u"result") {
+        if (isIqElement<QXmppNonSASLAuthIq>(el) && iqType == u"result") {
             auto queryEl = firstChildElement(el, u"query");
 
             bool digest = !firstChildElement(queryEl, u"digest").isNull();

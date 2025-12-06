@@ -2,15 +2,17 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMovedManager.h"
-#include "QXmppConstants_p.h"
 #include "QXmppPubSubManager.h"
 #ifdef BUILD_INTERNAL_TESTS
 #include "QXmppMovedItem_p.h"
 #endif
 
 #include "TestClient.h"
+
+using namespace QXmpp::Private;
 
 struct Tester {
     Tester()
@@ -134,8 +136,11 @@ void tst_QXmppMovedManager::testHandleDiscoInfo()
 {
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
     iq.setFeatures({ ns_moved.toString() });
+    QT_WARNING_POP
 
     manager->handleDiscoInfo(iq);
 
@@ -165,7 +170,10 @@ void tst_QXmppMovedManager::testOnRegistered()
 
     QVERIFY(!manager.supportedByServer());
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
+    QT_WARNING_POP
     iq.setFeatures({ ns_moved.toString() });
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
 
@@ -185,7 +193,10 @@ void tst_QXmppMovedManager::testOnUnregistered()
     manager.setSupportedByServer(true);
     manager.onUnregistered(&client);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
+    QT_WARNING_POP
     iq.setFeatures({ ns_moved.toString() });
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
 
@@ -209,28 +220,28 @@ void tst_QXmppMovedManager::testPublishMoved()
 
     auto task = call();
 
-    client.expect(u"<iq id='qxmpp1' to='old@shakespeare.example' type='set'>"
-                                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
-                                 "<publish node='urn:xmpp:moved:1'>"
-                                 "<item id='current'>"
-                                 "<moved xmlns='urn:xmpp:moved:1'>"
-                                 "<new-jid>moved@shakespeare.example</new-jid>"
-                                 "</moved>"
-                                 "</item>"
-                                 "</publish>"
-                                 "</pubsub>"
-                                 "</iq>"_s);
-    client.inject(u"<iq id='qxmpp1' from='old@shakespeare.example' type='result'>"
-                                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
-                                 "<publish node='uurn:xmpp:moved:1'>"
-                                 "<item id='current'/>"
-                                 "</publish>"
-                                 "</pubsub>"
-                                 "</iq>"_s);
+    client.expect(u"<iq id='qx1' to='old@shakespeare.example' type='set'>"
+                  "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                  "<publish node='urn:xmpp:moved:1'>"
+                  "<item id='current'>"
+                  "<moved xmlns='urn:xmpp:moved:1'>"
+                  "<new-jid>moved@shakespeare.example</new-jid>"
+                  "</moved>"
+                  "</item>"
+                  "</publish>"
+                  "</pubsub>"
+                  "</iq>"_s);
+    client.inject(u"<iq id='qx1' from='old@shakespeare.example' type='result'>"
+                  "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                  "<publish node='uurn:xmpp:moved:1'>"
+                  "<item id='current'/>"
+                  "</publish>"
+                  "</pubsub>"
+                  "</iq>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"old@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"old@shakespeare.example"_s);
 }
 
 void tst_QXmppMovedManager::testVerifyMoved()
@@ -245,28 +256,28 @@ void tst_QXmppMovedManager::testVerifyMoved()
 
     auto task = call();
 
-    client.expect(u"<iq id='qxmpp1' to='old@shakespeare.example' type='get'>"
-                                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
-                                 "<items node='urn:xmpp:moved:1'>"
-                                 "<item id='current'/>"
-                                 "</items>"
-                                 "</pubsub>"
-                                 "</iq>"_s);
-    client.inject(u"<iq id='qxmpp1' from='old@shakespeare.example' type='result'>"
-                                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
-                                 "<items node='urn:xmpp:moved:1'>"
-                                 "<item id='current'>"
-                                 "<moved xmlns='urn:xmpp:moved:1'>"
-                                 "<new-jid>moved@shakespeare.example</new-jid>"
-                                 "</moved>"
-                                 "</item>"
-                                 "</items>"
-                                 "</pubsub>"
-                                 "</iq>"_s);
+    client.expect(u"<iq id='qx1' to='old@shakespeare.example' type='get'>"
+                  "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                  "<items node='urn:xmpp:moved:1'>"
+                  "<item id='current'/>"
+                  "</items>"
+                  "</pubsub>"
+                  "</iq>"_s);
+    client.inject(u"<iq id='qx1' from='old@shakespeare.example' type='result'>"
+                  "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                  "<items node='urn:xmpp:moved:1'>"
+                  "<item id='current'>"
+                  "<moved xmlns='urn:xmpp:moved:1'>"
+                  "<new-jid>moved@shakespeare.example</new-jid>"
+                  "</moved>"
+                  "</item>"
+                  "</items>"
+                  "</pubsub>"
+                  "</iq>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"old@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"old@shakespeare.example"_s);
 }
 
 void tst_QXmppMovedManager::testNotify()
@@ -282,11 +293,11 @@ void tst_QXmppMovedManager::testNotify()
     auto task = call();
 
     client.expect(u"<presence to='contact@shakespeare.example' type='subscribe'>"
-                                 "<status>I moved.</status>"
-                                 "<moved xmlns='urn:xmpp:moved:1'>"
-                                 "<old-jid>old@shakespeare.example</old-jid>"
-                                 "</moved>"
-                                 "</presence>"_s);
+                  "<status>I moved.</status>"
+                  "<moved xmlns='urn:xmpp:moved:1'>"
+                  "<old-jid>old@shakespeare.example</old-jid>"
+                  "</moved>"
+                  "</presence>"_s);
 }
 
 template<typename T>

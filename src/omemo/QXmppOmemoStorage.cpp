@@ -8,8 +8,6 @@
 /// \brief The QXmppOmemoStorage class stores data used by
 /// \xep{0384, OMEMO Encryption}.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 

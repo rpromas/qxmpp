@@ -30,8 +30,8 @@ void tst_QXmppEntityTimeManager::testSendRequest()
     QSignalSpy spy(manager, &QXmppEntityTimeManager::timeReceived);
 
     manager->requestTime("juliet@capulet.com/balcony");
-    test.expect("<iq id='qxmpp1' to='juliet@capulet.com/balcony' type='get'><time xmlns='urn:xmpp:time'/></iq>");
-    manager->handleStanza(xmlToDom(R"(<iq id='qxmpp1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
+    test.expect("<iq id='qx1' to='juliet@capulet.com/balcony' type='get'><time xmlns='urn:xmpp:time'/></iq>");
+    manager->handleStanza(xmlToDom(R"(<iq id='qx1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
   <time xmlns='urn:xmpp:time'>
     <tzo>-06:00</tzo>
     <utc>2006-12-19T17:58:35Z</utc>
@@ -40,7 +40,7 @@ void tst_QXmppEntityTimeManager::testSendRequest()
 
     QCOMPARE(spy.size(), 1);
     auto time = spy.at(0).at(0).value<QXmppEntityTimeIq>();
-    QCOMPARE(time.utc(), QDateTime({ 2006, 12, 19 }, { 17, 58, 35 }, Qt::UTC));
+    QCOMPARE(time.utc(), QDateTime({ 2006, 12, 19 }, { 17, 58, 35 }, TimeZoneUTC));
     QCOMPARE(time.tzo(), -6 * 60 * 60);
 }
 
@@ -56,7 +56,12 @@ void tst_QXmppEntityTimeManager::testHandleRequest()
 </iq>)"));
 
     auto packet = xmlToDom(test.takePacket());
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QVERIFY(QXmppEntityTimeIq::isEntityTimeIq(packet));
+    QT_WARNING_POP
+
     QXmppEntityTimeIq resp;
     resp.parse(packet);
 

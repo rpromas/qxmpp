@@ -13,11 +13,13 @@
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
 
+using namespace QXmpp::Private;
+
 ///
 /// \class QXmppAttentionManager
 ///
 /// \brief The QXmppAttentionManager class manages attention requests as defined
-/// by \xep{0224}: Attention.
+/// by \xep{0224, Attention}.
 ///
 /// The manager also does some checks, including rate limiting and checking
 /// whether the senders are trusted (aka. in the roster).
@@ -91,7 +93,7 @@ QXmppAttentionManager::QXmppAttentionManager(quint8 allowedAttempts, QTime timeF
 QXmppAttentionManager::~QXmppAttentionManager() = default;
 
 ///
-/// Returns the \xep{0224}: Attention feature.
+/// Returns the \xep{0224, Attention} feature.
 ///
 QStringList QXmppAttentionManager::discoveryFeatures() const
 {
@@ -162,7 +164,7 @@ void QXmppAttentionManager::setAllowedAttemptsTimeInterval(QTime interval)
 ///
 /// \return The ID of the sent message, if sent successfully, a null string
 /// otherwise. In case an ID is returned, it also corresponds to the origin ID
-/// of the message as defined by \xep{0359}: Unique and Stable Stanza IDs.
+/// of the message as defined by \xep{0359, Unique and Stable Stanza IDs}.
 ///
 QString QXmppAttentionManager::requestAttention(const QString &jid, const QString &message)
 {
@@ -176,10 +178,7 @@ QString QXmppAttentionManager::requestAttention(const QString &jid, const QStrin
     msg.setBody(message);
     msg.setAttentionRequested(true);
 
-    if (client()->sendPacket(msg)) {
-        return msg.id();
-    }
-    return {};
+    return client()->sendLegacyId(msg);
 }
 
 void QXmppAttentionManager::onRegistered(QXmppClient *client)
@@ -226,7 +225,7 @@ QXmppAttentionManagerPrivate::QXmppAttentionManagerPrivate(QXmppAttentionManager
       allowedAttemptsTimeInterval(timeFrame),
       cleanUpTimer(new QTimer(parent))
 {
-    QObject::connect(cleanUpTimer, &QTimer::timeout, [this]() {
+    QObject::connect(cleanUpTimer, &QTimer::timeout, this, [this]() {
         cleanUp();
     });
 }

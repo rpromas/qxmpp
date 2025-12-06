@@ -43,6 +43,7 @@ struct SmEnabled;
 struct SmFailed;
 struct SmResumed;
 struct StreamErrorElement;
+struct StreamOpen;
 
 enum HandleElementResult {
     Accepted,
@@ -83,6 +84,7 @@ class QXMPP_EXPORT QXmppOutgoingClient : public QXmppLoggable
 public:
     using IqResult = std::variant<QDomElement, QXmppError>;
     using ConnectionError = std::variant<QAbstractSocket::SocketError, QXmpp::TimeoutError, QXmpp::StreamError, QXmpp::AuthenticationError, QXmpp::BindError>;
+    static constexpr QStringView TaskName = u"client session";
 
     explicit QXmppOutgoingClient(QObject *parent);
     ~QXmppOutgoingClient() override;
@@ -93,8 +95,6 @@ public:
     bool isConnected() const;
     QXmppTask<IqResult> sendIq(QXmppIq &&);
 
-    /// Returns the used socket
-    QSslSocket *socket() const;
     QXmppStanza::Error::Condition xmppStreamError();
 
     QXmppConfiguration &configuration();
@@ -133,7 +133,7 @@ public:
 
 private:
     void handleStart();
-    void handleStream(const QDomElement &element);
+    void handleStream(const QXmpp::Private::StreamOpen &stream);
     void handlePacketReceived(const QDomElement &element);
     QXmpp::Private::HandleElementResult handleElement(const QDomElement &nodeRecv);
     void handleStreamFeatures(const QXmppStreamFeatures &features);
@@ -141,9 +141,9 @@ private:
     bool handleStanza(const QDomElement &);
     bool handleStarttls(const QXmppStreamFeatures &features);
 
-    void _q_socketDisconnected();
-    void socketError(QAbstractSocket::SocketError);
-    void socketSslErrors(const QList<QSslError> &);
+    void handleSocketDisconnected();
+    void handleSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>);
+    void handleSocketSslErrors(const QList<QSslError> &);
 
     void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &sasl2Feature);
     void startNonSaslAuth();
@@ -174,6 +174,7 @@ class C2sStreamManager
 {
 public:
     using Result = std::variant<Success, QXmppError>;
+    static constexpr QStringView TaskName = u"stream management";
 
     explicit C2sStreamManager(QXmppOutgoingClient *q);
 
@@ -194,6 +195,7 @@ public:
     QXmppTask<void> requestResume();
     bool canRequestEnable() const { return m_smAvailable && !m_enabled; }
     QXmppTask<void> requestEnable();
+    bool hasOngoingRequest() const { return !std::holds_alternative<NoRequest>(m_request); }
 
 private:
     friend class ::TestClient;

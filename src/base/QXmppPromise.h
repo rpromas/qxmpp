@@ -24,17 +24,7 @@ class QXmppPromise
     static_assert(!std::is_abstract_v<T>);
 
 public:
-    template<typename U = T, std::enable_if_t<std::is_void_v<U>> * = nullptr>
-    QXmppPromise()
-        : d(QXmpp::Private::TaskPrivate(nullptr))
-    {
-    }
-
-    template<typename U = T, std::enable_if_t<!std::is_void_v<U>> * = nullptr>
-    QXmppPromise()
-        : d(QXmpp::Private::TaskPrivate([](void *r) { delete static_cast<T *>(r); }))
-    {
-    }
+    QXmppPromise() : d(std::make_shared<QXmpp::Private::TaskData<T>>()) { }
 
     ///
     /// Report that the asynchronous operation has finished, and call the connected handler of the
@@ -45,46 +35,46 @@ public:
 #ifdef QXMPP_DOC
     void reportFinished(T &&value)
 #else
-    template<typename U, typename TT = T, std::enable_if_t<!std::is_void_v<TT> && std::is_same_v<TT, U>> * = nullptr>
+    template<typename U, typename TT = T>
+        requires(!std::is_void_v<T> && std::is_same_v<TT, U>)
     void finish(U &&value)
 #endif
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                d.invokeContinuation(&value);
-            }
-        } else {
-            d.setResult(new U(std::move(value)));
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        d->result = std::move(value);
+        if (d->continuation) {
+            d->continuation(*d);
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d->continuation = {};
         }
     }
 
     /// \cond
-    template<typename U, typename TT = T, std::enable_if_t<!std::is_void_v<TT> && std::is_constructible_v<TT, U> && !std::is_same_v<TT, U>> * = nullptr>
+    template<typename U, typename TT = T>
+        requires(!std::is_void_v<T> && std::is_constructible_v<TT, U> && !std::is_same_v<TT, U>)
     void finish(U &&value)
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                T convertedValue { std::move(value) };
-                d.invokeContinuation(&convertedValue);
-            }
-        } else {
-            d.setResult(new T(std::move(value)));
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        d->result = T { std::move(value) };
+        if (d->continuation) {
+            d->continuation(*d);
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d->continuation = {};
         }
     }
 
-    template<typename U = T, std::enable_if_t<std::is_void_v<U>> * = nullptr>
+    template<typename U = T>
+        requires(std::is_void_v<T>)
     void finish()
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                d.invokeContinuation(nullptr);
-            }
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        if (d->continuation) {
+            d->continuation(*d);
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d->continuation = {};
         }
     }
     /// \endcond
@@ -93,13 +83,10 @@ public:
     /// Obtain a handle to this promise that allows to obtain the value that will be produced
     /// asynchronously.
     ///
-    QXmppTask<T> task()
-    {
-        return QXmppTask<T>(d);
-    }
+    QXmppTask<T> task() { return QXmppTask<T> { d }; }
 
 private:
-    QXmpp::Private::TaskPrivate d;
+    std::shared_ptr<QXmpp::Private::TaskData<T>> d;
 };
 
 #endif  // QXMPPPROMISE_H

@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -50,14 +51,18 @@ using namespace QXmpp::Private;
 /// \since QXmpp 1.5
 ///
 
-constexpr auto PUBSUB_EVENTS = to_array<QStringView>({
-    u"configuration",
-    u"delete",
-    u"items",
-    u"items",  // virtual retract type
-    u"purge",
-    u"subscription",
-});
+template<>
+struct Enums::Data<QXmppPubSubEventBase::EventType> {
+    using enum QXmppPubSubEventBase::EventType;
+    static constexpr auto Values = makeValues<QXmppPubSubEventBase::EventType>({
+        { Configuration, u"configuration" },
+        { Delete, u"delete" },
+        { Items, u"items" },
+        { Retract, u"items" },  // virtual retract type
+        { Purge, u"purge" },
+        { Subscription, u"subscription" },
+    });
+};
 
 class QXmppPubSubEventPrivate : public QSharedData
 {
@@ -228,7 +233,7 @@ bool QXmppPubSubEventBase::isPubSubEvent(const QDomElement &stanza, std::functio
     auto eventTypeElement = event.firstChildElement();
 
     // check for validity of the event type
-    auto eventType = enumFromString<EventType>(PUBSUB_EVENTS, eventTypeElement.tagName());
+    auto eventType = Enums::fromString<EventType>(eventTypeElement.tagName());
     if (!eventType) {
         return false;
     }
@@ -287,7 +292,7 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
         eventElement.namespaceURI() == ns_pubsub_event) {
         // check that the query type is valid
         const auto eventTypeElement = eventElement.firstChildElement();
-        if (auto eventType = enumFromString<EventType>(PUBSUB_EVENTS, eventTypeElement.tagName())) {
+        if (auto eventType = Enums::fromString<EventType>(eventTypeElement.tagName())) {
             d->eventType = *eventType;
         } else {
             return false;
@@ -331,23 +336,14 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
             break;
         case Retract:
             // parse retract ids
-            for (const auto &retract : iterChildElements(eventTypeElement, u"retract")) {
-                d->retractIds << retract.attribute(u"id"_s);
-            }
+            d->retractIds = parseSingleAttributeElements(eventTypeElement, u"retract", ns_pubsub_event, u"id"_s);
             break;
         case Subscription: {
-            QXmppPubSubSubscription subscription;
-            subscription.parse(eventTypeElement);
-            d->subscription = subscription;
+            d->subscription = parseElement<QXmppPubSubSubscription>(eventTypeElement).value_or(QXmppPubSubSubscription());
             break;
         }
         case Configuration:
-            if (auto formElement = firstChildElement(eventTypeElement, u"x"_s, ns_data);
-                !formElement.isNull()) {
-                QXmppDataForm form;
-                form.parse(formElement);
-                d->configurationForm = form;
-            }
+            d->configurationForm = parseOptionalChildElement<QXmppDataForm>(eventTypeElement);
             break;
         case Purge:
             break;
@@ -362,70 +358,47 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
 
 void QXmppPubSubEventBase::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode sceMode, const QString &baseNamespace) const
 {
+    XmlWriter w(writer);
+
     QXmppMessage::serializeExtensions(writer, sceMode, baseNamespace);
 
     if (!(sceMode & QXmpp::SceSensitive)) {
         return;
     }
 
-    writer->writeStartElement(QSL65("event"));
-    writer->writeDefaultNamespace(toString65(ns_pubsub_event));
-
-    if (d->eventType == Subscription && d->subscription) {
-        d->subscription->toXml(writer);
+    if (d->eventType == Subscription) {
+        w.write(Element { { u"event", ns_pubsub_event }, d->subscription });
     } else {
-        writer->writeStartElement(toString65(PUBSUB_EVENTS.at(size_t(d->eventType))));
-
-        // write node attribute
-        switch (d->eventType) {
-        case Delete:
-        case Items:
-        case Retract:
-        case Purge:
-            // node attribute is required
-            writer->writeAttribute(QSL65("node"), d->node);
-            break;
-        case Configuration:
-            // node attribute is optional
-            writeOptionalXmlAttribute(writer, u"node", d->node);
-            break;
-        case Subscription:
-            break;
-        }
-
-        switch (d->eventType) {
-        case Configuration:
-            if (d->configurationForm) {
-                d->configurationForm->toXml(writer);
-            }
-            break;
-        case Delete:
-            if (!d->redirectUri.isEmpty()) {
-                writer->writeStartElement(QSL65("redirect"));
-                writer->writeAttribute(QSL65("uri"), d->redirectUri);
-                writer->writeEndElement();
-            }
-        case Items:
-            // serialize items
-            serializeItems(writer);
-
-            break;
-        case Retract:
-            // serialize retract ids
-            for (const auto &id : std::as_const(d->retractIds)) {
-                writer->writeStartElement(QSL65("retract"));
-                writer->writeAttribute(QSL65("id"), id);
-                writer->writeEndElement();
-            }
-
-            break;
-        case Purge:
-        case Subscription:
-            break;
-        }
-
-        writer->writeEndElement();  // close event's type element
+        w.write(Element {
+            { u"event", ns_pubsub_event },
+            Element {
+                d->eventType,
+                // `node` attribute
+                OptionalContent {
+                    d->eventType == Delete || d->eventType == Items || d->eventType == Retract ||
+                        d->eventType == Purge,
+                    Attribute { u"node", d->node },
+                },
+                OptionalContent {
+                    d->eventType == Configuration,
+                    OptionalAttribute { u"node", d->node },
+                },
+                // content
+                OptionalContent { d->eventType == Configuration, d->configurationForm },
+                OptionalContent {
+                    d->eventType == Delete && !d->redirectUri.isEmpty(),
+                    Element { u"redirect", Attribute { u"uri", d->redirectUri } },
+                },
+                OptionalContent {
+                    d->eventType == Items || d->eventType == Delete,
+                    [&] { serializeItems(writer); },
+                },
+                OptionalContent {
+                    d->eventType == Retract,
+                    SingleAttributeElements { u"retract", u"id", d->retractIds },
+                },
+            },
+        });
     }
-    writer->writeEndElement();  // </event>
 }
 /// \endcond

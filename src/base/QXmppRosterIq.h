@@ -6,6 +6,7 @@
 #ifndef QXMPPROSTERIQ_H
 #define QXMPPROSTERIQ_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppIq.h"
 
 #include <QList>
@@ -77,6 +78,7 @@ public:
         void setMixParticipantId(const QString &);
 
         /// \cond
+        static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_roster };
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
         /// \endcond
@@ -112,6 +114,8 @@ public:
     void setMixAnnotate(bool);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_roster };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isRosterIq(const QDomElement &element);
     /// \endcond
 

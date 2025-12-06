@@ -8,10 +8,21 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
 using namespace QXmpp::Private;
+
+template<>
+struct Enums::Data<QXmppByteStreamIq::Mode> {
+    static constexpr auto NullValue = QXmppByteStreamIq::None;
+    static constexpr auto Values = makeValues<QXmppByteStreamIq::Mode>({
+        { QXmppByteStreamIq::None, {} },
+        { QXmppByteStreamIq::Tcp, u"tcp" },
+        { QXmppByteStreamIq::Udp, u"udp" },
+    });
+};
 
 ///
 /// \enum QXmppByteStreamIq::Mode
@@ -88,6 +99,29 @@ void QXmppByteStreamIq::StreamHost::setZeroconf(const QString &zeroconf)
 {
     m_zeroconf = zeroconf;
 }
+
+/// \cond
+std::optional<QXmppByteStreamIq::StreamHost> QXmppByteStreamIq::StreamHost::fromDom(const QDomElement &el)
+{
+    StreamHost streamHost;
+    streamHost.setHost(el.attribute(u"host"_s));
+    streamHost.setJid(el.attribute(u"jid"_s));
+    streamHost.setPort(parseInt<quint16>(el.attribute(u"port"_s)).value_or(0));
+    streamHost.setZeroconf(el.attribute(u"zeroconf"_s));
+    return streamHost;
+}
+
+void QXmppByteStreamIq::StreamHost::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"host", m_host },
+        OptionalAttribute { u"jid", m_jid },
+        Attribute { u"port", m_port },
+        OptionalAttribute { u"zeroconf", m_zeroconf },
+    });
+}
+/// \endcond
 
 ///
 /// \class QXmppByteStreamIq
@@ -176,14 +210,6 @@ void QXmppByteStreamIq::setStreamHostUsed(const QString &jid)
     m_streamHostUsed = jid;
 }
 
-///
-/// Returns whether \a element is an IQ element with a bytestream query.
-///
-bool QXmppByteStreamIq::isByteStreamIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_bytestreams);
-}
-
 /// \cond
 void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
 {
@@ -198,47 +224,21 @@ void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
         m_mode = None;
     }
 
-    for (const auto &hostElement : iterChildElements(queryElement, u"streamhost")) {
-        StreamHost streamHost;
-        streamHost.setHost(hostElement.attribute(u"host"_s));
-        streamHost.setJid(hostElement.attribute(u"jid"_s));
-        streamHost.setPort(parseInt<quint16>(hostElement.attribute(u"port"_s)).value_or(0));
-        streamHost.setZeroconf(hostElement.attribute(u"zeroconf"_s));
-        m_streamHosts.append(streamHost);
-    }
+    m_streamHosts = parseChildElements<QList<StreamHost>>(queryElement);
     m_activate = firstChildElement(queryElement, u"activate").text();
     m_streamHostUsed = firstChildElement(queryElement, u"streamhost-used").attribute(u"jid"_s);
 }
 
 void QXmppByteStreamIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_bytestreams));
-    writeOptionalXmlAttribute(writer, u"sid", m_sid);
-    QString modeStr;
-    if (m_mode == Tcp) {
-        modeStr = u"tcp"_s;
-    } else if (m_mode == Udp) {
-        modeStr = u"udp"_s;
-    }
-    writeOptionalXmlAttribute(writer, u"mode", modeStr);
-    for (const auto &streamHost : m_streamHosts) {
-        writer->writeStartElement(QSL65("streamhost"));
-        writeOptionalXmlAttribute(writer, u"host", streamHost.host());
-        writeOptionalXmlAttribute(writer, u"jid", streamHost.jid());
-        writeOptionalXmlAttribute(writer, u"port", QString::number(streamHost.port()));
-        writeOptionalXmlAttribute(writer, u"zeroconf", streamHost.zeroconf());
-        writer->writeEndElement();
-    }
-    if (!m_activate.isEmpty()) {
-        writeXmlTextElement(writer, u"activate", m_activate);
-    }
-    if (!m_streamHostUsed.isEmpty()) {
-        writer->writeStartElement(QSL65("streamhost-used"));
-        writeOptionalXmlAttribute(writer, u"jid", m_streamHostUsed);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"query", ns_bytestreams },
+        OptionalAttribute { u"sid", m_sid },
+        OptionalAttribute { u"mode", m_mode == Tcp ? u"tcp"_s : m_mode == Udp ? u"udp"_s
+                                                                              : QString() },
+        m_streamHosts,
+        OptionalTextElement { u"activate", m_activate },
+        SingleAttributeElements { u"streamhost-used", u"jid", QList<QString> { m_streamHostUsed } },
+    });
 }
 /// \endcond

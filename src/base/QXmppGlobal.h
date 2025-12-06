@@ -10,9 +10,14 @@
 
 #include "qxmpp_export.h"
 
+#include <variant>
+
 #include <QString>
 
+struct QXmppError;
+
 #define QXMPP_AUTOTEST_EXPORT
+#define QXMPP_PRIVATE_EXPORT QXMPP_EXPORT
 
 ///
 /// This macro expands a numeric value of the form 0xMMNNPP (MM =
@@ -69,6 +74,13 @@ inline QLatin1String QXmppVersion()
     name::~name() = default;                       \
     name &name::operator=(const name &) = default; \
     name &name::operator=(name &&) noexcept = default;
+// Same as QXMPP_PRIVATE_DEFINE_RULE_OF_SIX but for an inner class.
+#define QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(outer, name)             \
+    outer::name::name(const outer::name &) = default;                   \
+    outer::name::name(outer::name &&) noexcept = default;               \
+    outer::name::~name() = default;                                     \
+    outer::name &outer::name::operator=(const outer::name &) = default; \
+    outer::name &outer::name::operator=(outer::name &&) noexcept = default;
 
 ///
 /// \namespace QXmpp
@@ -104,7 +116,7 @@ enum EncryptionMethod {
     /// \xep{0384, OMEMO Encryption} since version 0.8
     Omemo2,
 
-// Keep in sync with namespaces and names in Global.cpp!
+// Keep in sync with namespaces and names in Global/Message.cpp!
 
 #if QXMPP_DEPRECATED_SINCE(1, 5)
     /// \xep{0364, Current Off-the-Record Messaging Usage}
@@ -185,6 +197,14 @@ struct Cancelled { };
 /// \since QXmpp 1.7
 ///
 struct TimeoutError { };
+
+///
+/// Generic result type offering value or QXmppError
+///
+/// \since QXmpp 1.12
+///
+template<typename T>
+using Result = std::variant<T, QXmppError>;
 
 }  // namespace QXmpp
 

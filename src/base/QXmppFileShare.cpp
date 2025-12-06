@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <optional>
 
@@ -23,65 +24,39 @@ using Disposition = QXmppFileShare::Disposition;
 
 namespace QXmpp::Private {
 
+template<>
+struct Enums::Data<Disposition> {
+    using enum Disposition;
+    static constexpr auto Values = makeValues<Disposition>({
+        { Inline, u"inline" },
+        { Attachment, u"attachment" },
+    });
+};
+
 struct FileSources {
-    static FileSources fromSourcesDom(const QDomElement &el);
-    void innerToXml(QXmlStreamWriter *writer) const;
+    static FileSources fromDom(const QDomElement &el);
+    void toXml(XmlWriter &writer) const;
 
     QVector<QXmppHttpFileSource> httpSources;
     QVector<QXmppEncryptedFileSource> encryptedSources;
 };
 
-FileSources FileSources::fromSourcesDom(const QDomElement &el)
+FileSources FileSources::fromDom(const QDomElement &el)
 {
-    FileSources sources;
-    for (const auto &sourceEl : iterChildElements(el, u"url-data", ns_url_data)) {
-        QXmppHttpFileSource source;
-        if (source.parse(sourceEl)) {
-            sources.httpSources.push_back(std::move(source));
-        }
-    }
-    for (const auto &sourceEl : iterChildElements(el, u"encrypted", ns_esfs)) {
-        QXmppEncryptedFileSource source;
-        if (source.parse(sourceEl)) {
-            sources.encryptedSources.push_back(std::move(source));
-        }
-    }
-    return sources;
+    return {
+        parseChildElements<QVector<QXmppHttpFileSource>>(el),
+        parseChildElements<QVector<QXmppEncryptedFileSource>>(el),
+    };
 }
 
-void FileSources::innerToXml(QXmlStreamWriter *writer) const
+// only inner (without <sources/> element)
+void FileSources::toXml(XmlWriter &writer) const
 {
-    for (const auto &source : httpSources) {
-        source.toXml(writer);
-    }
-    for (const auto &source : encryptedSources) {
-        source.toXml(writer);
-    }
+    writer.write(httpSources);
+    writer.write(encryptedSources);
 }
 
 }  // namespace QXmpp::Private
-
-static std::optional<Disposition> dispositionFromString(const QString &str)
-{
-    if (str == u"inline") {
-        return Disposition::Inline;
-    }
-    if (str == u"attachment") {
-        return Disposition::Attachment;
-    }
-    return {};
-}
-
-static QString dispositionToString(Disposition value)
-{
-    switch (value) {
-    case Disposition::Inline:
-        return u"inline"_s;
-    case Disposition::Attachment:
-        return u"attachment"_s;
-    }
-    Q_UNREACHABLE();
-}
 
 class QXmppFileSourcesAttachmentPrivate : public QSharedData
 {
@@ -162,17 +137,18 @@ std::optional<QXmppFileSourcesAttachment> QXmppFileSourcesAttachment::fromDom(co
     }
     QXmppFileSourcesAttachment result;
     result.d->id = el.attribute(u"id"_s);
-    result.d->sources = FileSources::fromSourcesDom(el);
+    result.d->sources = FileSources::fromDom(el);
     return result;
 }
 
-void QXmppFileSourcesAttachment::toXml(QXmlStreamWriter *writer) const
+/// Serialize to XML
+void QXmppFileSourcesAttachment::toXml(QXmpp::Private::XmlWriter &writer) const
 {
-    writer->writeStartElement(QSL65("sources"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    writer->writeAttribute(QSL65("id"), d->id);
-    d->sources.innerToXml(writer);
-    writer->writeEndElement();
+    writer.write(Element {
+        { u"sources", ns_sfs },
+        Attribute { u"id", d->id },
+        d->sources,
+    });
 }
 
 class QXmppFileSharePrivate : public QSharedData
@@ -318,20 +294,20 @@ bool QXmppFileShare::parse(const QDomElement &el)
 {
     if (el.tagName() == u"file-sharing" && el.namespaceURI() == ns_sfs) {
         // disposition
-        d->disposition = dispositionFromString(el.attribute(u"disposition"_s))
+        d->disposition = Enums::fromString<Disposition>(el.attribute(u"disposition"_s))
                              .value_or(Disposition::Inline);
         d->id = el.attribute(u"id"_s);
 
         // file metadata
-        auto fileEl = firstChildElement(el, u"file");
-        d->metadata = QXmppFileMetadata();
-        if (!d->metadata.parse(fileEl)) {
+        if (auto metadata = parseElement<QXmppFileMetadata>(firstChildElement(el, u"file"))) {
+            d->metadata = std::move(*metadata);
+        } else {
             return false;
         }
 
         // sources
         if (auto sourcesEl = firstChildElement(el, u"sources", ns_sfs); !sourcesEl.isNull()) {
-            d->sources = FileSources::fromSourcesDom(sourcesEl);
+            d->sources = FileSources::fromDom(sourcesEl);
         }
         return true;
     }
@@ -340,16 +316,12 @@ bool QXmppFileShare::parse(const QDomElement &el)
 
 void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file-sharing"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    writer->writeAttribute(QSL65("disposition"), dispositionToString(d->disposition));
-    writeOptionalXmlAttribute(writer, u"id", d->id);
-    d->metadata.toXml(writer);
-
-    // sources
-    writer->writeStartElement(QSL65("sources"));
-    d->sources.innerToXml(writer);
-    writer->writeEndElement();
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"disposition", d->disposition },
+        OptionalAttribute { u"id", d->id },
+        d->metadata,
+        Element { u"sources", d->sources },
+    });
 }
 /// \endcond

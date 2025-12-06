@@ -3,21 +3,584 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppArchiveIq.h"
+#include "QXmppBindIq.h"
+#include "QXmppBitsOfBinaryIq.h"
+#include "QXmppByteStreamIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryIq.h"
 #include "QXmppElement.h"
+#include "QXmppEntityTimeIq.h"
+#include "QXmppExternalServiceDiscoveryIq.h"
+#include "QXmppHttpUploadIq.h"
+#include "QXmppIbbIq.h"
+#include "QXmppMamIq.h"
+#include "QXmppNonSASLAuth.h"
+#include "QXmppPingIq.h"
 #include "QXmppPubSubIq.h"
 #include "QXmppPubSubItem.h"
+#include "QXmppRegisterIq.h"
+#include "QXmppRosterIq.h"
 #include "QXmppSessionIq.h"
 #include "QXmppStartTlsPacket.h"
 #include "QXmppUtils_p.h"
+#include "QXmppVCardIq.h"
+#include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
+#include <QCryptographicHash>
 #include <QDomElement>
 #include <QSharedData>
 #include <QXmlStreamWriter>
 
 using namespace QXmpp::Private;
+
+template<typename Enum, std::size_t N>
+std::optional<Enum> enumFromString(const std::array<QStringView, N> &values, QStringView str)
+{
+    if (auto itr = std::ranges::find(values, str); itr != values.end()) {
+        return Enum(std::distance(values.begin(), itr));
+    }
+    return {};
+}
+
+static void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name, QStringView value)
+{
+    if (!value.isEmpty()) {
+        stream->writeAttribute(name.toString(), value.toString());
+    }
+}
+
+static bool isIqType(const QDomElement &element, QStringView tagName, QStringView xmlns)
+{
+    // IQs must have only one child element, so we do not need to iterate over the child elements.
+    auto child = element.firstChildElement();
+    return child.tagName() == tagName && child.namespaceURI() == xmlns;
+}
+
+// ArchiveIq
+
+/// \cond
+bool QXmppArchiveChatIq::isArchiveChatIq(const QDomElement &element)
+{
+    auto chatEl = firstChildElement(element, u"chat", ns_archive);
+    return !chatEl.isNull() && !chatEl.attribute(u"with"_s).isEmpty();
+}
+
+bool QXmppArchiveListIq::isArchiveListIq(const QDomElement &element)
+{
+    return isIqType(element, u"list", ns_archive);
+}
+
+bool QXmppArchiveRemoveIq::isArchiveRemoveIq(const QDomElement &element)
+{
+    return isIqType(element, u"remove", ns_archive);
+}
+
+bool QXmppArchiveRetrieveIq::isArchiveRetrieveIq(const QDomElement &element)
+{
+    return isIqType(element, u"retrieve", ns_archive);
+}
+
+bool QXmppArchivePrefIq::isArchivePrefIq(const QDomElement &element)
+{
+    return isIqType(element, u"pref", ns_archive);
+}
+
+// BindIq
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+QXmppBindIq QXmppBindIq::bindAddressIq(const QString &resource)
+{
+    QXmppBindIq iq;
+    iq.setType(QXmppIq::Set);
+    iq.setResource(resource);
+    return iq;
+}
+
+QString QXmppBindIq::jid() const
+{
+    return m_jid;
+}
+
+void QXmppBindIq::setJid(const QString &jid)
+{
+    m_jid = jid;
+}
+
+QString QXmppBindIq::resource() const
+{
+    return m_resource;
+}
+
+void QXmppBindIq::setResource(const QString &resource)
+{
+    m_resource = resource;
+}
+
+void QXmppBindIq::parseElementFromChild(const QDomElement &element)
+{
+    QDomElement bindElement = firstChildElement(element, u"bind");
+    m_jid = firstChildElement(bindElement, u"jid").text();
+    m_resource = firstChildElement(bindElement, u"resource").text();
+}
+
+void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        { u"bind", ns_bind },
+        OptionalTextElement { u"jid", m_jid },
+        OptionalTextElement { u"resource", m_resource },
+    });
+}
+
+bool QXmppBindIq::isBindIq(const QDomElement &element)
+{
+    return isIqType(element, u"bind", ns_bind);
+}
+
+QT_WARNING_POP
+
+// Bob
+
+bool QXmppBitsOfBinaryIq::isBitsOfBinaryIq(const QDomElement &element)
+{
+    return isIqType(element, u"data", ns_bob);
+}
+
+// ByteStreamIq
+
+bool QXmppByteStreamIq::isByteStreamIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_bytestreams);
+}
+
+// DiscoveryIq
+
+bool QXmppDiscoveryIq::isDiscoveryIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_disco_info) || isIqType(element, u"query", ns_disco_items);
+}
+/// \endcond
+
+class QXmppDiscoveryIqPrivate : public QSharedData
+{
+public:
+    QStringList features;
+    QList<QXmppDiscoIdentity> identities;
+    QList<QXmppDiscoItem> items;
+    QList<QXmppDataForm> dataForms;
+    QString queryNode;
+    QXmppDiscoveryIq::QueryType queryType;
+};
+
+///
+/// \class QXmppDiscoveryIq
+///
+/// QXmppDiscoveryIq represents a discovery IQ request or result containing a
+/// list of features and other information about an entity as defined by
+/// \xep{0030, Service Discovery}.
+///
+/// \ingroup Stanzas
+///
+/// \deprecated
+///
+
+///
+/// \enum QXmppDiscoveryIq::QueryType
+///
+/// Specifies the type of a service discovery query. An InfoQuery queries
+/// identities and features, an ItemsQuery queries subservices in the form of
+/// items.
+///
+
+QXmppDiscoveryIq::QXmppDiscoveryIq()
+    : d(new QXmppDiscoveryIqPrivate)
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppDiscoveryIq)
+
+///
+/// Returns the features of the service.
+///
+QStringList QXmppDiscoveryIq::features() const
+{
+    return d->features;
+}
+
+///
+/// Sets the features of the service.
+///
+void QXmppDiscoveryIq::setFeatures(const QStringList &features)
+{
+    d->features = features;
+}
+
+///
+/// Returns the list of identities for this service.
+///
+QList<QXmppDiscoIdentity> QXmppDiscoveryIq::identities() const
+{
+    return d->identities;
+}
+
+///
+/// Sets the list of identities for this service.
+///
+void QXmppDiscoveryIq::setIdentities(const QList<QXmppDiscoIdentity> &identities)
+{
+    d->identities = identities;
+}
+
+///
+/// Returns the list of service discovery items.
+///
+QList<QXmppDiscoItem> QXmppDiscoveryIq::items() const
+{
+    return d->items;
+}
+
+///
+/// Sets the list of service discovery items.
+///
+void QXmppDiscoveryIq::setItems(const QList<QXmppDiscoItem> &items)
+{
+    d->items = items;
+}
+
+///
+/// Returns the first of the included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Returns empty form if no form is included.
+///
+/// \deprecated Use dataForms() or findForm() instead.
+///
+QXmppDataForm QXmppDiscoveryIq::form() const
+{
+    if (d->dataForms.empty()) {
+        return {};
+    }
+    if (d->dataForms.size() == 1) {
+        return d->dataForms.constFirst();
+    }
+
+    // compat: with old behaviour: append all fields into one form
+    QXmppDataForm mixedForm = d->dataForms.constLast();
+    mixedForm.setFields({});
+
+    // copy all fields
+    QList<QXmppDataForm::Field> mixedFields;
+    for (const auto &form : d->dataForms) {
+        mixedFields << form.fields();
+    }
+    mixedForm.setFields(mixedFields);
+
+    return mixedForm;
+}
+
+///
+/// Sets included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \deprecated Use setForms() instead.
+///
+void QXmppDiscoveryIq::setForm(const QXmppDataForm &form)
+{
+    d->dataForms.clear();
+    d->dataForms.append(form);
+}
+
+///
+/// Returns included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+const QList<QXmppDataForm> &QXmppDiscoveryIq::dataForms() const
+{
+    return d->dataForms;
+}
+
+///
+/// Sets included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Each form must have a FORM_TYPE field and each form type MUST occur only once.
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryIq::setDataForms(const QList<QXmppDataForm> &dataForms)
+{
+    d->dataForms = dataForms;
+}
+
+///
+/// Looks for a data form with the given form type and returns it if found.
+///
+/// Data dataForms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+std::optional<QXmppDataForm> QXmppDiscoveryIq::dataForm(QStringView formType) const
+{
+    for (const auto &form : d->dataForms) {
+        if (form.formType() == formType) {
+            return form;
+        }
+    }
+    return {};
+}
+
+///
+/// Returns the special node to query.
+///
+QString QXmppDiscoveryIq::queryNode() const
+{
+    return d->queryNode;
+}
+
+///
+/// Sets the special node to query.
+///
+void QXmppDiscoveryIq::setQueryNode(const QString &node)
+{
+    d->queryNode = node;
+}
+
+///
+/// Returns the query type (info query or items query).
+///
+QXmppDiscoveryIq::QueryType QXmppDiscoveryIq::queryType() const
+{
+    return d->queryType;
+}
+
+///
+/// Sets the query type (info query or items query).
+///
+void QXmppDiscoveryIq::setQueryType(enum QXmppDiscoveryIq::QueryType type)
+{
+    d->queryType = type;
+}
+
+///
+/// Calculate the verification string for \xep{0115, Entity Capabilities}.
+///
+QByteArray QXmppDiscoveryIq::verificationString() const
+{
+    auto entityCapabilities1Compare = [](const QXmppDiscoIdentity &i1, const QXmppDiscoIdentity &i2) {
+        return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
+            std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
+    };
+
+    QString S;
+    QList<QXmppDiscoIdentity> sortedIdentities = d->identities;
+    std::sort(sortedIdentities.begin(), sortedIdentities.end(), entityCapabilities1Compare);
+    QStringList sortedFeatures = d->features;
+    std::sort(sortedFeatures.begin(), sortedFeatures.end());
+    sortedFeatures.removeDuplicates();
+    for (const auto &identity : sortedIdentities) {
+        S += identity.category() + u'/' + identity.type() + u'/' + identity.language() + u'/' + identity.name() + u'<';
+    }
+    for (const auto &feature : sortedFeatures) {
+        S += feature + u'<';
+    }
+
+    // extension data dataForms
+    auto forms = d->dataForms;
+    std::sort(forms.begin(), forms.end(), [](const auto &a, const auto &b) {
+        return a.formType() < b.formType();
+    });
+
+    for (const auto &form : forms) {
+        S += form.formType();
+        S += u'<';
+
+        auto fields = form.fields();
+        std::sort(fields.begin(), fields.end(), [](const auto &a, const auto &b) {
+            return a.key() < b.key();
+        });
+
+        for (const auto &field : fields) {
+            if (field.key() != u"FORM_TYPE") {
+                S += field.key() + u'<';
+                if (field.value().canConvert<QStringList>()) {
+                    QStringList list = field.value().toStringList();
+                    list.sort();
+                    S += list.join(u'<');
+                } else {
+                    S += field.value().toString();
+                }
+                S += u'<';
+            }
+        }
+    }
+
+    QCryptographicHash hasher(QCryptographicHash::Sha1);
+    hasher.addData(S.toUtf8());
+    return hasher.result();
+}
+
+/// \cond
+bool QXmppDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"query" &&
+        (xmlNamespace == ns_disco_info || xmlNamespace == ns_disco_items);
+}
+
+void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
+{
+    QDomElement queryElement = firstChildElement(element, u"query");
+    d->queryNode = queryElement.attribute(u"node"_s);
+    if (queryElement.namespaceURI() == ns_disco_items) {
+        d->queryType = ItemsQuery;
+    } else {
+        d->queryType = InfoQuery;
+    }
+
+    d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
+    d->identities = parseChildElements<QList<QXmppDiscoIdentity>>(queryElement);
+    d->items = parseChildElements<QList<QXmppDiscoItem>>(queryElement);
+    d->dataForms = parseChildElements<QList<QXmppDataForm>>(queryElement);
+}
+
+void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        { u"query", d->queryType == InfoQuery ? ns_disco_info : ns_disco_items },
+        OptionalAttribute { u"node", d->queryNode },
+        // InfoQuery
+        OptionalContent {
+            d->queryType == InfoQuery,
+            d->identities,
+            SingleAttributeElements { u"feature", u"var", d->features } },
+        OptionalContent {
+            d->queryType == ItemsQuery,
+            d->items,
+        },
+        d->dataForms,
+    });
+}
+
+// EntityTimeIq
+
+bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
+{
+    return isIqType(element, u"time", ns_entity_time);
+}
+
+bool QXmppEntityTimeIq::checkIqType(const QString &tagName, const QString &xmlns)
+{
+    return tagName == u"time" && xmlns == ns_entity_time;
+}
+
+// ExternalServiceDiscoveryIq
+
+bool QXmppExternalServiceDiscoveryIq::isExternalServiceDiscoveryIq(const QDomElement &element)
+{
+    return isIqType(element, u"services", ns_external_service_discovery);
+}
+
+// HttpUploadIq
+
+bool QXmppHttpUploadRequestIq::isHttpUploadRequestIq(const QDomElement &element)
+{
+    return isIqType(element, u"request", ns_http_upload);
+}
+
+bool QXmppHttpUploadSlotIq::isHttpUploadSlotIq(const QDomElement &element)
+{
+    return isIqType(element, u"slot", ns_http_upload);
+}
+
+// IbbIq
+
+bool QXmppIbbDataIq::isIbbDataIq(const QDomElement &element)
+{
+    return isIqType(element, u"data", ns_ibb);
+}
+
+bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
+{
+    return isIqType(element, u"open", ns_ibb);
+}
+
+bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
+{
+    return isIqType(element, u"close", ns_ibb);
+}
+
+// MamIq
+
+bool QXmppMamQueryIq::isMamQueryIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_mam);
+}
+
+bool QXmppMamResultIq::isMamResultIq(const QDomElement &element)
+{
+    if (element.tagName() == u"iq") {
+        QDomElement finElement = element.firstChildElement(u"fin"_s);
+        if (!finElement.isNull() && finElement.namespaceURI() == ns_mam) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// NonSaslIq
+
+bool QXmppNonSASLAuthIq::isNonSASLAuthIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_auth);
+}
+
+// PingIq
+
+bool QXmppPingIq::isPingIq(const QDomElement &element)
+{
+    return isIqType(element, u"ping", ns_ping) && element.attribute(u"type"_s) == u"get";
+}
+
+// RegisterIq
+
+bool QXmppRegisterIq::isRegisterIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_register);
+}
+
+// RosterIq
+
+bool QXmppRosterIq::isRosterIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_roster);
+}
+
+// VCardIq
+
+bool QXmppVCardIq::isVCard(const QDomElement &el)
+{
+    return isIqType(el, u"vCard", ns_vcard);
+}
+
+bool QXmppVCardIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"vCard" && xmlNamespace == ns_vcard;
+}
+
+// VersionIq
+
+bool QXmppVersionIq::isVersionIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_version);
+}
+
+bool QXmppVersionIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"query" && xmlNamespace == ns_version;
+}
 
 // SessionIq
 
@@ -28,8 +591,8 @@ bool QXmppSessionIq::isSessionIq(const QDomElement &element)
 
 void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("session"));
-    writer->writeDefaultNamespace(toString65(ns_session));
+    writer->writeStartElement(u"session"_s);
+    writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
 
@@ -204,8 +767,8 @@ void QXmppPubSubIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPubSubIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("pubsub"));
-    writer->writeDefaultNamespace(toString65(ns_pubsub));
+    writer->writeStartElement(u"pubsub"_s);
+    writer->writeDefaultNamespace(ns_pubsub.toString());
 
     // write query type
     writer->writeStartElement(PUBSUB_QUERIES.at(d->queryType));
@@ -294,7 +857,7 @@ void QXmppPubSubItem::parse(const QDomElement &element)
 
 void QXmppPubSubItem::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("item"));
+    writer->writeStartElement(u"item"_s);
     writeOptionalXmlAttribute(writer, u"id", d->id);
     d->contents.toXml(writer);
     writer->writeEndElement();
@@ -303,11 +866,11 @@ void QXmppPubSubItem::toXml(QXmlStreamWriter *writer) const
 
 // StarttlsPacket
 
-constexpr auto STARTTLS_TYPES = to_array<QStringView>({
+constexpr std::array<QStringView, 3> STARTTLS_TYPES = {
     u"starttls",
     u"proceed",
     u"failure",
-});
+};
 
 ///
 /// Constructs a new QXmppStartTlsPacket
@@ -346,8 +909,8 @@ void QXmppStartTlsPacket::parse(const QDomElement &element)
 void QXmppStartTlsPacket::toXml(QXmlStreamWriter *writer) const
 {
     if (m_type != Invalid) {
-        writer->writeStartElement(toString65(STARTTLS_TYPES.at(size_t(m_type))));
-        writer->writeDefaultNamespace(toString65(ns_tls));
+        writer->writeStartElement(STARTTLS_TYPES.at(size_t(m_type)).toString());
+        writer->writeDefaultNamespace(ns_tls.toString());
         writer->writeEndElement();
     }
 }

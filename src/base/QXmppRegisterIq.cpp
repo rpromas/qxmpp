@@ -10,14 +10,12 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QSharedData>
 
 using namespace QXmpp::Private;
-
-#define ELEMENT_REGISTERED u"registered"_s
-#define ELEMENT_REMOVE u"remove"_s
 
 class QXmppRegisterIqPrivate : public QSharedData
 {
@@ -203,7 +201,7 @@ void QXmppRegisterIq::setIsRemove(bool isRemove)
 }
 
 ///
-/// Returns a list of data packages attached using \xep{0231}: Bits of Binary.
+/// Returns a list of data packages attached using \xep{0231, Bits of Binary}.
 ///
 /// This could be used to resolve a \c cid: URL of an CAPTCHA field of the
 /// form.
@@ -216,7 +214,7 @@ QXmppBitsOfBinaryDataList QXmppRegisterIq::bitsOfBinaryData() const
 }
 
 ///
-/// Returns a list of data attached using \xep{0231}: Bits of Binary.
+/// Returns a list of data attached using \xep{0231, Bits of Binary}.
 ///
 /// This could be used to resolve a \c cid: URL of an CAPTCHA field of the
 /// form.
@@ -229,7 +227,7 @@ QXmppBitsOfBinaryDataList &QXmppRegisterIq::bitsOfBinaryData()
 }
 
 ///
-/// Sets a list of \xep{0231}: Bits of Binary attachments to be included.
+/// Sets a list of \xep{0231, Bits of Binary} attachments to be included.
 ///
 /// \since QXmpp 1.2
 ///
@@ -259,11 +257,6 @@ void QXmppRegisterIq::setOutOfBandUrl(const QString &outOfBandUrl)
 }
 
 /// \cond
-bool QXmppRegisterIq::isRegisterIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_register);
-}
-
 void QXmppRegisterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -279,56 +272,28 @@ void QXmppRegisterIq::parseElementFromChild(const QDomElement &element)
         d->outOfBandUrl = oobEl.firstChildElement(u"url"_s).text();
     }
 
-    d->isRegistered = !queryElement.firstChildElement(ELEMENT_REGISTERED).isNull();
-    d->isRemove = !queryElement.firstChildElement(ELEMENT_REMOVE).isNull();
+    d->isRegistered = !queryElement.firstChildElement(u"registered"_s).isNull();
+    d->isRemove = !queryElement.firstChildElement(u"remove"_s).isNull();
     d->bitsOfBinaryData.parse(queryElement);
 }
 
 void QXmppRegisterIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_register));
-
-    if (!d->instructions.isEmpty()) {
-        writer->writeTextElement(QSL65("instructions"), d->instructions);
-    }
-
-    if (d->isRegistered) {
-        writer->writeEmptyElement(ELEMENT_REGISTERED);
-    }
-    if (d->isRemove) {
-        writer->writeEmptyElement(ELEMENT_REMOVE);
-    }
-
-    if (!d->username.isEmpty()) {
-        writer->writeTextElement(QSL65("username"), d->username);
-    } else if (!d->username.isNull()) {
-        writer->writeEmptyElement(u"username"_s);
-    }
-
-    if (!d->password.isEmpty()) {
-        writer->writeTextElement(QSL65("password"), d->password);
-    } else if (!d->password.isNull()) {
-        writer->writeEmptyElement(u"password"_s);
-    }
-
-    if (!d->email.isEmpty()) {
-        writer->writeTextElement(QSL65("email"), d->email);
-    } else if (!d->email.isNull()) {
-        writer->writeEmptyElement(u"email"_s);
-    }
-
-    d->form.toXml(writer);
-    d->bitsOfBinaryData.toXml(writer);
-
-    if (!d->outOfBandUrl.isEmpty()) {
-        writer->writeStartElement(QSL65("x"));
-        writer->writeDefaultNamespace(toString65(ns_oob));
-        writer->writeTextElement(QSL65("url"), d->outOfBandUrl);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalTextElement { u"instructions", d->instructions },
+        OptionalContent { d->isRegistered, Element { u"registered" } },
+        OptionalContent { d->isRemove, Element { u"remove" } },
+        OptionalContent { !d->username.isNull(), TextElement { u"username", d->username } },
+        OptionalContent { !d->password.isNull(), TextElement { u"password", d->password } },
+        OptionalContent { !d->email.isNull(), TextElement { u"email", d->email } },
+        d->form,
+        d->bitsOfBinaryData,
+        OptionalContent {
+            !d->outOfBandUrl.isEmpty(),
+            Element { { u"x", ns_oob }, TextElement { u"url", d->outOfBandUrl } },
+        },
+    });
 }
 
 /// \endcond

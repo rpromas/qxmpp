@@ -16,6 +16,10 @@
 class QXmppPubSubIqPrivate;
 
 #if QXMPP_DEPRECATED_SINCE(1, 5)
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 class QXMPP_EXPORT QXmppPubSubIq : public QXmppIq
 {
 public:
@@ -31,28 +35,40 @@ public:
         UnsubscribeQuery
     };
 
-    [[deprecated]] QXmppPubSubIq();
+    [[deprecated]]
+    QXmppPubSubIq();
     QXmppPubSubIq(const QXmppPubSubIq &iq);
     ~QXmppPubSubIq() override;
 
     QXmppPubSubIq &operator=(const QXmppPubSubIq &iq);
 
-    [[deprecated]] QXmppPubSubIq::QueryType queryType() const;
-    [[deprecated]] void setQueryType(QXmppPubSubIq::QueryType queryType);
+    [[deprecated]]
+    QXmppPubSubIq::QueryType queryType() const;
+    [[deprecated]]
+    void setQueryType(QXmppPubSubIq::QueryType queryType);
 
-    [[deprecated]] QString queryJid() const;
-    [[deprecated]] void setQueryJid(const QString &jid);
+    [[deprecated]]
+    QString queryJid() const;
+    [[deprecated]]
+    void setQueryJid(const QString &jid);
 
-    [[deprecated]] QString queryNode() const;
-    [[deprecated]] void setQueryNode(const QString &node);
+    [[deprecated]]
+    QString queryNode() const;
+    [[deprecated]]
+    void setQueryNode(const QString &node);
 
-    [[deprecated]] QList<QXmppPubSubItem> items() const;
-    [[deprecated]] void setItems(const QList<QXmppPubSubItem> &items);
+    [[deprecated]]
+    QList<QXmppPubSubItem> items() const;
+    [[deprecated]]
+    void setItems(const QList<QXmppPubSubItem> &items);
 
-    [[deprecated]] QString subscriptionId() const;
-    [[deprecated]] void setSubscriptionId(const QString &id);
+    [[deprecated]]
+    QString subscriptionId() const;
+    [[deprecated]]
+    void setSubscriptionId(const QString &id);
 
-    [[deprecated]] static bool isPubSubIq(const QDomElement &element);
+    [[deprecated]]
+    static bool isPubSubIq(const QDomElement &element);
 
 protected:
     void parseElementFromChild(const QDomElement &) override;
@@ -61,6 +77,9 @@ protected:
 private:
     QSharedDataPointer<QXmppPubSubIqPrivate> d;
 };
+
+QT_WARNING_POP
+
 #endif
 
 #endif  // QXMPPPUBSUBIQ_H

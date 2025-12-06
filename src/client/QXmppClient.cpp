@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 
+#include "QXmppAsync_p.h"
 #include "QXmppClientExtension.h"
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
@@ -14,7 +15,6 @@
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppEntityTimeManager.h"
-#include "QXmppFutureUtils_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageHandler.h"
@@ -27,6 +27,7 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 
@@ -61,13 +62,18 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
 {
 }
 
+void QXmppClientPrivate::resendPresence()
+{
+    auto presence = clientPresence;
+    q->send(std::move(presence));
+}
+
 void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 {
-    auto *ext = q->findExtension<QXmppDiscoveryManager>();
-    if (ext) {
+    if (auto *discoManager = q->findExtension<QXmppDiscoveryManager>()) {
         presence.setCapabilityHash(u"sha-1"_s);
-        presence.setCapabilityNode(ext->clientCapabilitiesNode());
-        presence.setCapabilityVer(ext->capabilities().verificationString());
+        presence.setCapabilityNode(discoManager->clientCapabilitiesNode());
+        presence.setCapabilityVer(discoManager->buildClientInfo().calculateEntityCapabilitiesHash());
     }
 }
 
@@ -148,10 +154,7 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
 
     // notify managers
     Q_EMIT q->error(oldError);
-    Q_EMIT q->errorOccurred(QXmppError {
-        text,
-        visit([](const auto &value) { return std::any(value); }, err),
-    });
+    Q_EMIT q->errorOccurred(QXmppError { text, into<std::any>(std::move(err)) });
 }
 /// \endcond
 
@@ -195,7 +198,7 @@ bool process(QXmppClient *client, const QList<QXmppClientExtension *> &extension
     }
     QXmppMessage message;
     if (e2eeExt) {
-        message.parse(element, e2eeExt->isEncrypted(element) ? ScePublic : SceSensitive);
+        message.parse(element, e2eeExt->isEncrypted(element) ? ScePublic : SceAll);
     } else {
         message.parse(element);
     }
@@ -316,9 +319,6 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     connect(d->stream, &QXmppOutgoingClient::sslErrors,
             this, &QXmppClient::sslErrors);
 
-    connect(d->stream->socket(), &QAbstractSocket::stateChanged,
-            this, &QXmppClient::_q_socketStateChanged);
-
     connect(d->stream, &QXmppOutgoingClient::connected,
             this, &QXmppClient::_q_streamConnected);
 
@@ -328,6 +328,8 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     connect(d->stream, &QXmppOutgoingClient::errorOccurred, this, [this](const auto &text, const auto &error, auto oldError) {
         d->onErrorOccurred(text, error, oldError);
     });
+
+    connect(&d->stream->xmppSocket(), &XmppSocket::internalSocketStateChanged, this, &QXmppClient::onInternalSocketStateChanged);
 
     // reconnection
     d->reconnectionTimer = new QTimer(this);
@@ -481,30 +483,6 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 }
 
 ///
-/// After successfully connecting to the server use this function to send
-/// stanzas to the server. This function can solely be used to send various kind
-/// of stanzas to the server. QXmppStanza is a parent class of all the stanzas
-/// QXmppMessage, QXmppPresence, QXmppIq, QXmppBind, QXmppRosterIq, QXmppSession
-/// and QXmppVCard.
-///
-/// This function does not end-to-end encrypt the packets.
-///
-/// \return Returns true if the packet was sent, false otherwise.
-///
-/// Following code snippet illustrates how to send a message using this function:
-/// \code
-/// QXmppMessage message(from, to, message);
-/// client.sendPacket(message);
-/// \endcode
-///
-/// \param packet A valid XMPP stanza. It can be an iq, a message or a presence stanza.
-///
-bool QXmppClient::sendPacket(const QXmppNonza &packet)
-{
-    return d->stream->streamAckManager().sendPacketCompat(packet);
-}
-
-///
 /// Sends a packet and reports the result via QXmppTask.
 ///
 /// If stream management is enabled, the task continues to be active until the
@@ -513,8 +491,6 @@ bool QXmppClient::sendPacket(const QXmppNonza &packet)
 ///
 /// If connection errors occur, the packet is resent if possible. If
 /// reconnecting is not possible, an error is reported.
-///
-/// \warning THIS API IS NOT FINALIZED YET!
 ///
 /// \returns A QXmppTask that makes it possible to track the state of the packet.
 ///
@@ -565,8 +541,6 @@ QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, co
 /// This does the same as send(), but does not do any end-to-end encryption on
 /// the stanza.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \returns A QXmppTask that makes it possible to track the state of the packet.
 ///
 /// \since QXmpp 1.5
@@ -609,8 +583,6 @@ QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std:
 ///
 /// \sa sendSensitiveIq()
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
@@ -630,8 +602,6 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
 /// IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
 /// QXmppStanza::Error.
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
@@ -643,7 +613,7 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
             std::visit(overloaded {
                            [&](std::unique_ptr<QXmppIq> &&iq) {
                                // success (encrypted)
-                               d->stream->sendIq(std::move(*iq)).then(this, [this, p = std::move(p)](auto &&result) mutable {
+                               d->stream->sendIq(std::move(*iq)).then(this, [this, p = std::move(p)](IqResult &&result) mutable {
                                    // iq sent, response received
                                    std::visit(overloaded {
                                                   [&](QDomElement &&el) {
@@ -704,8 +674,6 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
 /// \returns Returns QXmpp::Success (on response type 'result') or the contained
 /// QXmppStanza::Error (on response type 'error')
 ///
-/// \warning THIS API IS NOT FINALIZED YET!
-///
 /// \since QXmpp 1.5
 ///
 QXmppTask<QXmppClient::EmptyResult> QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
@@ -731,7 +699,7 @@ void QXmppClient::disconnectFromServer()
     d->clientPresence.setType(QXmppPresence::Unavailable);
     d->clientPresence.setStatusText(u"Logged out"_s);
     if (d->stream->isConnected()) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     }
 
     d->stream->disconnectFromHost();
@@ -792,39 +760,6 @@ QXmppClient::StreamManagementState QXmppClient::streamManagementState() const
     return NoStreamManagement;
 }
 
-///
-/// Utility function to send message to all the resources associated with the
-/// specified bareJid. If there are no resources available, that is the contact
-/// is offline or not present in the roster, it will still send a message to
-/// the bareJid.
-///
-/// \note Usage of this method is discouraged because most modern clients use
-/// carbon messages (\xep{0280}: Message Carbons) and MAM (\xep{0313}: Message
-/// Archive Management) and so could possibly receive messages multiple times
-/// or not receive them at all.
-/// \c QXmppClient::sendPacket() should be used instead with a \c QXmppMessage.
-///
-/// \param bareJid bareJid of the receiving entity
-/// \param message Message string to be sent.
-///
-void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
-{
-    QXmppRosterManager *rosterManager = findExtension<QXmppRosterManager>();
-
-    const QStringList resources = rosterManager
-        ? rosterManager->getResources(bareJid)
-        : QStringList();
-
-    if (!resources.isEmpty()) {
-        for (const auto &resource : resources) {
-            sendPacket(
-                QXmppMessage({}, bareJid + u"/"_s + resource, message));
-        }
-    } else {
-        sendPacket(QXmppMessage({}, bareJid, message));
-    }
-}
-
 QXmppOutgoingClient *QXmppClient::stream() const
 {
     return d->stream;
@@ -834,8 +769,9 @@ QXmppClient::State QXmppClient::state() const
 {
     if (d->stream->isConnected()) {
         return QXmppClient::ConnectedState;
-    } else if (d->stream->socket()->state() != QAbstractSocket::UnconnectedState &&
-               d->stream->socket()->state() != QAbstractSocket::ClosingState) {
+    }
+    auto state = d->stream->xmppSocket().internalSocket()->state();
+    if (state != QAbstractSocket::UnconnectedState && state != QAbstractSocket::ClosingState) {
         return QXmppClient::ConnectingState;
     } else {
         return QXmppClient::DisconnectedState;
@@ -873,12 +809,12 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
         // NOTE: we can't call disconnect() because it alters
         // the client presence
         if (d->stream->isConnected()) {
-            sendPacket(d->clientPresence);
+            d->resendPresence();
         }
 
         d->stream->disconnectFromHost();
     } else if (d->stream->isConnected()) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     } else {
         connectToServer(d->stream->configuration(), presence);
     }
@@ -887,13 +823,13 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
 /// Returns the socket error if error() is QXmppClient::SocketError.
 QAbstractSocket::SocketError QXmppClient::socketError()
 {
-    return d->stream->socket()->error();
+    return d->stream->xmppSocket().internalSocket()->error();
 }
 
 /// Returns the human-readable description of the last socket error if error() is QXmppClient::SocketError.
 QString QXmppClient::socketErrorString() const
 {
-    return d->stream->socket()->errorString();
+    return d->stream->xmppSocket().internalSocket()->errorString();
 }
 
 /// Returns the XMPP stream error if QXmppClient::Error is QXmppClient::XmppStreamError.
@@ -970,9 +906,9 @@ void QXmppClient::_q_reconnect()
     }
 }
 
-void QXmppClient::_q_socketStateChanged(QAbstractSocket::SocketState socketState)
+void QXmppClient::onInternalSocketStateChanged()
 {
-    Q_UNUSED(socketState);
+    // FIXME: only emit signal if state actually changed
     Q_EMIT stateChanged(state());
 }
 
@@ -991,7 +927,7 @@ void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session
 
     // send initial presence
     if (d->stream->isAuthenticated() && streamManagementState() != ResumedStream) {
-        sendPacket(d->clientPresence);
+        d->resendPresence();
     }
 }
 

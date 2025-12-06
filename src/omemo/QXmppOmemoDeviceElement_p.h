@@ -6,6 +6,7 @@
 #ifndef QXMPPOMEMODEVICEELEMENT_H
 #define QXMPPOMEMODEVICEELEMENT_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 class QDomElement;
@@ -23,6 +24,7 @@ public:
     void setLabel(const QString &label);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"device", QXmpp::Private::ns_omemo_2 };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

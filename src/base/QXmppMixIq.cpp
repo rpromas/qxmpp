@@ -10,6 +10,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QSharedData>
@@ -17,29 +18,24 @@
 
 using namespace QXmpp::Private;
 
-static const QStringList MIX_ACTION_TYPES = {
-    QString(),
-    u"client-join"_s,
-    u"client-leave"_s,
-    u"join"_s,
-    u"leave"_s,
-    u"update-subscription"_s,
-    u"setnick"_s,
-    u"create"_s,
-    u"destroy"_s
-};
+template<>
+struct Enums::Data<QXmppMixIq::Type> {
+    using enum QXmppMixIq::Type;
 
-static const QMap<QXmppMixConfigItem::Node, QStringView> NODES = {
-    { QXmppMixConfigItem::Node::AllowedJids, ns_mix_node_allowed },
-    { QXmppMixConfigItem::Node::AvatarData, ns_user_avatar_data },
-    { QXmppMixConfigItem::Node::AvatarMetadata, ns_user_avatar_metadata },
-    { QXmppMixConfigItem::Node::BannedJids, ns_mix_node_banned },
-    { QXmppMixConfigItem::Node::Configuration, ns_mix_node_config },
-    { QXmppMixConfigItem::Node::Information, ns_mix_node_info },
-    { QXmppMixConfigItem::Node::JidMap, ns_mix_node_jidmap },
-    { QXmppMixConfigItem::Node::Messages, ns_mix_node_messages },
-    { QXmppMixConfigItem::Node::Participants, ns_mix_node_participants },
-    { QXmppMixConfigItem::Node::Presence, ns_mix_node_presence },
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    static constexpr auto Values = makeValues<QXmppMixIq::Type>({
+        { None, {} },
+        { ClientJoin, u"client-join" },
+        { ClientLeave, u"client-leave" },
+        { Join, u"join" },
+        { Leave, u"leave" },
+        { UpdateSubscription, u"update-subscription" },
+        { SetNick, u"setnick" },
+        { Create, u"create" },
+        { Destroy, u"destroy" },
+    });
+    QT_WARNING_POP
 };
 
 //
@@ -111,41 +107,17 @@ bool QXmppMixSubscriptionUpdateIq::isMixSubscriptionUpdateIq(const QDomElement &
 void QXmppMixSubscriptionUpdateIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement child = element.firstChildElement();
-
-    QVector<QString> additions;
-    QVector<QString> removals;
-
-    for (const auto &node : iterChildElements(child, u"subscribe")) {
-        additions << node.attribute(u"node"_s);
-    }
-    for (const auto &node : iterChildElements(child, u"unsubscribe")) {
-        removals << node.attribute(u"node"_s);
-    }
-
-    m_additions = listToMixNodes(additions);
-    m_removals = listToMixNodes(removals);
+    m_additions = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
+    m_removals = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"unsubscribe", ns_mix, u"node"_s));
 }
 
 void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("update-subscription"));
-    writer->writeDefaultNamespace(toString65(ns_mix));
-
-    const auto additions = mixNodesToList(m_additions);
-    for (const auto &addition : additions) {
-        writer->writeStartElement(QSL65("subscribe"));
-        writer->writeAttribute(QSL65("node"), addition);
-        writer->writeEndElement();
-    }
-
-    const auto removals = mixNodesToList(m_removals);
-    for (const auto &removal : removals) {
-        writer->writeStartElement(QSL65("unsubscribe"));
-        writer->writeAttribute(QSL65("node"), removal);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"update-subscription", ns_mix },
+        SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(m_additions) },
+        SingleAttributeElements { u"unsubscribe", u"node", Enums::toStrings(m_removals) },
+    });
 }
 
 //
@@ -203,10 +175,10 @@ void QXmppMixInvitationRequestIq::parseElementFromChild(const QDomElement &eleme
 
 void QXmppMixInvitationRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("invite"));
-    writer->writeDefaultNamespace(toString65(ns_mix_misc));
-    writeXmlTextElement(writer, u"invitee", m_inviteeJid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"invite", ns_mix_misc },
+        TextElement { u"invitee", m_inviteeJid },
+    });
 }
 
 //
@@ -265,10 +237,7 @@ void QXmppMixInvitationResponseIq::parseElementFromChild(const QDomElement &elem
 
 void QXmppMixInvitationResponseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("invite"));
-    writer->writeDefaultNamespace(toString65(ns_mix_misc));
-    m_invitation.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"invite", ns_mix_misc }, m_invitation });
 }
 
 class QXmppMixIqPrivate : public QSharedData
@@ -508,7 +477,7 @@ void QXmppMixIq::setChannelJid(const QString &channelJid)
 ///
 QStringList QXmppMixIq::nodes() const
 {
-    return mixNodesToList(d->subscriptions).toList();
+    return Enums::toStringList(d->subscriptions);
 }
 
 ///
@@ -521,7 +490,7 @@ QStringList QXmppMixIq::nodes() const
 ///
 void QXmppMixIq::setNodes(const QStringList &nodes)
 {
-    d->subscriptions = listToMixNodes(nodes.toVector());
+    d->subscriptions = Enums::fromStrings<QXmppMixConfigItem::Node>(nodes);
 }
 
 ///
@@ -621,9 +590,7 @@ bool QXmppMixIq::isMixIq(const QDomElement &element)
 void QXmppMixIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement child = element.firstChildElement();
-
-    const auto actionTypeIndex = MIX_ACTION_TYPES.indexOf(child.tagName());
-    d->actionType = actionTypeIndex == -1 ? None : (QXmppMixIq::Type)actionTypeIndex;
+    d->actionType = Enums::fromString<Type>(child.tagName()).value_or(None);
 
     if (child.namespaceURI() == ns_mix_pam) {
         if (child.hasAttribute(u"channel"_s)) {
@@ -645,19 +612,8 @@ void QXmppMixIq::parseElementFromChild(const QDomElement &element)
         }
 
         d->nick = firstChildElement(child, u"nick").text();
-
-        if (const auto invitationElement = firstChildElement(child, u"invitation"); !invitationElement.isNull()) {
-            d->invitation = QXmppMixInvitation();
-            d->invitation->parse(invitationElement);
-        }
-
-        QVector<QString> subscriptions;
-
-        for (const auto &node : iterChildElements(child, u"subscribe")) {
-            subscriptions << node.attribute(u"node"_s);
-        }
-
-        d->subscriptions = listToMixNodes(subscriptions);
+        d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child);
+        d->subscriptions = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
     }
 }
 
@@ -667,89 +623,28 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(MIX_ACTION_TYPES.at(d->actionType));
-
     if (d->actionType == ClientJoin || d->actionType == ClientLeave) {
-        writer->writeDefaultNamespace(toString65(ns_mix_pam));
-        if (type() == Set) {
-            writeOptionalXmlAttribute(writer, u"channel", d->channelJid);
-        }
-        if (d->actionType == ClientJoin) {
-            writer->writeStartElement(QSL65("join"));
-        } else if (d->actionType == ClientLeave) {
-            writer->writeStartElement(QSL65("leave"));
-        }
-    }
-
-    writer->writeDefaultNamespace(toString65(ns_mix));
-    writeOptionalXmlAttribute(writer, u"channel", d->channelId);
-    if (type() == Result) {
-        writeOptionalXmlAttribute(writer, u"id", d->participantId);
-    }
-
-    const auto subscriptions = mixNodesToList(d->subscriptions);
-    for (const auto &subscription : subscriptions) {
-        writer->writeStartElement(QSL65("subscribe"));
-        writer->writeAttribute(QSL65("node"), subscription);
-        writer->writeEndElement();
-    }
-
-    if (!d->nick.isEmpty()) {
-        writer->writeTextElement(QSL65("nick"), d->nick);
-    }
-
-    if (d->invitation) {
-        d->invitation->toXml(writer);
-    }
-
-    writer->writeEndElement();
-
-    if (d->actionType == ClientJoin || d->actionType == ClientLeave) {
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element {
+            Tag { d->actionType, ns_mix_pam },
+            OptionalContent { type() == Set, Attribute { u"channel", d->channelJid } },
+            Element {
+                { d->actionType == ClientJoin ? u"join" : u"leave", ns_mix },
+                OptionalAttribute { u"channel", d->channelId },
+                OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
+                SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(d->subscriptions) },
+                OptionalTextElement { u"nick", d->nick },
+                d->invitation,
+            },
+        });
+    } else {
+        XmlWriter(writer).write(Element {
+            Tag { d->actionType, ns_mix },
+            OptionalAttribute { u"channel", d->channelId },
+            OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
+            SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(d->subscriptions) },
+            OptionalTextElement { u"nick", d->nick },
+            d->invitation,
+        });
     }
 }
 /// \endcond
-
-namespace QXmpp::Private {
-
-///
-/// Converts a nodes flag to a list of nodes.
-///
-/// \param nodes nodes to convert
-///
-/// \return the list of nodes
-///
-QVector<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes)
-{
-    QVector<QString> nodeList;
-
-    for (auto itr = NODES.cbegin(); itr != NODES.cend(); ++itr) {
-        if (nodes.testFlag(itr.key())) {
-            nodeList.append(itr.value().toString());
-        }
-    }
-
-    return nodeList;
-}
-
-///
-/// Converts a list of nodes to a nodes flag
-///
-/// \param nodeList list of nodes to convert
-///
-/// \return the nodes flag
-///
-QXmppMixConfigItem::Nodes listToMixNodes(const QVector<QString> &nodeList)
-{
-    QXmppMixConfigItem::Nodes nodes;
-
-    for (auto itr = NODES.cbegin(); itr != NODES.cend(); ++itr) {
-        if (nodeList.contains(itr.value().toString())) {
-            nodes |= itr.key();
-        }
-    }
-
-    return nodes;
-}
-
-}  // namespace QXmpp::Private

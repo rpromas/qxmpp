@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2019 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <ole@salscheider.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -13,16 +15,23 @@
 #include "QXmppConstants_p.h"
 #include "QXmppJingleIq.h"
 #include "QXmppStun.h"
+#include "QXmppTask.h"
 #include "QXmppUtils.h"
 
 #include "StringLiterals.h"
 
+#include <chrono>
+#include <ranges>
+
+// gstreamer
 #include <gst/gst.h>
 
 #include <QDomElement>
 #include <QTimer>
 
-/// \cond
+using namespace std::chrono_literals;
+using namespace QXmpp::Private;
+
 QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
     : direction(QXmppCall::IncomingDirection),
       manager(0),
@@ -40,27 +49,27 @@ QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
         qFatal("Failed to create pipeline");
         return;
     }
-    rtpbin = gst_element_factory_make("rtpbin", nullptr);
-    if (!rtpbin) {
+    rtpBin = gst_element_factory_make("rtpbin", nullptr);
+    if (!rtpBin) {
         qFatal("Failed to create rtpbin");
         return;
     }
     // We do not want to build up latency over time
-    g_object_set(rtpbin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
-    if (!gst_bin_add(GST_BIN(pipeline), rtpbin)) {
+    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
+    if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
         qFatal("Could not add rtpbin to the pipeline");
     }
-    g_signal_connect_swapped(rtpbin, "pad-added",
+    g_signal_connect_swapped(rtpBin, "pad-added",
                              G_CALLBACK(+[](QXmppCallPrivate *p, GstPad *pad) {
                                  p->padAdded(pad);
                              }),
                              this);
-    g_signal_connect_swapped(rtpbin, "request-pt-map",
+    g_signal_connect_swapped(rtpBin, "request-pt-map",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint pt) {
                                  p->ptMap(sessionId, pt);
                              }),
                              this);
-    g_signal_connect_swapped(rtpbin, "on-ssrc-active",
+    g_signal_connect_swapped(rtpBin, "on-ssrc-active",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint ssrc) {
                                  p->ssrcActive(sessionId, ssrc);
                              }),
@@ -77,15 +86,16 @@ QXmppCallPrivate::~QXmppCallPrivate()
     if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
         qFatal("Unable to set the pipeline to the null state");
     }
+    // Delete streams before pipeline.
+    // Streams still need to be children of QXmppCall for logging to work.
     qDeleteAll(streams);
-    gst_object_unref(pipeline);
 }
 
 void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
 {
     Q_UNUSED(ssrc)
     GstElement *rtpSession;
-    g_signal_emit_by_name(rtpbin, "get-session", static_cast<uint>(sessionId), &rtpSession);
+    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(sessionId), &rtpSession);
     // TODO: implement bitrate controller
 }
 
@@ -95,21 +105,13 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
     if (nameParts.size() < 4) {
         return;
     }
-    if (nameParts[0] == QLatin1String("send") &&
-        nameParts[1] == QLatin1String("rtp") &&
-        nameParts[2] == QLatin1String("src")) {
-        if (nameParts.size() != 4) {
-            return;
-        }
-        int sessionId = nameParts[3].toInt();
-        auto stream = findStreamById(sessionId);
-        stream->d->addRtpSender(pad);
-    } else if (nameParts[0] == QLatin1String("recv") ||
-               nameParts[1] == QLatin1String("rtp") ||
-               nameParts[2] == QLatin1String("src")) {
+    if (nameParts[0] == u"recv" ||
+        nameParts[1] == u"rtp" ||
+        nameParts[2] == u"src") {
         if (nameParts.size() != 6) {
             return;
         }
+
         int sessionId = nameParts[3].toInt();
         int pt = nameParts[5].toInt();
         auto stream = findStreamById(sessionId);
@@ -147,79 +149,50 @@ GstCaps *QXmppCallPrivate::ptMap(uint sessionId, uint pt)
     return nullptr;
 }
 
-bool QXmppCallPrivate::isFormatSupported(const QString &codecName) const
+bool QXmppCallPrivate::isFormatSupported(const QString &codecName)
 {
-    GstElementFactory *factory;
-    factory = gst_element_factory_find(codecName.toLatin1().data());
-    if (!factory) {
-        return false;
-    }
-    g_object_unref(factory);
-    return true;
+    return GstElementFactoryPtr(gst_element_factory_find(codecName.toLatin1().data())) != nullptr;
+}
+
+bool QXmppCallPrivate::isCodecSupported(const GstCodec &codec)
+{
+    return isFormatSupported(codec.gstPay) &&
+        isFormatSupported(codec.gstDepay) &&
+        isFormatSupported(codec.gstEnc) &&
+        isFormatSupported(codec.gstDec);
 }
 
 void QXmppCallPrivate::filterGStreamerFormats(QList<GstCodec> &formats)
 {
-    auto it = formats.begin();
-    while (it != formats.end()) {
-        bool supported = isFormatSupported(it->gstPay) &&
-            isFormatSupported(it->gstDepay) &&
-            isFormatSupported(it->gstEnc) &&
-            isFormatSupported(it->gstDec);
-        if (!supported) {
-            it = formats.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    auto removedRange = std::ranges::remove_if(formats, std::not_fn(isCodecSupported));
+    formats.erase(removedRange.begin(), removedRange.end());
 }
 
-QXmppCallStream *QXmppCallPrivate::findStreamByMedia(const QString &media)
+QXmppCallStream *QXmppCallPrivate::findStreamByMedia(QStringView media)
 {
-    for (auto stream : std::as_const(streams)) {
-        if (stream->media() == media) {
-            return stream;
-        }
+    if (auto stream = std::ranges::find(streams, media, &QXmppCallStream::media);
+        stream != streams.end()) {
+        return *stream;
     }
     return nullptr;
 }
 
-QXmppCallStream *QXmppCallPrivate::findStreamByName(const QString &name)
+QXmppCallStream *QXmppCallPrivate::findStreamByName(QStringView name)
 {
-    for (auto stream : std::as_const(streams)) {
-        if (stream->name() == name) {
-            return stream;
-        }
+    if (auto stream = std::ranges::find(streams, name, &QXmppCallStream::name);
+        stream != streams.end()) {
+        return *stream;
     }
     return nullptr;
 }
 
-QXmppCallStream *QXmppCallPrivate::findStreamById(const int id)
+QXmppCallStream *QXmppCallPrivate::findStreamById(int id)
 {
-    for (auto stream : std::as_const(streams)) {
-        if (stream->id() == id) {
-            return stream;
-        }
+    if (auto stream = std::ranges::find(streams, id, &QXmppCallStream::id);
+        stream != streams.end()) {
+        return *stream;
     }
     return nullptr;
-}
-
-void QXmppCallPrivate::handleAck(const QXmppIq &ack)
-{
-    const QString id = ack.id();
-    for (int i = 0; i < requests.size(); ++i) {
-        if (id == requests[i].id()) {
-            // process acknowledgement
-            const QXmppJingleIq request = requests.takeAt(i);
-            q->debug(u"Received ACK for packet %1"_s.arg(id));
-
-            // handle termination
-            if (request.action() == QXmppJingleIq::SessionTerminate) {
-                q->terminated();
-            }
-            return;
-        }
-    }
 }
 
 bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content)
@@ -276,6 +249,32 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
 
 bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content)
 {
+    if (stream->d->useDtls && !content.transportFingerprint().isEmpty()) {
+        if (content.transportFingerprintHash() != u"sha-256") {
+            q->warning(u"Unsupported hashing algorithm for DTLS fingerprint: %1."_s.arg(content.transportFingerprintHash()));
+            return false;
+        }
+        stream->d->expectedPeerCertificateDigest = content.transportFingerprint();
+
+        // active/passive part negotiation
+        const auto setup = content.transportFingerprintSetup();
+        if (setup == u"actpass") {
+            stream->d->dtlsPeerSetup = Actpass;
+        } else if (setup == u"active") {
+            stream->d->dtlsPeerSetup = Active;
+        } else if (setup == u"passive") {
+            stream->d->dtlsPeerSetup = Passive;
+        } else {
+            // invalid setup attribute
+            return false;
+        }
+
+        q->debug(u"Decided to be DTLS %1"_s.arg(stream->d->isDtlsClient() ? u"client (active)" : u"server (passive)"));
+        if (stream->d->isDtlsClient()) {
+            stream->d->enableDtlsClientMode();
+        }
+    }
+
     stream->d->connection->setRemoteUser(content.transportUser());
     stream->d->connection->setRemotePassword(content.transportPassword());
     const auto candidates = content.transportCandidates();
@@ -311,7 +310,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             !handleTransport(stream, content)) {
 
             // terminate call
-            terminate(QXmppJingleIq::Reason::FailedApplication);
+            terminate({ QXmppJingleReason::FailedApplication, {}, {} });
             return;
         }
 
@@ -321,7 +320,9 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
     } else if (iq.action() == QXmppJingleIq::SessionInfo) {
 
         // notify user
-        QTimer::singleShot(0, q, SIGNAL(ringing()));
+        QTimer::singleShot(0, q, [this]() {
+            Q_EMIT q->ringing();
+        });
 
     } else if (iq.action() == QXmppJingleIq::SessionTerminate) {
 
@@ -374,8 +375,8 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             iq.setType(QXmppIq::Set);
             iq.setAction(QXmppJingleIq::ContentReject);
             iq.setSid(q->sid());
-            iq.reason().setType(QXmppJingleIq::Reason::FailedApplication);
-            sendRequest(iq);
+            iq.setActionReason(QXmppJingleReason(QXmppJingleReason::FailedApplication, {}, {}));
+            manager->client()->sendIq(std::move(iq));
             streams.removeAll(stream);
             delete stream;
             return;
@@ -388,7 +389,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         iq.setAction(QXmppJingleIq::ContentAccept);
         iq.setSid(q->sid());
         iq.addContent(localContent(stream));
-        sendRequest(iq);
+        manager->client()->sendIq(std::move(iq));
 
     } else if (iq.action() == QXmppJingleIq::TransportInfo) {
 
@@ -419,7 +420,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         return nullptr;
     }
 
-    auto *stream = new QXmppCallStream(pipeline, rtpbin, media, creator, name, ++nextId);
+    auto *stream = new QXmppCallStream(pipeline, rtpBin, media, creator, name, ++nextId, useDtls, q);
 
     // Fill local payload payload types
     auto &codecs = media == AUDIO_MEDIA ? audioCodecs : videoCodecs;
@@ -442,10 +443,21 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
 
     // connect signals
     QObject::connect(stream->d->connection, &QXmppIceConnection::localCandidatesChanged,
-                     q, &QXmppCall::localCandidatesChanged);
+                     q, [this, stream]() { q->onLocalCandidatesChanged(stream); });
 
     QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected,
                      q, &QXmppCall::hangup);
+
+    connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this](bool fingerprintMatches) {
+        if (!fingerprintMatches) {
+            q->warning(u"DTLS handshake returned unexpected certificate fingerprint."_s);
+
+            // TODO: only cancel this stream (e.g. only video)
+            terminate({ QXmppJingleReason::SecurityError, {}, {} });
+        } else {
+            q->debug(u"DTLS handshake returned certificate with expected fingerprint."_s);
+        }
+    });
 
     Q_EMIT q->streamCreated(stream);
 
@@ -469,6 +481,21 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) c
     content.setTransportPassword(stream->d->connection->localPassword());
     content.setTransportCandidates(stream->d->connection->localCandidates());
 
+    // encryption
+    if (useDtls) {
+        Q_ASSERT(!stream->d->ownCertificateDigest.isEmpty());
+        content.setTransportFingerprint(stream->d->ownCertificateDigest);
+        content.setTransportFingerprintHash(u"sha-256"_s);
+
+        // choose whether we are DTLS client or server
+        if (stream->d->dtlsPeerSetup.has_value()) {
+            content.setTransportFingerprintSetup(stream->d->isDtlsClient() ? u"active"_s : u"passive"_s);
+        } else {
+            // let other end decide
+            content.setTransportFingerprintSetup(u"actpass"_s);
+        }
+    }
+
     return content;
 }
 
@@ -481,10 +508,10 @@ bool QXmppCallPrivate::sendAck(const QXmppJingleIq &iq)
     ack.setId(iq.id());
     ack.setTo(iq.from());
     ack.setType(QXmppIq::Result);
-    return manager->client()->sendPacket(ack);
+    return manager->client()->sendLegacy(ack);
 }
 
-bool QXmppCallPrivate::sendInvite()
+void QXmppCallPrivate::sendInvite()
 {
     // create audio stream
     QXmppCallStream *stream = findStreamByMedia(AUDIO_MEDIA);
@@ -497,16 +524,7 @@ bool QXmppCallPrivate::sendInvite()
     iq.setInitiator(ownJid);
     iq.setSid(sid);
     iq.addContent(localContent(stream));
-    return sendRequest(iq);
-}
-
-///
-/// Sends a Jingle IQ and adds it to outstanding requests.
-///
-bool QXmppCallPrivate::sendRequest(const QXmppJingleIq &iq)
-{
-    requests << iq;
-    return manager->client()->sendPacket(iq);
+    manager->client()->send(std::move(iq));
 }
 
 void QXmppCallPrivate::setState(QXmppCall::State newState)
@@ -526,7 +544,7 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
 ///
 /// Request graceful call termination
 ///
-void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
+void QXmppCallPrivate::terminate(QXmppJingleReason reason)
 {
     if (state == QXmppCall::DisconnectingState ||
         state == QXmppCall::FinishedState) {
@@ -539,14 +557,18 @@ void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::SessionTerminate);
     iq.setSid(sid);
-    iq.reason().setType(reasonType);
-    sendRequest(iq);
+    iq.setActionReason(std::move(reason));
+
     setState(QXmppCall::DisconnectingState);
 
+    manager->client()->sendIq(std::move(iq)).then(q, [this](auto result) {
+        // terminate on both success or error
+        q->terminated();
+    });
+
     // schedule forceful termination in 5s
-    QTimer::singleShot(5000, q, &QXmppCall::terminated);
+    QTimer::singleShot(5s, q, &QXmppCall::terminated);
 }
-/// \endcond
 
 ///
 /// \class QXmppCall
@@ -585,7 +607,7 @@ void QXmppCall::accept()
         iq.setResponder(d->ownJid);
         iq.setSid(d->sid);
         iq.addContent(d->localContent(stream));
-        d->sendRequest(iq);
+        d->manager->client()->sendIq(std::move(iq));
 
         // notify user
         Q_EMIT d->manager->callStarted(this);
@@ -649,34 +671,21 @@ QXmppCall::Direction QXmppCall::direction() const
 ///
 void QXmppCall::hangup()
 {
-    d->terminate(QXmppJingleIq::Reason::None);
+    d->terminate({ QXmppJingleReason::None, {}, {} });
 }
 
 ///
 /// Sends a transport-info to inform the remote party of new local candidates.
 ///
-void QXmppCall::localCandidatesChanged()
+void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
 {
-    // find the stream
-    QXmppIceConnection *conn = qobject_cast<QXmppIceConnection *>(sender());
-    QXmppCallStream *stream = nullptr;
-    for (auto ptr : std::as_const(d->streams)) {
-        if (ptr->d->connection == conn) {
-            stream = ptr;
-            break;
-        }
-    }
-    if (!stream) {
-        return;
-    }
-
     QXmppJingleIq iq;
     iq.setTo(d->jid);
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::TransportInfo);
     iq.setSid(d->sid);
     iq.addContent(d->localContent(stream));
-    d->sendRequest(iq);
+    d->manager->client()->sendIq(std::move(iq));
 }
 
 ///
@@ -721,8 +730,8 @@ void QXmppCall::addVideo()
     }
 
     // create video stream
-    QLatin1String creator = (d->direction == QXmppCall::OutgoingDirection) ? QLatin1String("initiator") : QLatin1String("responder");
-    stream = d->createStream(VIDEO_MEDIA, creator, QLatin1String("webcam"));
+    QString creator = (d->direction == QXmppCall::OutgoingDirection) ? u"initiator"_s : u"responder"_s;
+    stream = d->createStream(VIDEO_MEDIA.toString(), creator, u"webcam"_s);
     d->streams << stream;
 
     // build request
@@ -732,5 +741,15 @@ void QXmppCall::addVideo()
     iq.setAction(QXmppJingleIq::ContentAdd);
     iq.setSid(d->sid);
     iq.addContent(d->localContent(stream));
-    d->sendRequest(iq);
+    d->manager->client()->sendIq(std::move(iq));
+}
+
+///
+/// Returns if the call is encrypted
+///
+/// \since QXmpp 1.11
+///
+bool QXmppCall::isEncrypted() const
+{
+    return d->useDtls;
 }

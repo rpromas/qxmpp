@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2019 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <ole@salscheider.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -7,6 +9,8 @@
 
 #include "QXmppCall.h"
 #include "QXmppJingleIq.h"
+
+#include "GstWrapper.h"
 
 #include <gst/gst.h>
 
@@ -29,6 +33,8 @@ class QXmppCallPrivate : public QObject
 {
     Q_OBJECT
 public:
+    using GstElementPtr = QXmpp::Private::GstElementPtr;
+
     struct GstCodec {
         int pt;
         QString name;
@@ -46,41 +52,40 @@ public:
         QList<Property> encProps;
     };
 
-    QXmppCallPrivate(QXmppCall *qq);
+    explicit QXmppCallPrivate(QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
     void padAdded(GstPad *pad);
     GstCaps *ptMap(uint sessionId, uint pt);
-    bool isFormatSupported(const QString &codecName) const;
-    void filterGStreamerFormats(QList<GstCodec> &formats);
+    static bool isFormatSupported(const QString &codecName);
+    static bool isCodecSupported(const GstCodec &codec);
+    static void filterGStreamerFormats(QList<GstCodec> &formats);
 
     QXmppCallStream *createStream(const QString &media, const QString &creator, const QString &name);
-    QXmppCallStream *findStreamByMedia(const QString &media);
-    QXmppCallStream *findStreamByName(const QString &name);
-    QXmppCallStream *findStreamById(const int id);
+    QXmppCallStream *findStreamByMedia(QStringView media);
+    QXmppCallStream *findStreamByName(QStringView name);
+    QXmppCallStream *findStreamById(int id);
     QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
 
-    void handleAck(const QXmppIq &iq);
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void handleRequest(const QXmppJingleIq &iq);
     bool handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void setState(QXmppCall::State state);
     bool sendAck(const QXmppJingleIq &iq);
-    bool sendInvite();
-    bool sendRequest(const QXmppJingleIq &iq);
-    void terminate(QXmppJingleIq::Reason::Type reasonType);
+    void sendInvite();
+    void terminate(QXmppJingleReason reason);
 
     QXmppCall::Direction direction;
     QString jid;
     QString ownJid;
+    bool useDtls = false;
     QXmppCallManager *manager;
-    QList<QXmppJingleIq> requests;
     QString sid;
     QXmppCall::State state;
 
-    GstElement *pipeline;
-    GstElement *rtpbin;
+    GstElementPtr pipeline;
+    GstElement *rtpBin;
 
     // Media streams
     QList<QXmppCallStream *> streams;

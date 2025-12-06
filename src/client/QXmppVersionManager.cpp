@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppUtils.h"
 #include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
@@ -16,6 +17,7 @@
 #include <QSysInfo>
 
 using namespace QXmpp;
+using namespace QXmpp::Private;
 
 class QXmppVersionManagerPrivate
 {
@@ -48,11 +50,7 @@ QString QXmppVersionManager::requestVersion(const QString &jid)
     QXmppVersionIq request;
     request.setType(QXmppIq::Get);
     request.setTo(jid);
-    if (client()->sendPacket(request)) {
-        return request.id();
-    } else {
-        return QString();
-    }
+    return client()->sendLegacyId(request);
 }
 
 /// Sets the local XMPP client's name.
@@ -121,7 +119,7 @@ bool QXmppVersionManager::handleStanza(const QDomElement &element)
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppVersionIq::isVersionIq(element)) {
+    if (isIqElement<QXmppVersionIq>(element)) {
         QXmppVersionIq versionIq;
         versionIq.parse(element);
 

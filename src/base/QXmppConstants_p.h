@@ -2,29 +2,31 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#ifndef QXMPPCONSTANTS_H
-#define QXMPPCONSTANTS_H
-
-#include <QStringView>
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 
 //
 //  W A R N I N G
 //  -------------
 //
-// This file is not part of the QXmpp API.  It exists for the convenience
-// of QXmpp's own classes.  This header file may change from version to
-// version without notice, or even be removed.
+// This file is not part of the QXmpp API.
+//
+// This header file may change from version to version without notice,
+// or even be removed.
 //
 // We mean it.
 //
+
+#include <QStringView>
 
 namespace QXmpp::Private {
 
 constexpr quint16 XMPP_DEFAULT_PORT = 5222;
 constexpr quint16 XMPPS_DEFAULT_PORT = 5223;
 constexpr quint16 XMPP_SERVER_DEFAULT_PORT = 5269;
-}
 
+// XML
+inline constexpr QStringView ns_xml = u"http://www.w3.org/XML/1998/namespace";
 // QXmpp
 inline constexpr QStringView ns_qxmpp_credentials = u"org.qxmpp.credentials";
 inline constexpr QStringView ns_qxmpp_export = u"org.qxmpp.export";
@@ -129,6 +131,8 @@ inline constexpr QStringView ns_compressFeature = u"http://jabber.org/features/c
 inline constexpr QStringView ns_rosternotes = u"storage:rosternotes";
 // XEP-0153: vCard-Based Avatars
 inline constexpr QStringView ns_vcard_update = u"vcard-temp:x:update";
+// XEP-0157: Contact Addresses for XMPP Services
+inline constexpr QStringView ns_contact_addresses = u"http://jabber.org/network/serverinfo";
 // XEP-0158: CAPTCHA Forms
 inline constexpr QStringView ns_captcha = u"urn:xmpp:captcha";
 // XEP-0166: Jingle
@@ -174,9 +178,9 @@ inline constexpr QStringView ns_carbons = u"urn:xmpp:carbons:2";
 // XEP-0283: Moved
 inline constexpr QStringView ns_moved = u"urn:xmpp:moved:1";
 // XEP-0293: Jingle RTP Feedback Negotiation
-inline constexpr QStringView ns_jingle_rtp_feedback_negotiation = u"urn:xmpp:jingle:apps:rtp:rtcp-fb:0";
+inline constexpr QStringView ns_jingle_rtcp_fb = u"urn:xmpp:jingle:apps:rtp:rtcp-fb:0";
 // XEP-0294: Jingle RTP Header Extensions Negotiation
-inline constexpr QStringView ns_jingle_rtp_header_extensions_negotiation = u"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0";
+inline constexpr QStringView ns_jingle_rtp_hdrext = u"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0";
 // XEP-0297: Stanza Forwarding
 inline constexpr QStringView ns_forwarding = u"urn:xmpp:forward:0";
 // XEP-0300: Use of Cryptographic Hash Functions in XMPP
@@ -196,7 +200,7 @@ inline constexpr QStringView ns_message_processing_hints = u"urn:xmpp:hints";
 // XEP-0352: Client State Indication
 inline constexpr QStringView ns_csi = u"urn:xmpp:csi:0";
 // XEP-0353: Jingle Message Initiation
-inline constexpr QStringView ns_jingle_message_initiation = u"urn:xmpp:jingle-message:0";
+inline constexpr QStringView ns_jingle_message = u"urn:xmpp:jingle-message:0";
 // XEP-0357: Push Notifications
 inline constexpr QStringView ns_push = u"urn:xmpp:push:0";
 // XEP-0359: Unique and Stable Stanza IDs
@@ -265,6 +269,8 @@ inline constexpr QStringView ns_reply = u"urn:xmpp:reply:0";
 // XEP-0482: Call Invites
 inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
-inline constexpr auto ns_fast = u"urn:xmpp:fast:0";
+inline constexpr QStringView ns_fast = u"urn:xmpp:fast:0";
 
-#endif  // QXMPPCONSTANTS_H
+}  // namespace QXmpp::Private
+
+#endif  // CONSTANTS_H

@@ -12,6 +12,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
@@ -22,14 +23,16 @@
 #include <QSslSocket>
 #include <QTimer>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 constexpr uint RESOURCE_RANDOM_SUFFIX_LENGTH = 8;
+constexpr std::tuple SessionIqXmlTag = { u"session", ns_session };
 
 class QXmppIncomingClientPrivate
 {
 public:
-    QXmppIncomingClientPrivate(QXmppIncomingClient *qq);
+    QXmppIncomingClientPrivate(QSslSocket *socket, QXmppIncomingClient *qq);
 
     QTimer *idleTimer = nullptr;
     XmppSocket socket;
@@ -52,8 +55,8 @@ private:
     QXmppIncomingClient *q;
 };
 
-QXmppIncomingClientPrivate::QXmppIncomingClientPrivate(QXmppIncomingClient *qq)
-    : socket(qq),
+QXmppIncomingClientPrivate::QXmppIncomingClientPrivate(QSslSocket *socket, QXmppIncomingClient *qq)
+    : socket(socket, qq),
       q(qq)
 {
 }
@@ -83,7 +86,7 @@ void QXmppIncomingClientPrivate::checkCredentials(const QByteArray &response)
 
 QString QXmppIncomingClientPrivate::origin() const
 {
-    auto *sslSocket = this->socket.socket();
+    auto *sslSocket = socket.internalSocket();
     if (sslSocket) {
         return sslSocket->peerAddress().toString() + u' ' + QString::number(sslSocket->peerPort());
     } else {
@@ -100,21 +103,15 @@ QString QXmppIncomingClientPrivate::origin() const
 ///
 QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
-      d(std::make_unique<QXmppIncomingClientPrivate>(this))
+      d(std::make_unique<QXmppIncomingClientPrivate>(socket, this))
 {
     connect(&d->socket, &XmppSocket::started, this, &QXmppIncomingClient::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppIncomingClient::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppIncomingClient::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppIncomingClient::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppIncomingClient::onSocketDisconnected);
 
     d->domain = domain;
-
-    if (socket) {
-        connect(socket, &QAbstractSocket::disconnected,
-                this, &QXmppIncomingClient::onSocketDisconnected);
-
-        d->socket.setSocket(socket);
-    }
 
     info(u"Incoming client connection from %1"_s.arg(d->origin()));
 
@@ -189,7 +186,7 @@ void QXmppIncomingClient::handleStart()
 {
 }
 
-void QXmppIncomingClient::handleStream(const QDomElement &streamElement)
+void QXmppIncomingClient::handleStream(const StreamOpen &stream)
 {
     if (d->idleTimer->interval()) {
         d->idleTimer->start();
@@ -198,25 +195,23 @@ void QXmppIncomingClient::handleStream(const QDomElement &streamElement)
 
     // start stream
     const QByteArray sessionId = QXmppUtils::generateStanzaHash().toLatin1();
-    QString response = u"<?xml version='1.0'?><stream:stream xmlns=\"%1\" "
-                       "xmlns:stream=\"%2\" id=\"%3\" from=\"%4\" "
-                       "version=\"1.0\" xml:lang=\"en\">"_s
-                           .arg(
-                               ns_client,
-                               ns_stream,
-                               QString::fromUtf8(sessionId),
-                               d->domain);
-    sendData(response.toUtf8());
+    sendData(serializeXml(StreamOpen {
+        stream.from,
+        d->domain,
+        QString::fromUtf8(sessionId),
+        u"1.0"_s,
+        ns_client.toString(),
+    }));
 
     // check requested domain
-    if (streamElement.attribute(u"to"_s) != d->domain) {
+    if (stream.to != d->domain) {
         QString response = u"<stream:error>"
                            "<host-unknown xmlns=\"urn:ietf:params:xml:ns:xmpp-streams\"/>"
                            "<text xmlns=\"urn:ietf:params:xml:ns:xmpp-streams\">"
                            "This server does not serve %1"
                            "</text>"
                            "</stream:error>"_s
-                               .arg(streamElement.attribute(u"to"_s));
+                               .arg(stream.to);
         sendData(response.toUtf8());
         disconnectFromHost();
         return;
@@ -228,7 +223,7 @@ void QXmppIncomingClient::sendStreamFeatures()
 {
     // send stream features
     QXmppStreamFeatures features;
-    auto *socket = d->socket.socket();
+    auto *socket = d->socket.internalSocket();
     if (socket && !socket->isEncrypted() && !socket->localCertificate().isNull() && !socket->privateKey().isNull()) {
         features.setTlsMode(QXmppStreamFeatures::Enabled);
     }
@@ -264,8 +259,8 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
 
     if (StarttlsRequest::fromDom(nodeRecv)) {
         sendData(serializeXml(StarttlsProceed()));
-        d->socket.socket()->flush();
-        d->socket.socket()->startServerEncryption();
+        d->socket.internalSocket()->flush();
+        d->socket.internalSocket()->startServerEncryption();
         return;
     } else if (ns == ns_sasl_2) {
         if (!d->passwordChecker) {
@@ -394,25 +389,27 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             const QString type = nodeRecv.attribute(u"type"_s);
             const auto id = nodeRecv.attribute(u"id"_s);
 
-            if (QXmppBindIq::isBindIq(nodeRecv) && type == u"set") {
-                QXmppBindIq bindSet;
-                bindSet.parse(nodeRecv);
-                d->resource = bindSet.resource().trimmed();
-                if (d->resource.isEmpty()) {
-                    d->resource = QXmppUtils::generateStanzaHash();
+            if (isElement<BindElement>(nodeRecv.firstChildElement())) {
+                if (auto bindSet = SetIq<BindElement>::fromDom(nodeRecv)) {
+                    d->resource = bindSet->payload.resource.trimmed();
+                    if (d->resource.isEmpty()) {
+                        d->resource = QXmppUtils::generateStanzaHash();
+                    }
+                    d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
+
+                    sendData(serializeXml(ResultIq<BindElement> {
+                        bindSet->id,
+                        {},
+                        {},
+                        {},
+                        BindElement { d->jid, {} },
+                    }));
+
+                    // bound
+                    Q_EMIT connected();
+                    return;
                 }
-                d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
-
-                QXmppBindIq bindResult;
-                bindResult.setType(QXmppIq::Result);
-                bindResult.setId(bindSet.id());
-                bindResult.setJid(d->jid);
-                sendPacket(bindResult);
-
-                // bound
-                Q_EMIT connected();
-                return;
-            } else if (isIqType(nodeRecv, u"session", ns_session) && type == u"set") {
+            } else if (iqPayloadXmlTag(nodeRecv) == SessionIqXmlTag && type == u"set") {
                 QXmppIq sessionResult;
                 sessionResult.setType(QXmppIq::Result);
                 sessionResult.setId(id);

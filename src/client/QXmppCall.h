@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2019 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2019 Niels Ole Salscheider <ole@salscheider.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -55,6 +57,8 @@ public:
     QXmppCallStream *audioStream() const;
     QXmppCallStream *videoStream() const;
 
+    bool isEncrypted() const;
+
     /// \brief This signal is emitted when a call is connected.
     ///
     /// Once this signal is emitted, you can connect a QAudioOutput and
@@ -82,8 +86,8 @@ public:
     Q_SLOT void addVideo();
 
 private:
-    Q_SLOT void localCandidatesChanged();
-    Q_SLOT void terminated();
+    void onLocalCandidatesChanged(QXmppCallStream *stream);
+    void terminated();
 
     QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent);
 

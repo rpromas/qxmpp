@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QSharedData>
@@ -115,46 +116,24 @@ void QXmppRosterIq::setMixAnnotate(bool mixAnnotate)
 }
 
 /// \cond
-bool QXmppRosterIq::isRosterIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_roster);
-}
-
 void QXmppRosterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
     setVersion(queryElement.attribute(u"ver"_s));
-
-    for (const auto &itemElement : iterChildElements(queryElement, u"item")) {
-        QXmppRosterIq::Item item;
-        item.parse(itemElement);
-        d->items.append(item);
-    }
-
+    d->items = parseChildElements<QList<Item>>(queryElement);
     setMixAnnotate(!firstChildElement(queryElement, u"annotate", ns_mix_roster).isNull());
 }
 
 void QXmppRosterIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_roster));
-
-    // XEP-0237 roster versioning - If the server does not advertise support for roster versioning, the client MUST NOT include the 'ver' attribute.
-    if (!version().isEmpty()) {
-        writer->writeAttribute(QSL65("ver"), version());
-    }
-
-    // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
-    if (d->mixAnnotate) {
-        writer->writeStartElement(QSL65("annotate"));
-        writer->writeAttribute(QSL65("xmlns"), toString65(ns_mix_roster));
-        writer->writeEndElement();
-    }
-
-    for (int i = 0; i < d->items.count(); ++i) {
-        d->items.at(i).toXml(writer);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        // XEP-0237: Roster Versioning
+        OptionalAttribute { u"ver", d->version },
+        // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
+        OptionalContent { d->mixAnnotate, Element { { u"annotate", ns_mix_roster } } },
+        d->items,
+    });
 }
 /// \endcond
 
@@ -418,10 +397,7 @@ void QXmppRosterIq::Item::parse(const QDomElement &element)
     const QString approved = element.attribute(u"approved"_s);
     d->approved = (approved == u"1" || approved == u"true");
 
-    // groups
-    for (const auto &groupElement : iterChildElements(element, u"group")) {
-        d->groups << groupElement.text();
-    }
+    d->groups = parseTextElements<QSet<QString>>(element, u"group", ns_roster);
 
     // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
     auto channelElement = firstChildElement(element, u"channel", ns_mix_roster);
@@ -438,32 +414,23 @@ void QXmppRosterIq::Item::toXml(QXmlStreamWriter *writer) const
 
 void QXmppRosterIq::Item::toXml(QXmlStreamWriter *writer, bool external) const
 {
-    writer->writeStartElement(QSL65("item"));
-    if (external) {
-        writer->writeDefaultNamespace(toString65(ns_roster));
-    }
-    writeOptionalXmlAttribute(writer, u"jid", d->bareJid);
-    writeOptionalXmlAttribute(writer, u"name", d->name);
-    writeOptionalXmlAttribute(writer, u"subscription", getSubscriptionTypeStr());
-    writeOptionalXmlAttribute(writer, u"ask", subscriptionStatus());
-    if (d->approved) {
-        writer->writeAttribute(QSL65("approved"), u"true"_s);
-    }
-
-    QSet<QString>::const_iterator i = d->groups.constBegin();
-    while (i != d->groups.constEnd()) {
-        writeXmlTextElement(writer, u"group", *i);
-        ++i;
-    }
-
-    // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
-    if (d->isMixChannel) {
-        writer->writeStartElement(QSL65("channel"));
-        writer->writeAttribute(QSL65("xmlns"), toString65(ns_mix_roster));
-        writeOptionalXmlAttribute(writer, u"participant-id", d->mixParticipantId);
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"item",
+        OptionalContent { external, DefaultNamespace { ns_roster } },
+        Attribute { u"jid", d->bareJid },
+        OptionalAttribute { u"name", d->name },
+        OptionalAttribute { u"subscription", getSubscriptionTypeStr() },
+        OptionalAttribute { u"ask", d->subscriptionStatus },
+        OptionalAttribute { u"approved", DefaultedBool { d->approved, false } },
+        TextElements { u"group", d->groups },
+        // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
+        OptionalContent {
+            d->isMixChannel,
+            Element {
+                { u"channel", ns_mix_roster },
+                OptionalAttribute { u"participant-id", d->mixParticipantId },
+            },
+        },
+    });
 }
 /// \endcond

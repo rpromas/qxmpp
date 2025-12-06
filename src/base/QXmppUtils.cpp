@@ -10,6 +10,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QBuffer>
 #include <QByteArray>
@@ -95,6 +96,8 @@ static quint32 crctable[256] = {
     0xB40BBE37L, 0xC30C8EA1L, 0x5A05DF1BL, 0x2D02EF8DL
 };
 
+QAtomicInt QXmpp::Private::globalStanzaIdCounter = 0;
+
 ///
 /// Parses a date-time from a string according to \xep{0082, XMPP Date and Time Profiles}.
 ///
@@ -106,19 +109,14 @@ QDateTime QXmppUtils::datetimeFromString(QStringView str)
     return QDateTime::fromString(toString60(str), Qt::ISODate).toUTC();
 }
 
-/// \cond
-QDateTime QXmppUtils::datetimeFromString(const QString &str)
-{
-    return QDateTime::fromString(str, Qt::ISODate).toUTC();
-}
-/// \endcond
-
 ///
-/// Serializes a date-time to a string according to
-/// \xep{0082}: XMPP Date and Time Profiles.
+/// Serializes a date-time to a string according to \xep{0082, XMPP Date and Time Profiles}.
 ///
 QString QXmppUtils::datetimeToString(const QDateTime &dt)
 {
+    if (!dt.isValid()) {
+        return {};
+    }
     if (dt.time().msec()) {
         return dt.toUTC().toString(Qt::ISODateWithMs);
     }
@@ -155,7 +153,7 @@ int QXmppUtils::timezoneOffsetFromString(const QString &str)
 
 ///
 /// Serializes a timezone offset (in seconds) to a string according to
-/// \xep{0082}: XMPP Date and Time Profiles.
+/// \xep{0082, XMPP Date and Time Profiles}.
 ///
 QString QXmppUtils::timezoneOffsetToString(int secs)
 {
@@ -318,49 +316,34 @@ QString QXmppUtils::generateStanzaHash(int length)
     return hashResult;
 }
 
+std::tuple<QString, QString> QXmpp::Private::elementXmlTag(const QDomElement &el)
+{
+    return { el.tagName(), el.namespaceURI() };
+}
+
+std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &el)
+{
+    if (el.tagName() == u"iq") {
+        return elementXmlTag(el.firstChildElement());
+    }
+    return { {}, {} };
+}
+
+///
+/// Generates a new sequential stanza id. The ID is locally unique, not globally unique (see
+/// QXmppUtils::generateStanzaUuid()).
+///
+/// This is used for all QXmppStanzas automatically.
+///
+/// \since QXmpp 1.11
+///
+QString QXmpp::generateSequentialStanzaId()
+{
+    ++globalStanzaIdCounter;
+    return u"qx" + QString::number(globalStanzaIdCounter);
+}
+
 /// \cond
-void QXmpp::Private::writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name,
-                                               QStringView value)
-{
-    if (!value.isEmpty()) {
-        stream->writeAttribute(toString65(name), toString65(value));
-    }
-}
-
-void QXmpp::Private::writeXmlTextElement(QXmlStreamWriter *stream, QStringView name,
-                                         QStringView value)
-{
-    if (!value.isEmpty()) {
-        stream->writeTextElement(toString65(name), toString65(value));
-    } else {
-        stream->writeEmptyElement(toString65(name));
-    }
-}
-
-void QXmpp::Private::writeXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns, QStringView value)
-{
-    writer->writeStartElement(toString65(name));
-    writer->writeDefaultNamespace(toString65(xmlns));
-    if (!value.isEmpty()) {
-        writer->writeCharacters(toString65(value));
-    }
-    writer->writeEndElement();
-}
-
-void QXmpp::Private::writeOptionalXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView value)
-{
-    if (!value.isEmpty()) {
-        writer->writeTextElement(toString65(name), toString65(value));
-    }
-}
-
-void QXmpp::Private::writeEmptyElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns)
-{
-    writer->writeStartElement(toString65(name));
-    writer->writeDefaultNamespace(toString65(xmlns));
-    writer->writeEndElement();
-}
-
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {
     if (auto result = QByteArray::fromBase64Encoding(text.toUtf8())) {
@@ -369,9 +352,19 @@ std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
     return {};
 }
 
+template<typename T>
+concept SupportedNumber =
+    std::same_as<T, int8_t> || std::same_as<T, uint8_t> ||
+    std::same_as<T, int16_t> || std::same_as<T, uint16_t> ||
+    std::same_as<T, int32_t> || std::same_as<T, uint32_t> ||
+    std::same_as<T, int64_t> || std::same_as<T, uint64_t> ||
+    std::same_as<T, float> || std::same_as<T, double>;
+
 template<typename Int>
 Int stringToInt(QStringView str, bool *ok)
 {
+    static_assert(SupportedNumber<Int>, "invalid integer type");
+
     if constexpr (std::is_same_v<Int, int8_t>) {
         auto result = str.toShort(ok);
         if (*ok && result <= std::numeric_limits<int8_t>::max() && result >= std::numeric_limits<int8_t>::min()) {
@@ -398,6 +391,10 @@ Int stringToInt(QStringView str, bool *ok)
         return str.toLongLong(ok);
     } else if constexpr (std::is_same_v<Int, uint64_t>) {
         return str.toULongLong(ok);
+    } else if constexpr (std::is_same_v<Int, double>) {
+        return str.toDouble(ok);
+    } else if constexpr (std::is_same_v<Int, float>) {
+        return str.toFloat(ok);
     }
 }
 
@@ -420,6 +417,16 @@ template std::optional<uint32_t> QXmpp::Private::parseInt<uint32_t>(QStringView)
 template std::optional<int64_t> QXmpp::Private::parseInt<int64_t>(QStringView);
 template std::optional<uint64_t> QXmpp::Private::parseInt<uint64_t>(QStringView);
 
+std::optional<double> QXmpp::Private::parseDouble(QStringView str)
+{
+    return parseInt<double>(str);
+}
+
+std::optional<float> QXmpp::Private::parseFloat(QStringView str)
+{
+    return parseInt<float>(str);
+}
+
 std::optional<bool> QXmpp::Private::parseBoolean(const QString &str)
 {
     if (str == u"1" || str == u"true") {
@@ -434,13 +441,6 @@ std::optional<bool> QXmpp::Private::parseBoolean(const QString &str)
 QString QXmpp::Private::serializeBoolean(bool value)
 {
     return value ? QStringLiteral("true") : QStringLiteral("false");
-}
-
-bool QXmpp::Private::isIqType(const QDomElement &element, QStringView tagName, QStringView xmlns)
-{
-    // IQs must have only one child element, so we do not need to iterate over the child elements.
-    auto child = element.firstChildElement();
-    return child.tagName() == tagName && child.namespaceURI() == xmlns;
 }
 
 QDomElement QXmpp::Private::firstChildElement(const QDomElement &el, QStringView tagName, QStringView xmlNs)
@@ -469,16 +469,20 @@ QDomElement QXmpp::Private::nextSiblingElement(const QDomElement &el, QStringVie
     return {};
 }
 
-std::vector<QString> QXmpp::Private::parseTextElements(DomChildElements elements)
-{
-    return transform<std::vector<QString>>(elements, &QDomElement::text);
-}
-
-QByteArray QXmpp::Private::serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *))
+QByteArray QXmpp::Private::serializeXmlWriter(std::function<void(XmlWriter &)> toXml)
 {
     QByteArray data;
     QXmlStreamWriter xmlStream(&data);
-    toXml(packet, &xmlStream);
+    XmlWriter writer(&xmlStream);
+    toXml(writer);
+    return data;
+}
+
+QByteArray QXmpp::Private::serializeQXmlStream(std::function<void(QXmlStreamWriter *)> toXml)
+{
+    QByteArray data;
+    QXmlStreamWriter xmlStream(&data);
+    toXml(&xmlStream);
     return data;
 }
 
@@ -490,9 +494,14 @@ QByteArray QXmpp::Private::serializeXml(const void *packet, void (*toXml)(const 
 //
 // \return the generated bytes
 //
-QByteArray QXmpp::Private::generateRandomBytes(uint32_t minimumByteCount, uint32_t maximumByteCount)
+QByteArray QXmpp::Private::generateRandomBytes(size_t minimumByteCount, size_t maximumByteCount)
 {
-    const auto byteCount = QRandomGenerator::system()->bounded(minimumByteCount, maximumByteCount);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const auto byteCount = QRandomGenerator::system()->bounded(quint64(minimumByteCount), quint64(maximumByteCount));
+#else
+    // Qt 5 only supports 32 bit integer!
+    const auto byteCount = QRandomGenerator::system()->bounded(quint32(minimumByteCount), quint32(maximumByteCount));
+#endif
     QByteArray bytes;
     bytes.resize(byteCount);
     generateRandomBytes(reinterpret_cast<uint8_t *>(bytes.data()), byteCount);
@@ -506,12 +515,12 @@ QByteArray QXmpp::Private::generateRandomBytes(uint32_t minimumByteCount, uint32
 // \param bytes generated bytes
 // \param byteCount count of bytes to generate
 //
-void QXmpp::Private::generateRandomBytes(uint8_t *bytes, uint32_t byteCount)
+void QXmpp::Private::generateRandomBytes(uint8_t *bytes, size_t byteCount)
 {
     // QRandomGenerator does not provide a random generation of single bytes. Thus, this approach
     // fills an array with unsigned integers until no additional integer fits into the array. If
     // byteCount is no multiple of intSize, the remaining bytes need to be filled separately.
-    constexpr uint32_t intSize = sizeof(uint32_t);
+    constexpr auto intSize = sizeof(uint32_t);
     auto intCount = byteCount / intSize;
 
     auto *randomGenerator = QRandomGenerator::system();

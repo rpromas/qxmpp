@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-cmake_minimum_required(VERSION 3.7)
-project(qxmpp VERSION 1.11.0)
+cmake_minimum_required(VERSION 3.16)
+project(qxmpp VERSION 1.12.0)
 
-set(SO_VERSION 5)
+set(SO_VERSION 7)
 
 # C++ standard settings:
 set(CMAKE_CXX_STANDARD 20)
@@ -15,10 +15,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules")
+find_package(PkgConfig REQUIRED)
 
 set(QT_VERSION_MAJOR 6)
 # Qt
+if(BUILD_WITH_QT6)
+    set(QT_VERSION_MAJOR 6)
+endif()
 if(NOT DEFINED QT_VERSION_MAJOR)
     find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network Xml)
 endif()
@@ -33,6 +36,7 @@ endif()
 
 include(GNUInstallDirs)
 
+option(BUILD_WITH_QT6 "Force build with Qt 6")
 option(BUILD_SHARED "Build shared library" OFF)
 option(BUILD_TESTS "Build tests." OFF)
 option(BUILD_INTERNAL_TESTS "Build internal tests." OFF)
@@ -47,7 +51,7 @@ set(QXMPP_TARGET QXmppQt${QT_VERSION_MAJOR})
 set(QXMPPOMEMO_TARGET QXmppOmemoQt${QT_VERSION_MAJOR})
 
 add_definitions(
-    -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00
+    -DQT_DISABLE_DEPRECATED_BEFORE=0x060900
     -DQT_NO_URL_CAST_FROM_STRING
     -DQT_NO_CAST_TO_ASCII
     -DQT_NO_CAST_FROM_BYTEARRAY
@@ -77,6 +81,11 @@ endif()
 if(WITH_QCA)
     add_definitions(-DWITH_QCA)
 endif()
+
+# if(WITH_GSTREAMER)
+#     pkg_check_modules(GStreamer REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.20)
+#     pkg_check_modules(GStreamerBase REQUIRED IMPORTED_TARGET gstreamer-base-1.0)
+# endif()
 
 add_subdirectory(src)
 

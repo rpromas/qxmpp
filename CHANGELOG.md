@@ -4,15 +4,83 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.11.0 (UNRELEASED)
--------------------------
+QXmpp 1.12.0 (November 9, 2025)
+-------------------------------
 
-*under development*
+ - Deprecate old APIs and finalize new APIs (@lnj, !716)
+ - Implement XEP-0157: Contact Addresses for XMPP Services (@lnj, !715)
+ - Modernize DiscoveryManager: Split up QXmppDiscoveryIq, add request deduplication and caching of disco info features (@lnj, !717)
+ - HttpFileSharingProvider: Fix early finished uploads hanging (@fazevedo, !722)
+
+QXmpp 1.11.3 (October 13, 2025)
+-------------------------------
+
+ - Fixes for Apple Clang (@lnj, !719)
+ - HttpUploadManager: Add Content-Type header when uploading via HTTP (@melvo, !721)
+ - EncryptedFileSharingProvider: Fix crash on cancellation (@fazevedo, !720)
+
+QXmpp 1.11.2 (September 2, 2025)
+--------------------------------
+
+ - Fix build with g++ 12 (@lnj)
+
+QXmpp 1.11.1 (August 13, 2025)
+------------------------------
+
+ - Fix behaviour change in DiscoveryIq: Continue to parse multiple form elements into one
+   QXmppDataForm object (@lnj)
+
+QXmpp 1.11.0 (August 7, 2025)
+-----------------------------
+
+ - RpcIq: Fix only-whitespace strings are stripped (@lnj, !694)
+ - CMake: Add `BUILD_WITH_QT6` option instead of `QT_VERSION_MAJOR` (@lnj)
+ - JingleIq: Replace reason attribute with optional<Reason> (@lnj, !696)
+ - New voice call example (@lnj, !696)
+ - Implement XEP-0320: Use of DTLS-SRTP in Jingle Sessions (@lnj, !696)
+ - Security and stability improvements by parsing whole stream through QXmlStreamReader internally and creating QDomElements manually (@lnj, !700)
+ - Client/Server: Close connection on unexpected element received (@lnj, !700)
+ - OutgoingClient: Re-create socket on connection errors to avoid race conditions (@lnj, !700)
+ - Big parsing/serialization overhaul (@lnj, !705)
+   - abstraction for parsing of sub-elements and implicitly checking for tag name/xmlns
+   - enum parsing/serialization with compile-time registry
+   - declarative XML serialization using new XmlWriter
+ - New internal Iq<T> type, separating parsing of IQ and payload (@lnj, !708)
+ - Task: Inline TaskData and use std::optional to avoid additional heap allocation (@lnj, !709)
+ - PubSubIq: Add notify attribute for retraction (@lnj, !713)
+
+Breaking changes:
+ - JingleIq::RtpSessionStateMuting: 'isMute' is not default initialized anymore like 'creator' is
+   not initialized, too (@lnj, !701)
+ - ExternalServiceDiscoveryIq: Change port type from `int` to `quint16` to match XEP-0215 (@lnj, !702)
+
+QXmpp 1.10.4 (May 17, 2025)
+---------------------------
+
+ - Client: Fix not accepting stanzas immediately after connecting if enabling of stream management
+   still runs (did not happen with SASL 2) (@lnj, !703)
+
+QXmpp 1.10.3 (March 21, 2025)
+-----------------------------
+
+ - OmemoManager: Clear complete in-memory cache on local own device reset (@melvo, !692)
+
+QXmpp 1.10.2 (March 19, 2025)
+-----------------------------
+
+ - RosterManager: Do not auto-accept Moved subscription requests to comply with XEP (@melvo, #691)
+
+QXmpp 1.10.1 (February 25, 2025)
+--------------------------------
+
+ - ColorGeneration: Fix MSVC linkage of header-only generateColor() (@lnj, #686)
+ - Fix comparison for checking validity of fallback markers sections (@lnj, #678)
+ - Stun: Include QSet to fix incomplete type with some Qt versions (@melvo, #681) 
 
 QXmpp 1.10.0 (February 22, 2025)
 --------------------------------
 
- - Implement XEP-0392: Consistent Color Generation (@lnjX, #672)
+ - Implement XEP-0392: Consistent Color Generation (@lnj, #672)
 
 QXmpp 1.9.4 (February 2, 2025)
 ------------------------------
@@ -30,7 +98,7 @@ QXmpp 1.9.3 (January 23, 2025)
 QXmpp 1.9.2 (December 07, 2024)
 -------------------------------
 
- - Fix build of unit tests with MSVC (@lnjX)
+ - Fix build of unit tests with MSVC (@lnj)
 
 QXmpp 1.9.1 (November 27, 2024)
 -------------------------------
@@ -41,90 +109,90 @@ QXmpp 1.9.1 (November 27, 2024)
 QXmpp 1.9.0 (November 17, 2024)
 -------------------------------
 
- - Implement XEP-0461: Message Replies parsing (@lnjX, #645)
- - Prevent unencrypted fallback markers are applied to encrypted body (@lnjX, #647)
+ - Implement XEP-0461: Message Replies parsing (@lnj, #645)
+ - Prevent unencrypted fallback markers are applied to encrypted body (@lnj, #647)
  - Implement XEP-0283: Moved (@pasnox, #621)
  - AccountMigration: Implement restoring of joined MIX channels (@pasnox, #657)
 
 QXmpp 1.8.3 (October 29, 2024)
 ------------------------------
 
- - MamManager: Fix some unencrypted are not parsed when end-to-end-encryption is enabled (@lnjX, #662)
+ - MamManager: Fix some unencrypted are not parsed when end-to-end-encryption is enabled (@lnj, #662)
 
 QXmpp 1.8.2 (October 21, 2024)
 ------------------------------
 
- - StreamError: Fix parsing of stream error conditions and missing "invalid-id" condition (@lnjX)
- - Omemo: Fix windows/msvc build (@lnjX, #658)
+ - StreamError: Fix parsing of stream error conditions and missing "invalid-id" condition (@lnj)
+ - Omemo: Fix windows/msvc build (@lnj, #658)
 
 QXmpp 1.8.1 (August 21, 2024)
 -----------------------------
 
- - Fix other DNS records are not tried if host does not exist (@lnjX)
- - Fix clang build (@lnjX)
+ - Fix other DNS records are not tried if host does not exist (@lnj)
+ - Fix clang build (@lnj)
 
 QXmpp 1.8.0 (July 30, 2024)
 ---------------------------
 
  - QXmpp now requires C++20
- - Fix connection to next SRV record if connection to first address fails (@lnjX, #644)
- - Implement XMPP over TLS ("direct TLS" instead of STARTTLS, XEP-0368) (@lnjX, #642)
+ - Fix connection to next SRV record if connection to first address fails (@lnj, #644)
+ - Implement XMPP over TLS ("direct TLS" instead of STARTTLS, XEP-0368) (@lnj, #642)
    - Support of protocol/server name multiplexing, ALPN and SNI extensions
- - New Bind 2 support (XEP-0386) (@lnjX, #614)
+ - New Bind 2 support (XEP-0386) (@lnj, #614)
    - Client and server support of resource binding through SASL2 + Bind2
    - Resource prefix can be configured in QXmppConfiguration
    - Setting of Client State Indication (CSI) initial state on connection
    - Enabling of Stream Management (through Bind 2) and stream resumption (through SASL 2)
    - Enabling of Message Carbons (through Bind 2)
- - Support FAST, token-based authentication (XEP-0484) (@lnjX, #630)
+ - Support FAST, token-based authentication (XEP-0484) (@lnj, #630)
    - Offers single round trip authentication (but doesn't replace strong authentication methods
      like SCRAM+password)
    - FAST tokens (and other credentials) can be stored permanently via QXmppCredentials
    - Tokens are generated if a SASL 2 user agent is set and FAST is not disabled in the config
- - New QXmppUri for parsing XMPP URIs (XEP-0147) (@lnjX, #641)
- - New AccountMigrationManager for importing and exporting account data (@lnjX, @pasnox, #623)
- - Message: Parse all stanza IDs (XEP-0359) (@lnjX, #638)
- - CSI state is automatically restored across reconnects, also without Bind 2 or stream management (@lnjX, #622)
- - Use smaller stream management acks instead of ping IQs if possible (@lnjX, #625)
- - Moved STARTTLS handling into the core client again (was in client extension) (@lnjX, #627)
- - VCardManager: New task-based API (@lnjX, #623)
+ - New QXmppUri for parsing XMPP URIs (XEP-0147) (@lnj, #641)
+ - New AccountMigrationManager for importing and exporting account data (@lnj, @pasnox, #623)
+ - Message: Parse all stanza IDs (XEP-0359) (@lnj, #638)
+ - CSI state is automatically restored across reconnects, also without Bind 2 or stream management (@lnj, #622)
+ - Use smaller stream management acks instead of ping IQs if possible (@lnj, #625)
+ - Moved STARTTLS handling into the core client again (was in client extension) (@lnj, #627)
+ - VCardManager: New task-based API (@lnj, #623)
 
 QXmpp 1.7.1 (July 07, 2024)
 ---------------------------
 
  - OMEMO: Fix messages are dropped if decryption fails (@melvo, #634)
- - Fix build issue with MSVC: missing export of utility functions (@lnjX)
+ - Fix build issue with MSVC: missing export of utility functions (@lnj)
 
 QXmpp 1.7.0 (May 19, 2024)
 --------------------------
 
  - Complete support of MIX groupchats and add new QXmppMixManager (@melvo, #589)
- - Support of new SASL 2 authentication from XEP-0388: Extensible SASL Profile (@lnjX, #607)
- - Update support of XEP-0428: Fallback Indication to v0.2 (@lnjX, #608)
- - Update support of XEP-0447: Stateless file sharing to v0.3.1 (@lnjX, #613)
+ - Support of new SASL 2 authentication from XEP-0388: Extensible SASL Profile (@lnj, #607)
+ - Update support of XEP-0428: Fallback Indication to v0.2 (@lnj, #608)
+ - Update support of XEP-0447: Stateless file sharing to v0.3.1 (@lnj, #613)
  - ClientExtension: New onRegistered() and onUnregistered() virtual functions, called when the
-   extension is added to or removed from a client. (@lnjX, #599)
- - Client: New error handling: New errorOccurred() signal with QXmppError based API (@lnjX)
+   extension is added to or removed from a client. (@lnj, #599)
+ - Client: New error handling: New errorOccurred() signal with QXmppError based API (@lnj)
  - New StreamError, AuthenticationError and BindError offering more details about connection
-   errors (@lnjX)
- - The 'from' attribute of the &lt;stream:stream&gt; open is set if a JID is configured (@lnjX)
+   errors (@lnj)
+ - The 'from' attribute of the &lt;stream:stream&gt; open is set if a JID is configured (@lnj)
  - Security improvements in the internals of QXmppClient by terminating the connection when
-   unexpected packets are received (@lnjX)
+   unexpected packets are received (@lnj)
 
 **Breaking** changes:
- - Drop support for RFC3920 servers requiring a &lt;session/&gt; IQ to be sent. (@lnjX)
+ - Drop support for RFC3920 servers requiring a &lt;session/&gt; IQ to be sent. (@lnj)
    Feel free to open an issue if this is a problem to you.
  - PLAIN authentication is disabled by default, but can be enabled in QXmppConfiguration again.
-   (@lnjX, #607)
+   (@lnj, #607)
 
 QXmpp 1.6.1 (May 16, 2024)
 --------------------------
 
 Fixes:
- - Fix handling of XMPP redirects (introduced in aaa6497) (@lnjX)
- - Fix compilation with Qt 6 + C++17 (not C++20) in OmemoData (@lnjX)
+ - Fix handling of XMPP redirects (introduced in aaa6497) (@lnj)
+ - Fix compilation with Qt 6 + C++17 (not C++20) in OmemoData (@lnj)
  - Fix OMEMO decryption of group chat messages (@melvo, #617)
- - Fix stream resumption (@lnjX)<br/>
+ - Fix stream resumption (@lnj)<br/>
    This has been an issue since the initial implementation of stream mangement. The xmlns was
    missing in the &lt;resume/&gt; element and the stream ID was not parsed in the &lt;enabled/&gt;
    element.
@@ -139,106 +207,106 @@ New features:
  - Implement XEP-0215: External Service Discovery (#542, @taiBsu)
  - Implement XEP-0353: Jingle Message Initiation (#570, @taiBsu)
  - Implement XEP-0482: Call Invites (#575, @taiBsu)
- - Implement XEP-0191: Blocking Command (#577, @lnjX)
- - Client: New constructor for creating without any extensions (@lnjX)
+ - Implement XEP-0191: Blocking Command (#577, @lnj)
+ - Client: New constructor for creating without any extensions (@lnj)
 
 QXmpp 1.5.6 (Feb 4, 2024)
 -------------------------
 
 Changes:
- - Behaviour change: sendIq() automatically parses stanza errors (returned as QXmppError) (@lnjX)
- - CMake: "QXmpp" legacy cmake package is now only installed for Qt 5 builds (@lnjX)
- - Fix unit test with Qt 6! (@lnjX)
- - EncryptedFileSharingProvider: Fix wrong cipher set in sent file share element (@lnjX)
- - Fix SCE parsing mode when parsing encrypted messages (@lnjX)
- - Fix file encryption with QCA issues (@lnjX)
- - Fix picking by strength of hashing algorithms (@lnjX)
- - Fix github ci (@lnjX)
- - Add unit tests for all file encryption ciphers (@lnjX)
+ - Behaviour change: sendIq() automatically parses stanza errors (returned as QXmppError) (@lnj)
+ - CMake: "QXmpp" legacy cmake package is now only installed for Qt 5 builds (@lnj)
+ - Fix unit test with Qt 6! (@lnj)
+ - EncryptedFileSharingProvider: Fix wrong cipher set in sent file share element (@lnj)
+ - Fix SCE parsing mode when parsing encrypted messages (@lnj)
+ - Fix file encryption with QCA issues (@lnj)
+ - Fix picking by strength of hashing algorithms (@lnj)
+ - Fix github ci (@lnj)
+ - Add unit tests for all file encryption ciphers (@lnj)
 
 QXmpp 1.5.5 (Apr 30, 2023)
 --------------------------
 
 Fixes:
  - Fix dependencies in generated pkg-config files (@krop)
- - Fix compilation with android/clang (@lnjX)
+ - Fix compilation with android/clang (@lnj)
 
 QXmpp 1.5.4 (Apr 07, 2023)
 --------------------------
 
 Fixes:
  - OMEMO fixes (@melvo)
- - Fix use-after-move in EntityTimeManager (@lnjX)
+ - Fix use-after-move in EntityTimeManager (@lnj)
  - EME: Always send encryption name text (@melvo)
- - Fix interpretation of empty to/from address in the client (@lnjX)
+ - Fix interpretation of empty to/from address in the client (@lnj)
  - MSVC related build fixes (@JBBgameich)
 
 Misc:
- - Support installing QXmpp with Qt 5 and Qt 6 in parallel (@lnjX)
- - Support building QXmppOmemo statically (@lnjX)
+ - Support installing QXmpp with Qt 5 and Qt 6 in parallel (@lnj)
+ - Support building QXmppOmemo statically (@lnj)
 
 QXmpp 1.5.3 (Mar 11, 2023)
 --------------------------
 
 Fixes:
  - MAM: Fix task is never finished when none of the messages is encrypted but
-   e2ee is enabled (@lnjX)
+   e2ee is enabled (@lnj)
  - SaslDigestMd5: Fix undefined behaviour with Qt 6 when parsing empty property
-   at the end of the input (@lnjX)
+   at the end of the input (@lnj)
  - CarbonManagerV2: Fix enable IQ sending (@melvo)
  - Fix various OMEMO issues and update to libomemo-c 0.5 (@melvo)
  - Fix compilation (inclunding omemo module) with MSVC 2019 (@JBBgameich)
- - Fix library files installation directory on windows (@lnjX)
+ - Fix library files installation directory on windows (@lnj)
 
 Misc:
  - Add CMake option to manually specify Qt major version (@TheBluestBird)
- - Readd old PubSubIq and PubSubItem after justified complaints (@lnjX)
+ - Readd old PubSubIq and PubSubItem after justified complaints (@lnj)
 
 QXmpp 1.5.2 (Feb 23, 2023)
 --------------------------
 
 Fixes:
- - Fix undefined behaviour in OmemoManager and FileSharingManager (@lnjX)
+ - Fix undefined behaviour in OmemoManager and FileSharingManager (@lnj)
  - STUN: Fix nonce attribute is not padded (@Choochmeque)
 
 QXmpp 1.5.1 (Feb 01, 2023)
 --------------------------
 
 Fixes:
- - Fix build with clang (usage of auto in template argument) (@lnjX)
+ - Fix build with clang (usage of auto in template argument) (@lnj)
 
 QXmpp 1.5.0 (Jan 31, 2023)
 --------------------------
 
 New features:
  - New asynchronous APIs:
-   - New QXmppTask/Promise for asynchronous APIs (@lnjX, @JBBgameich)
-   - Packet sending result reporting (sent, stream management acks) (@lnjX)
-   - IQ response recognition and mapping to requests via QXmppTask (@lnjX)
-   - Add QXmppTask-based APIs to most of the managers (@lnjX)
+   - New QXmppTask/Promise for asynchronous APIs (@lnj, @JBBgameich)
+   - Packet sending result reporting (sent, stream management acks) (@lnj)
+   - IQ response recognition and mapping to requests via QXmppTask (@lnj)
+   - Add QXmppTask-based APIs to most of the managers (@lnj)
  - PubSub:
-   - Implement XEP-0060: Publish-Subscribe (nearly complete) (@lnjX)
-   - Implement XEP-0118: User Tune (@lnjX)
-   - Implement XEP-0080: User Location (@lnjX, @c-cesar)
-   - Rewrite MIX items with new PubSubItem (@lnjX)
-   - Add specified data forms parsing utilities (@lnjX)
+   - Implement XEP-0060: Publish-Subscribe (nearly complete) (@lnj)
+   - Implement XEP-0118: User Tune (@lnj)
+   - Implement XEP-0080: User Location (@lnj, @c-cesar)
+   - Rewrite MIX items with new PubSubItem (@lnj)
+   - Add specified data forms parsing utilities (@lnj)
  - Encryption:
    - Implement XEP-0384: OMEMO Encryption (@melvo)
    - Implement XEP-0434: Trust Messages (TM) (@melvo)
    - Implement XEP-0450: Automatic Trust Management (ATM) (@melvo)
-   - Implement XEP-0420: Stanza Content Encryption (@lnjX)
-   - Add new Message Carbons manager capable of end-to-end-encryption (@lnjX)
-   - Adapt QXmppClient to support end-to-end-encryptions (@lnjX)
+   - Implement XEP-0420: Stanza Content Encryption (@lnj)
+   - Add new Message Carbons manager capable of end-to-end-encryption (@lnj)
+   - Adapt QXmppClient to support end-to-end-encryptions (@lnj)
  - File sharing:
    - Implement XEP-0446: File metadata element (@JBBgameich)
-   - Implement XEP-0300: Use of Cryptographic Hash Functions in XMPP (@lnjX)
-   - Implement XEP-0264: Jingle Content Thumbnails (@lnjX)
-   - Implement XEP-0447: Stateless file sharing (@lnjX, @JBBgameich)
-   - Implement XEP-0448: Encryption for stateless file sharing (@lnjX, @JBBgameich)
-   - Add new HTTP File Upload Manager for slot requesting and uploading (@lnjX, @JBBgameich)
+   - Implement XEP-0300: Use of Cryptographic Hash Functions in XMPP (@lnj)
+   - Implement XEP-0264: Jingle Content Thumbnails (@lnj)
+   - Implement XEP-0447: Stateless file sharing (@lnj, @JBBgameich)
+   - Implement XEP-0448: Encryption for stateless file sharing (@lnj, @JBBgameich)
+   - Add new HTTP File Upload Manager for slot requesting and uploading (@lnj, @JBBgameich)
  - Implement stanza parsing for modern audio-video calls (@melvo)
  - Implement XEP-0444: Message Reactions (@melvo)
- - Add QXmppNonza as base for stanzas and nonzas (@lnjX)
+ - Add QXmppNonza as base for stanzas and nonzas (@lnj)
  - RosterManager: Add subscription request signal with full presence (#346, @melvo)
 
 Breaking changes:
@@ -252,17 +320,17 @@ QXmpp now requires a C++17 compliant compiler. Qt 6 support has been added. The
 new compliance suites for 2021 are fulfilled without any changes being required.
 
 New features:
- - Qt 6 port, including many undeprecations and some refactoring (@lnjX)
- - Add XEP-0224: Attention manager (@lnjX)
+ - Qt 6 port, including many undeprecations and some refactoring (@lnj)
+ - Add XEP-0224: Attention manager (@lnj)
  - Implement MIX-MISC XEP-0407: Invitation message extension (#329, @melvo)
- - New SCRAM-SHA3-512 and SCRAM-SHA-512 SASL algorithms (#320, @lnjX)
- - Client: Advertise stream management state (#309, @lnjX)
- - RosterManager: Cache roster if stream can be resumed (#309, @lnjX)
+ - New SCRAM-SHA3-512 and SCRAM-SHA-512 SASL algorithms (#320, @lnj)
+ - Client: Advertise stream management state (#309, @lnj)
+ - RosterManager: Cache roster if stream can be resumed (#309, @lnj)
  - RosterManager: Enable MIX annotation for roster items (#331, @melvo)
 
 Fixes:
  - Bind IQ errors are now handled properly (@Bonnie080)
- - Fix cached stream management packets are resent with the wrong account (#335, @lnjX)
+ - Fix cached stream management packets are resent with the wrong account (#335, @lnj)
 
 QXmpp 1.3.2 (Jan 09, 2021)
 --------------------------
@@ -282,8 +350,8 @@ not vulnerable to roster push attacks (CVE-2016-9928).
 Fixes:
  - QXmppRosterIq: Set subscriptionType to NotSet correctly (#293, @melvo)
  - Fix `QXMPP_EXPORT` define when linking statically (#299, @leobasilio)
- - QXmppMessageReceiptManager: Ignore all error messages (#300, @lnjX)
- - QXmppCarbonManager: Fix CVE-2017-5603 (missing sender check) (#304, @lnjX)
+ - QXmppMessageReceiptManager: Ignore all error messages (#300, @lnj)
+ - QXmppCarbonManager: Fix CVE-2017-5603 (missing sender check) (#304, @lnj)
 
 QXmpp 1.3.0 (Apr 06, 2020)
 --------------------------
@@ -295,41 +363,41 @@ release (apart from classes marked as 'NOT FINALIZED').
 
 New features:
  - Port QXmppCallManager to GStreamer (#207, @olesalscheider)
- - Add XEP-0245: The /me Command (#276, @lnjX)
- - Add XEP-0357: Push Notifications: Enable/disable IQ (#271, @jbbgameich,
+ - Add XEP-0245: The /me Command (#276, @lnj)
+ - Add XEP-0357: Push Notifications: Enable/disable IQ (#271, @jbb,
    @zatroxde)
- - Add XEP-0359: Unique and Stable Stanza IDs (#256, @lnjX)
- - Add XEP-0428: Fallback Indication (#253, @lnjX)
+ - Add XEP-0359: Unique and Stable Stanza IDs (#256, @lnj)
+ - Add XEP-0428: Fallback Indication (#253, @lnj)
  - Update from RFC3920 to RFC6120:
    * Deprecate PaymentRequired stanza error condition as it was not adopted in
-     RFC6120 (#277, @lnjX)
-   * Add PolicyViolation stanza error condition added in RFC6120 (#279, @lnjX)
+     RFC6120 (#277, @lnj)
+   * Add PolicyViolation stanza error condition added in RFC6120 (#279, @lnj)
    * Add redirection URI from RFC6120 for Gone and Redirect conditions (#280,
-     @lnjX)
-   * Add 'by' attribute to QXmppStanza::Error from RFC6120 (#283, @lnjX)
+     @lnj)
+   * Add 'by' attribute to QXmppStanza::Error from RFC6120 (#283, @lnj)
  - Update from RFC3921 to RFC6121:
-   * Add pre-approved presence subscriptions (#285, @lnjX):
+   * Add pre-approved presence subscriptions (#285, @lnj):
      - Add 'approved' attribute to QXmppRosterIq
      - Add stream feature for pre-approved presence subscriptions
-   * Add stream feature for roster versioning (#286, @lnjX)
- - Use QUuid by default to generate unique stanza IDs (#255, @lnjX)
- - Add roster extension for MIX-PAM (XEP-0405) (#175, @lnjX)
+   * Add stream feature for roster versioning (#286, @lnj)
+ - Use QUuid by default to generate unique stanza IDs (#255, @lnj)
+ - Add roster extension for MIX-PAM (XEP-0405) (#175, @lnj)
  - Update MAM to v0.6 (including namespace bump to `urn:xmpp:mam:2`) (#254,
-   #257, @lnjX)
+   #257, @lnj)
  - Add not-authorized stream error condition in QXmppOutgoingClient (#191,
    @henry61024)
  - Add missing static service discovery features for supported message
-   extensions (#287, @lnjX)
+   extensions (#287, @lnj)
  - Add utility constructor to QXmppDataForm and QXmppDataForm::Field to make
-   creation of forms easier (#273, @lnjX)
+   creation of forms easier (#273, @lnj)
 
 Misc:
  - Make QXmpp work with projects using `QT_NO_KEYWORDS` (#258, @tomcucinotta)
- - Add hyperlinks to XEP references in the documentation (@lnjX)
+ - Add hyperlinks to XEP references in the documentation (@lnj)
  - Move from Travis-CI to GitHub Actions (#265, @jlaine)
  - Replace deprecated `qsrand()` and `qrand()` by QRandomGenerator (#267,
    @melvo)
- - Add tests for QXmppStanza::Error parsing (#279, @lnjX)
+ - Add tests for QXmppStanza::Error parsing (#279, @lnj)
 
 Deprecations:
  - `QXmppStanza::Error::Condition::PaymentRequired`: The error condition was
@@ -348,10 +416,10 @@ Fixes:
  - QXmppMessageReceiptManager: Fix receipts are sent on error messages
    (#269, @TheBluestBird)
  - QXmppVCardManager: Fix clientVCardReceived() not emitted when IQ is from the
-   bare JID of the user (#281, @melvo, @lnjX)
+   bare JID of the user (#281, @melvo, @lnj)
  - QXmppRosterManager: Fix 'ask' attribute is included when renaming item
-   (#262, @melvo, @lnjX)
- - QXmppRosterIq: Add missing implementation of the copy constructor (@lnjX)
+   (#262, @melvo, @lnj)
+ - QXmppRosterIq: Add missing implementation of the copy constructor (@lnj)
 
 QXmpp 1.2.0 (Feb 06, 2020)
 --------------------------
@@ -361,36 +429,36 @@ kept this release again. Code coverage has been improved from 68.93% to 69.55%.
 
 New features:
  - Implement XEP-0077: In-band registration:
-   - Add registration manager with full unit tests (#248, @lnjX)
-   - Add `registered` and `remove` to the IQ (#240, @lnjX)
- - Implement XEP-0231: Bits of Binary (#230, @lnjX)
- - Add `QXmppClient::indexOfExtension<T>()` (#241, @lnjX)
- - Add QXmppStartTlsPacket to replace fixed XML data (#236, @lnjX)
- - Move TLS code to private QXmppTlsManager (#236, @lnjX)
+   - Add registration manager with full unit tests (#248, @lnj)
+   - Add `registered` and `remove` to the IQ (#240, @lnj)
+ - Implement XEP-0231: Bits of Binary (#230, @lnj)
+ - Add `QXmppClient::indexOfExtension<T>()` (#241, @lnj)
+ - Add QXmppStartTlsPacket to replace fixed XML data (#236, @lnj)
+ - Move TLS code to private QXmppTlsManager (#236, @lnj)
  - Add private QXmppInternalClientExtensions to access private part of the
-   client (#243, @lnjX)
- - Add utility methods to QXmppRegisterIq to create common requests (#247, @lnjX)
+   client (#243, @lnj)
+ - Add utility methods to QXmppRegisterIq to create common requests (#247, @lnj)
 
 Fixes:
  - QXmppMucManager: Make it possible to handle stanzas not handled by the
    manager (#226, @kollix)
- - Only send Client State Indication (CSI) states when connected (#232, @lnjX)
+ - Only send Client State Indication (CSI) states when connected (#232, @lnj)
  - Fix no documentation is generated for QXmppStanza::Error and
-   QXmppStreamFeatures (@lnjX)
- - Fix some doxygen warnings and undocumented Q_PROPERTYs (@lnjX)
+   QXmppStreamFeatures (@lnj)
+ - Fix some doxygen warnings and undocumented Q_PROPERTYs (@lnj)
 
 Misc:
- - Replace deprecated Q_FOREACH (#210, @lnjX)
- - Replace deprecated Q_ENUMS with Q_ENUM (#227, @lnjX)
- - Replace deprecated signal/slots syntax (#237, @jbbgameich)
- - Switch to Ubuntu Bionic for Travis-CI builds (#210, @lnjX)
+ - Replace deprecated Q_FOREACH (#210, @lnj)
+ - Replace deprecated Q_ENUMS with Q_ENUM (#227, @lnj)
+ - Replace deprecated signal/slots syntax (#237, @jbb)
+ - Switch to Ubuntu Bionic for Travis-CI builds (#210, @lnj)
  - Use QSharedDataPointers for QXmppRegisterIq, QXmppPubSubIq,
    QXmppDiscoveryIq, QXmppMam{Query,Result}Iq, QXmppStreamFeatures
-   (#230, #235, #252, @lnjX)
- - Refactor QXmppPubSubIq and add missing tests (#235, @lnjX)
- - Refactor QXmppPresence and add missing tests (#231, @lnjX)
- - Replace manual xmlns writing by writeDefaultNamespace() (#244, @lnjX)
- - Use QT_VERSION_CHECK to generate QXMPP_VERSION (#238, @lnjX)
+   (#230, #235, #252, @lnj)
+ - Refactor QXmppPubSubIq and add missing tests (#235, @lnj)
+ - Refactor QXmppPresence and add missing tests (#231, @lnj)
+ - Replace manual xmlns writing by writeDefaultNamespace() (#244, @lnj)
+ - Use QT_VERSION_CHECK to generate QXMPP_VERSION (#238, @lnj)
  - Add clang-format file (#239, @0xd34df00d)
 
 QXmpp 1.1.0 (Oct 23, 2019)
@@ -402,43 +470,43 @@ with *since QXmpp 1.1*.
 New features:
  - Add support for SCRAM-SHA-1 and SCRAM-SHA-256 (#183, @jlaine)
  - Order SASL mechanisms to prefer the most secure (#187, @jlaine)
- - Add XEP-0334: Message Processing Hints (v0.3.0) (#212, @lnjX, @jaragont,
+ - Add XEP-0334: Message Processing Hints (v0.3.0) (#212, @lnj, @jaragont,
    @sam-truscott)
- - Add XEP-0363: HTTP File Upload (v0.9.0) (#188, @lnjX)
- - Add XEP-0367: Message Attaching (v0.3.0) (#196, @lnjX)
+ - Add XEP-0363: HTTP File Upload (v0.9.0) (#188, @lnj)
+ - Add XEP-0367: Message Attaching (v0.3.0) (#196, @lnj)
  - Add XEP-0369: Mediated Information eXchange (MIX) (v0.14.2) (partially):
-   * Add QXmppMixIq to manage/join channels (#174, @lnjX)
-   * Add QXmppMessage and QXmppPresence extensions for MIX (#175, @lnjX)
-   * Add channel info and participant PubSub/PEP items (#179, @lnjX)
- - Add XEP-0380: Explicit Message Encryption (v0.3.0) (#199, @lnjX)
- - Add XEP-0382: Spoiler messages (v0.2.0) (#195, @lnjX)
+   * Add QXmppMixIq to manage/join channels (#174, @lnj)
+   * Add QXmppMessage and QXmppPresence extensions for MIX (#175, @lnj)
+   * Add channel info and participant PubSub/PEP items (#179, @lnj)
+ - Add XEP-0380: Explicit Message Encryption (v0.3.0) (#199, @lnj)
+ - Add XEP-0382: Spoiler messages (v0.2.0) (#195, @lnj)
 
 Fixes:
  - Do not accept receipts from other resources of the used account (#192, lnjX)
- - cmake: Set minimum version before creating project() and bump to 3.3 (#205, @jbbgameich)
+ - cmake: Set minimum version before creating project() and bump to 3.3 (#205, @jbb)
 
 Deprecations:
- - Deprecate QXmppClient extension getters (#214, @lnjX):
+ - Deprecate QXmppClient extension getters (#214, @lnj):
    * `QXmppClient::rosterManager()`:
      Use `QXmppClient::findExtension<QXmppRosterManager>()` instead
    * `QXmppClient::vCardManager()`:
      Use `QXmppClient::findExtension<QXmppVCardManager>()` instead
    * `QXmppClient::versionManager()`:
      Use `QXmppClient::findExtension<QXmppVersionManager>()` instead
- - Refactor data form media element, deprecate `QXmppDataForm::Media` (#222, @lnjX):
+ - Refactor data form media element, deprecate `QXmppDataForm::Media` (#222, @lnj):
    * `QXmppDataForm::Media`:
      Use a list of the new `QXmppDataForm::MediaSource` in combination with a `QSize`
    * `QXmppDataForm::Field::media()` / `QXmppDataForm::Field::setMedia()`:
      Use `QXmppDataForm::Field::mediaSources()` and `QXmppDataForm::Field::mediaSize()`
 
 Misc:
- - Replace deprecated `qSort()` by `std::sort()` (#206, @jbbgameich)
- - Do not use deprecated `QSslSocket::setCaCertificates()` (#206, @jbbgameich)
- - Modernize code by using `nullptr`, `override`, etc. (#204, @jbbgameich)
+ - Replace deprecated `qSort()` by `std::sort()` (#206, @jbb)
+ - Do not use deprecated `QSslSocket::setCaCertificates()` (#206, @jbb)
+ - Modernize code by using `nullptr`, `override`, etc. (#204, @jbb)
  - Move attributes into private d-pointer for future ABI compatibility:
-   * QXmppRosterIq (#175, @lnjX)
-   * QXmppStanza::Error (#203, @lnjX)
- - Use raw literals, range based loops and `auto` (#224, @jbbgameich)
+   * QXmppRosterIq (#175, @lnj)
+   * QXmppStanza::Error (#203, @lnj)
+ - Use raw literals, range based loops and `auto` (#224, @jbb)
 
 QXmpp 1.0.1 (Oct 14, 2019)
 --------------------------
@@ -451,19 +519,19 @@ QXmpp 1.0.0 (Jan 8, 2019)
 -------------------------
 
 New features:
- - Add XEP-0066: Out of Band Data (partially) (#167, @lnjX)
+ - Add XEP-0066: Out of Band Data (partially) (#167, @lnj)
  - Add XEP-0198: Stream Management (#99, @olesalscheider)
  - Add XEP-0237: Roster Versioning (#142, @LightZam)
  - Add XEP-0280: Message Carbons (#88, @fbeutel)
- - Add XEP-0308: Last Message Correction (#170, @lnjX)
+ - Add XEP-0308: Last Message Correction (#170, @lnj)
  - Add XEP-0313: Message Archive Management (#120, @olesalscheider)
- - Add XEP-0319: Last User Interaction in Presence (#171, @lnjX)
- - Add XEP-0352: Client State Indication (#159, @fbeutel, @lnjX)
+ - Add XEP-0319: Last User Interaction in Presence (#171, @lnj)
+ - Add XEP-0352: Client State Indication (#159, @fbeutel, @lnj)
  - Auto-connect to next DNS-SRV record server on connection failure
    (#105, @kollix)
- - QXmppVersionManager: Use QSysInfo to determine default OS (#168, @lnjX)
+ - QXmppVersionManager: Use QSysInfo to determine default OS (#168, @lnj)
  - QXmppDiscoveryManager: Default to `phone` type on mobile platforms
-   (#168, @lnjX)
+   (#168, @lnj)
  - CMake based build system (#131, @olesalscheider)
  - Add BUILD_SHARED option (#160, @LightZam)
  - Use C++11 compiler standard (@jlaine)

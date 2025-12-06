@@ -6,6 +6,7 @@
 #define QXMPPOUTGOINGSERVER_H
 
 #include "QXmppLogger.h"
+#include "QXmppStreamError.h"
 
 #include <QAbstractSocket>
 
@@ -15,6 +16,10 @@ class QXmppDialback;
 class QXmppNonza;
 class QXmppOutgoingServer;
 class QXmppOutgoingServerPrivate;
+
+namespace QXmpp::Private {
+struct StreamOpen;
+}
 
 ///
 /// \brief The QXmppOutgoingServer class represents an outgoing XMPP stream
@@ -52,14 +57,14 @@ public:
 
 private:
     void handleStart();
-    void handleStream(const QDomElement &streamElement);
+    void handleStream(const QXmpp::Private::StreamOpen &streamElement);
     void handleStanza(const QDomElement &stanzaElement);
 
     void onDnsLookupFinished();
     void onSocketDisconnected();
     void sendDialback();
     void slotSslErrors(const QList<QSslError> &errors);
-    void socketError(QAbstractSocket::SocketError error);
+    void onSocketError(const QString &text, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError> error);
 
     const std::unique_ptr<QXmppOutgoingServerPrivate> d;
 };

@@ -26,53 +26,39 @@ public:
         Authorize,
         Allowlist
     };
-    static std::optional<AccessModel> accessModelFromString(const QString &);
-    static QString accessModelToString(AccessModel);
 
     enum PublishModel : uint8_t {
         Publishers,
         Subscribers,
         Anyone
     };
-    static std::optional<PublishModel> publishModelFromString(const QString &);
-    static QString publishModelToString(PublishModel);
 
     enum class ChildAssociationPolicy : uint8_t {
         All,
         Owners,
         Whitelist
     };
-    static std::optional<ChildAssociationPolicy> childAssociatationPolicyFromString(const QString &);
-    static QString childAssociationPolicyToString(ChildAssociationPolicy);
 
     enum ItemPublisher : uint8_t {
         NodeOwner,
         Publisher
     };
-    static std::optional<ItemPublisher> itemPublisherFromString(const QString &);
-    static QString itemPublisherToString(ItemPublisher);
 
     enum NodeType : uint8_t {
         Leaf,
         Collection
     };
-    static std::optional<NodeType> nodeTypeFromString(const QString &);
-    static QString nodeTypeToString(NodeType);
 
     enum NotificationType : uint8_t {
         Normal,
         Headline
     };
-    static std::optional<NotificationType> notificationTypeFromString(const QString &);
-    static QString notificationTypeToString(NotificationType);
 
     enum SendLastItemType : uint8_t {
         Never,
         OnSubscription,
         OnSubscriptionAndPresence
     };
-    static std::optional<SendLastItemType> sendLastItemTypeFromString(const QString &);
-    static QString sendLastItemTypeToString(SendLastItemType);
 
     static std::optional<QXmppPubSubNodeConfig> fromDataForm(const QXmppDataForm &form);
 

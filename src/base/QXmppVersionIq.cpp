@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -50,16 +51,6 @@ void QXmppVersionIq::setVersion(const QString &version)
 }
 
 /// \cond
-bool QXmppVersionIq::isVersionIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_version);
-}
-
-bool QXmppVersionIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
-{
-    return tagName == u"query" && xmlNamespace == ns_version;
-}
-
 void QXmppVersionIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -70,21 +61,11 @@ void QXmppVersionIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppVersionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_version));
-
-    if (!m_name.isEmpty()) {
-        writeXmlTextElement(writer, u"name", m_name);
-    }
-
-    if (!m_os.isEmpty()) {
-        writeXmlTextElement(writer, u"os", m_os);
-    }
-
-    if (!m_version.isEmpty()) {
-        writeXmlTextElement(writer, u"version", m_version);
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalTextElement { u"name", m_name },
+        OptionalTextElement { u"os", m_os },
+        OptionalTextElement { u"version", m_version },
+    });
 }
 /// \endcond

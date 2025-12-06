@@ -25,6 +25,7 @@
 #include <QTimer>
 
 using namespace std::chrono_literals;
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppOutgoingServerPrivate
@@ -40,8 +41,8 @@ public:
     QString remoteDomain;
     QString verifyId;
     QString verifyKey;
-    QTimer *dialbackTimer;
-    bool ready;
+    QTimer *dialbackTimer = nullptr;
+    bool ready = false;
 };
 
 QXmppOutgoingServerPrivate::QXmppOutgoingServerPrivate(QObject *q)
@@ -59,16 +60,13 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingServerPrivate>(this))
 {
-    // socket initialisation
-    auto *socket = new QSslSocket(this);
-    d->socket.setSocket(socket);
-
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingServer::handleStart);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingServer::handleStanza);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingServer::handleStream);
     connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingServer::disconnectFromHost);
-    connect(socket, &QAbstractSocket::disconnected, this, &QXmppOutgoingServer::onSocketDisconnected);
-    connect(socket, &QSslSocket::errorOccurred, this, &QXmppOutgoingServer::socketError);
+    connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingServer::onSocketDisconnected);
+    connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingServer::onSocketError);
+    connect(&d->socket, &XmppSocket::sslErrorsOccurred, this, &QXmppOutgoingServer::slotSslErrors);
 
     // DNS lookups
     connect(&d->dns, &QDnsLookup::finished, this, &QXmppOutgoingServer::onDnsLookupFinished);
@@ -79,9 +77,6 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     connect(d->dialbackTimer, &QTimer::timeout, this, &QXmppOutgoingServer::sendDialback);
 
     d->localDomain = domain;
-    d->ready = false;
-
-    connect(socket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &QXmppOutgoingServer::slotSslErrors);
 }
 
 QXmppOutgoingServer::~QXmppOutgoingServer() = default;
@@ -121,11 +116,10 @@ void QXmppOutgoingServer::onDnsLookupFinished()
     }
 
     // set the name the SSL certificate should match
-    d->socket.socket()->setPeerVerifyName(d->remoteDomain);
+    d->socket.internalSocket()->setPeerVerifyName(d->remoteDomain);
 
     // connect to server
-    info(u"Connecting to %1:%2"_s.arg(host, QString::number(port)));
-    d->socket.socket()->connectToHost(host, port);
+    d->socket.connectToHost(ServerAddress { ServerAddress::Tcp, host, port });
 }
 
 void QXmppOutgoingServer::onSocketDisconnected()
@@ -148,10 +142,8 @@ void QXmppOutgoingServer::handleStart()
     sendData(data.toUtf8());
 }
 
-void QXmppOutgoingServer::handleStream(const QDomElement &streamElement)
+void QXmppOutgoingServer::handleStream(const StreamOpen &)
 {
-    Q_UNUSED(streamElement);
-
     // gmail.com servers are broken: they never send <stream:features>,
     // so we schedule sending the dialback in a couple of seconds
     d->dialbackTimer->start();
@@ -163,7 +155,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         QXmppStreamFeatures features;
         features.parse(stanza);
 
-        if (!d->socket.socket()->isEncrypted()) {
+        if (!d->socket.internalSocket()->isEncrypted()) {
             // check we can satisfy TLS constraints
             if (!QSslSocket::supportsSsl() &&
                 features.tlsMode() == QXmppStreamFeatures::Required) {
@@ -185,7 +177,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         sendDialback();
     } else if (StarttlsProceed::fromDom(stanza)) {
         debug(u"Starting encryption"_s);
-        d->socket.socket()->startClientEncryption();
+        d->socket.internalSocket()->startClientEncryption();
         return;
     } else if (QXmppDialback::isDialback(stanza)) {
         QXmppDialback response;
@@ -307,11 +299,10 @@ void QXmppOutgoingServer::slotSslErrors(const QList<QSslError> &errors)
     for (int i = 0; i < errors.count(); ++i) {
         warning(errors.at(i).errorString());
     }
-    d->socket.socket()->ignoreSslErrors();
+    d->socket.internalSocket()->ignoreSslErrors();
 }
 
-void QXmppOutgoingServer::socketError(QAbstractSocket::SocketError error)
+void QXmppOutgoingServer::onSocketError(const QString &, std::variant<QXmpp::StreamError, QAbstractSocket::SocketError>)
 {
-    Q_UNUSED(error);
     Q_EMIT disconnected();
 }

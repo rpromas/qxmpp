@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -61,9 +62,6 @@ bool QXmppHttpFileSource::parse(const QDomElement &el)
 
 void QXmppHttpFileSource::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("url-data"));
-    writer->writeDefaultNamespace(toString65(ns_url_data));
-    writer->writeAttribute(QSL65("target"), m_url.toString());
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { XmlTag, Attribute { u"target", m_url } });
 }
 /// \endcond

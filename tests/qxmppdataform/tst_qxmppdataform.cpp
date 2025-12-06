@@ -4,16 +4,12 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include <QObject>
-#include <QtGlobal>
-
-// deprecated methods are also tested: this is used to avoid unnecessary warnings
-#undef QT_DEPRECATED_X
-#define QT_DEPRECATED_X(text)
-
 #include "QXmppDataForm.h"
 
 #include "util.h"
+
+#include <QObject>
+#include <QtGlobal>
 
 class tst_QXmppDataForm : public QObject
 {
@@ -45,10 +41,10 @@ void tst_QXmppDataForm::testSimple()
     QCOMPARE(form.title(), QLatin1String("Joggle Search"));
     QCOMPARE(form.instructions(), QLatin1String("Fill out this form to search for information!"));
     QVERIFY(form.formType().isNull());
-    QCOMPARE(form.fields().size(), 1);
-    QCOMPARE(form.fields().at(0).type(), QXmppDataForm::Field::TextSingleField);
-    QCOMPARE(form.fields().at(0).isRequired(), true);
-    QCOMPARE(form.fields().at(0).key(), u"search_request"_s);
+    QCOMPARE(form.constFields().size(), 1);
+    QCOMPARE(form.constFields().at(0).type(), QXmppDataForm::Field::TextSingleField);
+    QCOMPARE(form.constFields().at(0).isRequired(), true);
+    QCOMPARE(form.constFields().at(0).key(), u"search_request"_s);
 
     serializePacket(form, xml);
 }
@@ -65,6 +61,13 @@ void tst_QXmppDataForm::testSubmit()
     QXmppDataForm form;
     parsePacket(form, xml);
     QCOMPARE(form.isNull(), false);
+
+    QVERIFY(form.field(u"search_request").has_value());
+    QCOMPARE(form.field(u"search_request")->value().toString(), u"verona");
+
+    QVERIFY(form.fieldValue(u"search_request").has_value());
+    QCOMPARE(form.fieldValue(u"search_request")->toString(), u"verona");
+
     serializePacket(form, xml);
 }
 
@@ -92,41 +95,44 @@ void tst_QXmppDataForm::testMedia()
     parsePacket(form, xml);
 
     QCOMPARE(form.isNull(), false);
-    QCOMPARE(form.fields().size(), 1);
-    QCOMPARE(form.fields().at(0).type(), QXmppDataForm::Field::TextSingleField);
-    QCOMPARE(form.fields().at(0).isRequired(), false);
-    QCOMPARE(form.fields().at(0).mediaSize(), QSize(290, 80));
-    QCOMPARE(form.fields().at(0).mediaSources().size(), 2);
+    QCOMPARE(form.constFields().size(), 1);
+    QCOMPARE(form.constFields().at(0).type(), QXmppDataForm::Field::TextSingleField);
+    QCOMPARE(form.constFields().at(0).isRequired(), false);
+    QCOMPARE(form.constFields().at(0).mediaSize(), QSize(290, 80));
+    QCOMPARE(form.constFields().at(0).mediaSources().size(), 2);
     QCOMPARE(
-        form.fields().at(0).mediaSources().at(0).uri().toString(),
+        form.constFields().at(0).mediaSources().at(0).uri().toString(),
         u"http://www.victim.com/challenges/ocr.jpeg?F3A6292C"_s);
     QCOMPARE(
-        form.fields().at(0).mediaSources().at(0).contentType(),
+        form.constFields().at(0).mediaSources().at(0).contentType(),
         QMimeDatabase().mimeTypeForName(u"image/jpeg"_s));
     QCOMPARE(
-        form.fields().at(0).mediaSources().at(1).uri().toString(),
+        form.constFields().at(0).mediaSources().at(1).uri().toString(),
         u"cid:sha1+f24030b8d91d233bac14777be5ab531ca3b9f102@bob.xmpp.org"_s);
     QCOMPARE(
-        form.fields().at(0).mediaSources().at(1).contentType(),
+        form.constFields().at(0).mediaSources().at(1).contentType(),
         QMimeDatabase().mimeTypeForName(u"image/png"_s));
 
     // deprecated
-    QCOMPARE(form.fields().at(0).media().isNull(), false);
-    QCOMPARE(form.fields().at(0).media().width(), 290);
-    QCOMPARE(form.fields().at(0).media().height(), 80);
-    QCOMPARE(form.fields().at(0).media().uris().size(), 2);
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QCOMPARE(form.constFields().at(0).media().isNull(), false);
+    QCOMPARE(form.constFields().at(0).media().width(), 290);
+    QCOMPARE(form.constFields().at(0).media().height(), 80);
+    QCOMPARE(form.constFields().at(0).media().uris().size(), 2);
     QCOMPARE(
-        form.fields().at(0).media().uris().at(0).first,
+        form.constFields().at(0).media().uris().at(0).first,
         u"image/jpeg"_s);
     QCOMPARE(
-        form.fields().at(0).media().uris().at(0).second,
+        form.constFields().at(0).media().uris().at(0).second,
         u"http://www.victim.com/challenges/ocr.jpeg?F3A6292C"_s);
     QCOMPARE(
-        form.fields().at(0).media().uris().at(1).first,
+        form.constFields().at(0).media().uris().at(1).first,
         u"image/png"_s);
     QCOMPARE(
-        form.fields().at(0).media().uris().at(1).second,
+        form.constFields().at(0).media().uris().at(1).second,
         u"cid:sha1+f24030b8d91d233bac14777be5ab531ca3b9f102@bob.xmpp.org"_s);
+    QT_WARNING_POP
 
     serializePacket(form, xml);
 
@@ -135,14 +141,15 @@ void tst_QXmppDataForm::testMedia()
     //
 
     QXmppDataForm::Field mediaField1;
-    mediaField1.mediaSize().setWidth(290);
-    mediaField1.mediaSize().setHeight(80);
-    mediaField1.mediaSources() << QXmppDataForm::MediaSource(
-        QUrl(u"http://www.victim.com/challenges/ocr.jpeg?F3A6292C"_s),
-        QMimeDatabase().mimeTypeForName(u"image/jpeg"_s));
-    mediaField1.mediaSources() << QXmppDataForm::MediaSource(
-        QUrl(u"cid:sha1+f24030b8d91d233bac14777be5ab531ca3b9f102@bob.xmpp.org"_s),
-        QMimeDatabase().mimeTypeForName(u"image/png"_s));
+    mediaField1.setMediaSize(QSize(290, 80));
+    mediaField1.setMediaSources({
+        QXmppDataForm::MediaSource(
+            QUrl(u"http://www.victim.com/challenges/ocr.jpeg?F3A6292C"_s),
+            QMimeDatabase().mimeTypeForName(u"image/jpeg"_s)),
+        QXmppDataForm::MediaSource(
+            QUrl(u"cid:sha1+f24030b8d91d233bac14777be5ab531ca3b9f102@bob.xmpp.org"_s),
+            QMimeDatabase().mimeTypeForName(u"image/png"_s)),
+    });
 
     QXmppDataForm form2;
     form2.setType(QXmppDataForm::Form);
@@ -166,13 +173,15 @@ void tst_QXmppDataForm::testMedia()
 
     QXmppDataForm form3;
     form3.setType(QXmppDataForm::Form);
-    form3.fields().append(mediaField2);
+    form3.setFields({ mediaField2 });
     serializePacket(form3, xml);
 
     //
     // test compatibility of deprecated methods
     //
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDataForm::Field mediaFieldBefore = mediaField1;
     mediaField1.setMedia(mediaField1.media());
     QCOMPARE(mediaField1, mediaFieldBefore);
@@ -180,6 +189,7 @@ void tst_QXmppDataForm::testMedia()
     QXmppDataForm::Field mediaField2Before = mediaField2;
     mediaField2.setMedia(mediaField2.media());
     QCOMPARE(mediaField2, mediaField2Before);
+    QT_WARNING_POP
 }
 
 void tst_QXmppDataForm::testMediaSource()

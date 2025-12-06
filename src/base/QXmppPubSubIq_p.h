@@ -77,6 +77,9 @@ public:
     std::optional<uint32_t> maxItems() const;
     void setMaxItems(std::optional<uint32_t>);
 
+    bool retractNotify() const;
+    void setRetractNotify(bool);
+
     std::optional<QXmppDataForm> dataForm() const;
     void setDataForm(const std::optional<QXmppDataForm> &);
 
