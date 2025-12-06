@@ -654,7 +654,7 @@ void tst_QXmppJingleData::testContent()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.setMedia(u"audio"_s);
     content2desc.setSsrc(quint32(0));
     content2.setRtpMultiplexingSupported(true);
@@ -977,7 +977,7 @@ void tst_QXmppJingleData::testContentRtpFeedbackNegotiation()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.addPayloadType(payloadType);
     content2.setDescription(content2desc);
     content2.setRtpFeedbackProperties({ rtpFeedbackProperty1, rtpFeedbackProperty2 });
@@ -1037,7 +1037,7 @@ void tst_QXmppJingleData::testContentRtpHeaderExtensionsNegotiation()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.addPayloadType(payloadType);
     content2.setDescription(content2desc);
     content2.setRtpHeaderExtensionProperties({ rtpHeaderExtensionProperty1, rtpHeaderExtensionProperty2 });
@@ -1556,11 +1556,11 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
         "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'/>"
         "</propose>");
     QXmppJingleMessageInitiationElement proposeElement;
+    QVERIFY(!proposeElement.containsTieBreak());
     proposeElement.setType(JmiType::Propose);
 
     parsePacket(proposeElement, proposeXml);
     QCOMPARE(proposeElement.id(), u"ca3cf894-5325-482f-a412-a6e9f832298d"_s);
-    QCOMPARE(proposeElement.description()->type(), u"urn:xmpp:jingle:apps:rtp:1"_s);
     QCOMPARE(proposeElement.description()->media(), u"audio"_s);
     QCOMPARE(proposeElement.containsTieBreak(), false);  // single check if containsTieBreak is set correctly when unused
     QCOMPARE(proposeElement.reason(), std::nullopt);     // single check if reason is set correctly when unused
@@ -1593,8 +1593,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray rejectXml(
         "<reject xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Busy</text>"
         "<busy/>"
+        "<text>Busy</text>"
         "</reason>"
         "<tie-break/>"
         "</reject>");
@@ -1613,8 +1613,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray retractXml(
         "<retract xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Retracted</text>"
         "<cancel/>"
+        "<text>Retracted</text>"
         "</reason>"
         "</retract>");
     QXmppJingleMessageInitiationElement retractElement;
@@ -1631,8 +1631,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray finishXml(
         "<finish xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Success</text>"
         "<success/>"
+        "<text>Success</text>"
         "</reason>"
         "<migrated to='989a46a6-f202-4910-a7c3-83c6ba3f3947'/>"
         "</finish>");

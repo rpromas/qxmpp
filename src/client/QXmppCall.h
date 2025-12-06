@@ -18,6 +18,7 @@ class QHostAddress;
 class QXmppCallPrivate;
 class QXmppCallManager;
 class QXmppCallManagerPrivate;
+class QXmppError;
 
 class QXMPP_EXPORT QXmppCall : public QXmppLoggable
 {
@@ -52,24 +53,24 @@ public:
     QString jid() const;
     QString sid() const;
     QXmppCall::State state() const;
+    std::optional<QXmppError> error() const;
 
     GstElement *pipeline() const;
     QXmppCallStream *audioStream() const;
     QXmppCallStream *videoStream() const;
 
     bool isEncrypted() const;
+    bool videoSupported() const;
+
+    void accept();
+    void decline();
+    void hangUp();
+    void addVideo();
 
     /// \brief This signal is emitted when a call is connected.
-    ///
-    /// Once this signal is emitted, you can connect a QAudioOutput and
-    /// QAudioInput to the call. You can determine the appropriate clockrate
-    /// and the number of channels by calling payloadType().
     Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when a call is finished.
-    ///
-    /// Note: Do not delete the call in the slot connected to this signal,
-    /// instead use deleteLater().
     Q_SIGNAL void finished();
 
     /// \brief This signal is emitted when the remote party is ringing.
@@ -81,15 +82,12 @@ public:
     /// \brief This signal is emitted when a stream is created.
     Q_SIGNAL void streamCreated(QXmppCallStream *stream);
 
-    Q_SLOT void accept();
-    Q_SLOT void hangup();
-    Q_SLOT void addVideo();
-
 private:
     void onLocalCandidatesChanged(QXmppCallStream *stream);
     void terminated();
 
-    QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent);
+    QXmppCall(const QString &jid, const QString &sid, Direction direction, QXmppCallManager *manager);
+    QXmppCall(const QString &jid, const QString &sid, Direction direction, State state, QXmppError &&error, QXmppCallManager *manager);
 
     const std::unique_ptr<QXmppCallPrivate> d;
     friend class QXmppCallManager;

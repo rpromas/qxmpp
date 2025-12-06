@@ -18,6 +18,13 @@ class QTimer;
 class QXmppIceComponentPrivate;
 class QXmppIceConnectionPrivate;
 class QXmppIcePrivate;
+class QXmppIceTransport;
+class QXmppStunTransaction;
+
+namespace QXmpp {
+struct StunServer;
+struct TurnServer;
+}  // namespace QXmpp
 
 ///
 /// \internal
@@ -100,41 +107,41 @@ public:
     static quint16 peekType(const QByteArray &buffer, quint32 &cookie, QByteArray &id);
 
     // attributes
-    int errorCode;
+    int errorCode = 0;
     QString errorPhrase;
     QByteArray iceControlling;
     QByteArray iceControlled;
     QHostAddress changedHost;
-    quint16 changedPort;
+    quint16 changedPort = 0;
     QHostAddress mappedHost;
-    quint16 mappedPort;
+    quint16 mappedPort = 0;
     QHostAddress otherHost;
-    quint16 otherPort;
+    quint16 otherPort = 0;
     QHostAddress sourceHost;
-    quint16 sourcePort;
+    quint16 sourcePort = 0;
     QHostAddress xorMappedHost;
-    quint16 xorMappedPort;
+    quint16 xorMappedPort = 0;
     QHostAddress xorPeerHost;
-    quint16 xorPeerPort;
+    quint16 xorPeerPort = 0;
     QHostAddress xorRelayedHost;
-    quint16 xorRelayedPort;
-    bool useCandidate;
+    quint16 xorRelayedPort = 0;
+    bool useCandidate = false;
 
 private:
     quint32 m_cookie;
     QByteArray m_id;
-    quint16 m_type;
+    quint16 m_type = 0;
 
     // attributes
     QSet<quint16> m_attributes;
-    quint32 m_changeRequest;
-    quint16 m_channelNumber;
+    quint32 m_changeRequest = 0;
+    quint16 m_channelNumber = 0;
     QByteArray m_data;
-    quint32 m_lifetime;
+    quint32 m_lifetime = 0;
     QByteArray m_nonce;
-    quint32 m_priority;
+    quint32 m_priority = 0;
     QString m_realm;
-    quint8 m_requestedTransport;
+    quint8 m_requestedTransport = 0;
     QByteArray m_reservationToken;
     QString m_software;
     QString m_username;
@@ -159,34 +166,30 @@ public:
     static QList<QHostAddress> discoverAddresses();
     static QList<QUdpSocket *> reservePorts(const QList<QHostAddress> &addresses, int count, QObject *parent = nullptr);
 
-public Q_SLOTS:
-    void close();
-    void connectToHost();
-    qint64 sendDatagram(const QByteArray &datagram);
+    Q_SLOT void close();
+    Q_SLOT void connectToHost();
+    Q_SLOT qint64 sendDatagram(const QByteArray &datagram);
 
-private Q_SLOTS:
-    void checkCandidates();
-    void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
-    void turnConnected();
-    void transactionFinished();
-    void updateGatheringState();
-    void writeStun(const QXmppStunMessage &request);
-
-Q_SIGNALS:
     /// \brief This signal is emitted once ICE negotiation succeeds.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when a data packet is received.
-    void datagramReceived(const QByteArray &datagram);
+    Q_SIGNAL void datagramReceived(const QByteArray &datagram);
 
     /// This signal is emitted when the gathering state of local candidates changes.
-    void gatheringStateChanged();
+    Q_SIGNAL void gatheringStateChanged();
 
     /// \brief This signal is emitted when the list of local candidates changes.
-    void localCandidatesChanged();
+    Q_SIGNAL void localCandidatesChanged();
 
 private:
     QXmppIceComponent(int component, QXmppIcePrivate *config, QObject *parent = nullptr);
+
+    Q_SLOT void checkCandidates();
+    Q_SLOT void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
+    Q_SLOT void turnConnected();
+    void handleStunResponse(QXmppIceTransport *transport, const QXmppStunMessage &response);
+    Q_SLOT void updateGatheringState();
 
     const std::unique_ptr<QXmppIceComponentPrivate> d;
     friend class QXmppIceComponentPrivate;
@@ -260,14 +263,26 @@ public:
     void setRemoteUser(const QString &user);
     void setRemotePassword(const QString &password);
 
+    void setStunServers(const QList<QXmpp::StunServer> &servers);
+    void setTurnServer(const QXmpp::TurnServer &);
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+    [[deprecated("Use setStunServers(QList<StunServer>)")]]
     void setStunServers(const QList<QPair<QHostAddress, quint16>> &servers);
+    [[deprecated("Use setStunServers(QList<StunServer>)")]]
     void setStunServer(const QHostAddress &host, quint16 port = 3478);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnServer(const QHostAddress &host, quint16 port = 3478);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnUser(const QString &user);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnPassword(const QString &password);
+#endif
 
     bool bind(const QList<QHostAddress> &addresses);
     bool isConnected() const;
+
+    Q_SLOT void close();
+    Q_SLOT void connectToHost();
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
     ///
@@ -278,33 +293,27 @@ public:
     ///
     GatheringState gatheringState() const;
 
-Q_SIGNALS:
     /// \brief This signal is emitted once ICE negotiation succeeds.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when ICE negotiation fails.
-    void disconnected();
+    Q_SIGNAL void disconnected();
 
     ///
     /// \brief This signal is emitted when the gathering state of local candidates changes.
     ///
     /// \since QXmpp 0.9.3
     ///
-    void gatheringStateChanged();
+    Q_SIGNAL void gatheringStateChanged();
 
     /// \brief This signal is emitted when the list of local candidates changes.
-    void localCandidatesChanged();
-
-public Q_SLOTS:
-    void close();
-    void connectToHost();
-
-private Q_SLOTS:
-    void slotConnected();
-    void slotGatheringStateChanged();
-    void slotTimeout();
+    Q_SIGNAL void localCandidatesChanged();
 
 private:
+    Q_SLOT void slotConnected();
+    Q_SLOT void slotGatheringStateChanged();
+    Q_SLOT void slotTimeout();
+
     const std::unique_ptr<QXmppIceConnectionPrivate> d;
 };
 

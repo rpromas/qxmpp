@@ -8,13 +8,16 @@
 #define QXMPPCALL_P_H
 
 #include "QXmppCall.h"
+#include "QXmppError.h"
 #include "QXmppJingleIq.h"
 
 #include "GstWrapper.h"
+#include "StringLiterals.h"
 
 #include <gst/gst.h>
 
 #include <QList>
+#include <QPointer>
 
 //
 //  W A R N I N G
@@ -40,19 +43,19 @@ public:
         QString name;
         int channels;
         uint clockrate;
-        QString gstPay;
-        QString gstDepay;
-        QString gstEnc;
-        QString gstDec;
+        QLatin1String gstPay;
+        QLatin1String gstDepay;
+        QLatin1String gstEnc;
+        QLatin1String gstDec;
         struct Property {
-            QString name;
+            QLatin1String name;
             int value;
         };
         // Use e.g. gst-inspect-1.0 x264enc to find good encoder settings for live streaming
         QList<Property> encProps;
     };
 
-    explicit QXmppCallPrivate(QXmppCall *qq);
+    explicit QXmppCallPrivate(const QString &jid, const QString &sid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
@@ -60,57 +63,57 @@ public:
     GstCaps *ptMap(uint sessionId, uint pt);
     static bool isFormatSupported(const QString &codecName);
     static bool isCodecSupported(const GstCodec &codec);
-    static void filterGStreamerFormats(QList<GstCodec> &formats);
 
     QXmppCallStream *createStream(const QString &media, const QString &creator, const QString &name);
-    QXmppCallStream *findStreamByMedia(QStringView media);
-    QXmppCallStream *findStreamByName(QStringView name);
-    QXmppCallStream *findStreamById(int id);
     QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
+    QXmppJingleIq createIq(QXmppJingleIq::Action action) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
-    void handleRequest(const QXmppJingleIq &iq);
+    std::variant<QXmppIq, QXmppStanza::Error> handleRequest(QXmppJingleIq &&iq);
     bool handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void setState(QXmppCall::State state);
-    bool sendAck(const QXmppJingleIq &iq);
     void sendInvite();
-    void terminate(QXmppJingleReason reason);
+    void terminate(QXmppJingleReason reason, bool delay = false);
+
+    bool isOwn(QXmppCallStream *stream) const;
 
     QXmppCall::Direction direction;
     QString jid;
-    QString ownJid;
     bool useDtls = false;
-    QXmppCallManager *manager;
+    bool videoSupported = false;
+    QPointer<QXmppCallManager> manager;
     QString sid;
-    QXmppCall::State state;
+    QXmppCall::State state = QXmppCall::ConnectingState;
+    QXmppError error;
 
     GstElementPtr pipeline;
     GstElement *rtpBin;
 
     // Media streams
     QList<QXmppCallStream *> streams;
-    int nextId;
+    int nextId = 0;
 
     // Supported codecs
+    // See https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml
     QList<GstCodec> videoCodecs = {
-        { .pt = 100, .name = QStringLiteral("H264"), .channels = 1, .clockrate = 90000, .gstPay = QStringLiteral("rtph264pay"), .gstDepay = QStringLiteral("rtph264depay"), .gstEnc = QStringLiteral("x264enc"), .gstDec = QStringLiteral("avdec_h264"), .encProps = { { QStringLiteral("tune"), 4 }, { QStringLiteral("speed-preset"), 3 }, { QStringLiteral("byte-stream"), true }, { QStringLiteral("bitrate"), 512 } } },
-        { .pt = 99, .name = QStringLiteral("VP8"), .channels = 1, .clockrate = 90000, .gstPay = QStringLiteral("rtpvp8pay"), .gstDepay = QStringLiteral("rtpvp8depay"), .gstEnc = QStringLiteral("vp8enc"), .gstDec = QStringLiteral("vp8dec"), .encProps = { { QStringLiteral("deadline"), 20000 }, { QStringLiteral("target-bitrate"), 512000 } } },
+        GstCodec { .pt = 100, .name = u"H264"_s, .channels = 1, .clockrate = 90000, .gstPay = "rtph264pay"_L1, .gstDepay = "rtph264depay"_L1, .gstEnc = "x264enc"_L1, .gstDec = "avdec_h264"_L1, .encProps = { { "tune"_L1, 4 }, { "speed-preset"_L1, 3 }, { "byte-stream"_L1, true }, { "bitrate"_L1, 512 } } },
+        GstCodec { .pt = 99, .name = u"VP8"_s, .channels = 1, .clockrate = 90000, .gstPay = "rtpvp8pay"_L1, .gstDepay = "rtpvp8depay"_L1, .gstEnc = "vp8enc"_L1, .gstDec = "vp8dec"_L1, .encProps = { { "deadline"_L1, 20000 }, { "target-bitrate"_L1, 512000 } } },
         // vp9enc and x265enc seem to be very slow. Give them a lower priority for now.
-        { .pt = 102, .name = QStringLiteral("H265"), .channels = 1, .clockrate = 90000, .gstPay = QStringLiteral("rtph265pay"), .gstDepay = QStringLiteral("rtph265depay"), .gstEnc = QStringLiteral("x265enc"), .gstDec = QStringLiteral("avdec_h265"), .encProps = { { QStringLiteral("tune"), 4 }, { QStringLiteral("speed-preset"), 3 }, { QStringLiteral("bitrate"), 512 } } },
-        { .pt = 101, .name = QStringLiteral("VP9"), .channels = 1, .clockrate = 90000, .gstPay = QStringLiteral("rtpvp9pay"), .gstDepay = QStringLiteral("rtpvp9depay"), .gstEnc = QStringLiteral("vp9enc"), .gstDec = QStringLiteral("vp9dec"), .encProps = { { QStringLiteral("deadline"), 20000 }, { QStringLiteral("target-bitrate"), 512000 } } }
+        GstCodec { .pt = 102, .name = u"HEVC"_s, .channels = 1, .clockrate = 90000, .gstPay = "rtph265pay"_L1, .gstDepay = "rtph265depay"_L1, .gstEnc = "x265enc"_L1, .gstDec = "avdec_h265"_L1, .encProps = { { "tune"_L1, 4 }, { "speed-preset"_L1, 3 }, { "bitrate"_L1, 512 } } },
+        GstCodec { .pt = 101, .name = u"VP9"_s, .channels = 1, .clockrate = 90000, .gstPay = "rtpvp9pay"_L1, .gstDepay = "rtpvp9depay"_L1, .gstEnc = "vp9enc"_L1, .gstDec = "vp9dec"_L1, .encProps = { { "deadline"_L1, 20000 }, { "target-bitrate"_L1, 512000 } } }
     };
 
     QList<GstCodec> audioCodecs = {
-        { .pt = 98, .name = QStringLiteral("OPUS"), .channels = 2, .clockrate = 48000, .gstPay = QStringLiteral("rtpopuspay"), .gstDepay = QStringLiteral("rtpopusdepay"), .gstEnc = QStringLiteral("opusenc"), .gstDec = QStringLiteral("opusdec") },
-        { .pt = 98, .name = QStringLiteral("OPUS"), .channels = 1, .clockrate = 48000, .gstPay = QStringLiteral("rtpopuspay"), .gstDepay = QStringLiteral("rtpopusdepay"), .gstEnc = QStringLiteral("opusenc"), .gstDec = QStringLiteral("opusdec") },
-        { .pt = 97, .name = QStringLiteral("SPEEX"), .channels = 1, .clockrate = 48000, .gstPay = QStringLiteral("rtpspeexpay"), .gstDepay = QStringLiteral("rtpspeexdepay"), .gstEnc = QStringLiteral("speexenc"), .gstDec = QStringLiteral("speexdec") },
-        { .pt = 97, .name = QStringLiteral("SPEEX"), .channels = 1, .clockrate = 44100, .gstPay = QStringLiteral("rtpspeexpay"), .gstDepay = QStringLiteral("rtpspeexdepay"), .gstEnc = QStringLiteral("speexenc"), .gstDec = QStringLiteral("speexdec") },
-        { .pt = 96, .name = QStringLiteral("AAC"), .channels = 2, .clockrate = 48000, .gstPay = QStringLiteral("rtpmp4apay"), .gstDepay = QStringLiteral("rtpmp4adepay"), .gstEnc = QStringLiteral("avenc_aac"), .gstDec = QStringLiteral("avdec_aac") },
-        { .pt = 96, .name = QStringLiteral("AAC"), .channels = 2, .clockrate = 44100, .gstPay = QStringLiteral("rtpmp4apay"), .gstDepay = QStringLiteral("rtpmp4adepay"), .gstEnc = QStringLiteral("avenc_aac"), .gstDec = QStringLiteral("avdec_aac") },
-        { .pt = 96, .name = QStringLiteral("AAC"), .channels = 1, .clockrate = 48000, .gstPay = QStringLiteral("rtpmp4apay"), .gstDepay = QStringLiteral("rtpmp4adepay"), .gstEnc = QStringLiteral("avenc_aac"), .gstDec = QStringLiteral("avdec_aac") },
-        { .pt = 96, .name = QStringLiteral("AAC"), .channels = 1, .clockrate = 44100, .gstPay = QStringLiteral("rtpmp4apay"), .gstDepay = QStringLiteral("rtpmp4adepay"), .gstEnc = QStringLiteral("avenc_aac"), .gstDec = QStringLiteral("avdec_aac") },
-        { .pt = 8, .name = QStringLiteral("PCMA"), .channels = 1, .clockrate = 8000, .gstPay = QStringLiteral("rtppcmapay"), .gstDepay = QStringLiteral("rtppcmadepay"), .gstEnc = QStringLiteral("alawenc"), .gstDec = QStringLiteral("alawdec") },
-        { .pt = 0, .name = QStringLiteral("PCMU"), .channels = 1, .clockrate = 8000, .gstPay = QStringLiteral("rtppcmupay"), .gstDepay = QStringLiteral("rtppcmudepay"), .gstEnc = QStringLiteral("mulawenc"), .gstDec = QStringLiteral("mulawdec") }
+        { .pt = 111, .name = u"opus"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
+        { .pt = 112, .name = u"opus"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
+        { .pt = 96, .name = u"speex"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
+        { .pt = 97, .name = u"speex"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
+        { .pt = 100, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 101, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 102, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 103, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 8, .name = u"PCMA"_s, .channels = 1, .clockrate = 8000, .gstPay = "rtppcmapay"_L1, .gstDepay = "rtppcmadepay"_L1, .gstEnc = "alawenc"_L1, .gstDec = "alawdec"_L1, .encProps = {} },
+        { .pt = 0, .name = u"PCMU"_s, .channels = 1, .clockrate = 8000, .gstPay = "rtppcmupay"_L1, .gstDepay = "rtppcmudepay"_L1, .gstEnc = "mulawenc"_L1, .gstDec = "mulawdec"_L1, .encProps = {} },
     };
 
 private:

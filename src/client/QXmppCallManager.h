@@ -7,34 +7,36 @@
 #ifndef QXMPPCALLMANAGER_H
 #define QXMPPCALLMANAGER_H
 
-#include "QXmppCall.h"
 #include "QXmppClientExtension.h"
-#include "QXmppLogger.h"
+#include "QXmppTask.h"
 
-#include <QIODevice>
-#include <QMetaType>
-#include <QObject>
-
-class QHostAddress;
+class QXmppCall;
 class QXmppCallManagerPrivate;
 class QXmppIq;
-class QXmppJingleCandidate;
 class QXmppJingleIq;
-class QXmppJinglePayloadType;
 class QXmppPresence;
+
+namespace QXmpp {
+struct StunServer;
+struct TurnServer;
+}  // namespace QXmpp
 
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 {
     Q_OBJECT
 
 public:
+    /// Media type for starting a call.
+    enum class Media {
+        Audio,       /// only contains an audio stream
+        AudioVideo,  /// contains audio and video streams
+    };
+
     QXmppCallManager();
     ~QXmppCallManager() override;
-    void setStunServers(const QList<QPair<QHostAddress, quint16>> &servers);
-    void setStunServer(const QHostAddress &host, quint16 port = 3478);
-    void setTurnServer(const QHostAddress &host, quint16 port = 3478);
-    void setTurnUser(const QString &user);
-    void setTurnPassword(const QString &password);
+
+    void setFallbackStunServers(const QList<QXmpp::StunServer> &);
+    void setFallbackTurnServer(const std::optional<QXmpp::TurnServer> &);
     bool dtlsRequired() const;
     void setDtlsRequired(bool);
 
@@ -43,16 +45,9 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-    /// This signal is emitted when a new incoming call is received.
-    ///
-    /// To accept the call, invoke the call's QXmppCall::accept() method.
-    /// To refuse the call, invoke the call's QXmppCall::hangup() method.
-    Q_SIGNAL void callReceived(QXmppCall *call);
+    Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);
 
-    /// This signal is emitted when a call (incoming or outgoing) is started.
-    Q_SIGNAL void callStarted(QXmppCall *call);
-
-    QXmppCall *call(const QString &jid);
+    std::unique_ptr<QXmppCall> call(const QString &jid, Media media = Media::Audio, const QString &proposedSid = {});
 
 protected:
     /// \cond
@@ -61,15 +56,18 @@ protected:
     /// \endcond
 
 private:
-    void _q_callDestroyed(QObject *object);
-    void _q_disconnected();
-    void _q_jingleIqReceived(const QXmppJingleIq &iq);
-    void _q_presenceReceived(const QXmppPresence &presence);
+    void onCallDestroyed(QObject *object);
+    void onDisconnected();
+    using IncomingIqResult = std::variant<QXmppIq, QXmppStanza::Error, QXmppTask<std::variant<QXmppIq>>>;
+    IncomingIqResult handleIq(QXmppJingleIq &&iq);
+    void onPresenceReceived(const QXmppPresence &presence);
+    QXmppTask<void> refreshStunTurnConfig();
 
     const std::unique_ptr<QXmppCallManagerPrivate> d;
     friend class QXmppCall;
     friend class QXmppCallPrivate;
     friend class QXmppCallManagerPrivate;
+    friend class tst_QXmppCallManager;
 };
 
 #endif
