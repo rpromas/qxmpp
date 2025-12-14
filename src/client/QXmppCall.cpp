@@ -566,8 +566,8 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason)
         q->terminated();
     });
 
-    // schedule forceful termination in 5s
-    QTimer::singleShot(5s, q, &QXmppCall::terminated);
+    // schedule forceful termination in 2s
+    QTimer::singleShot(2s, q, &QXmppCall::terminated);
 }
 
 ///
