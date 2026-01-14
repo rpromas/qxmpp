@@ -37,7 +37,7 @@ struct TaskData {
 /// Unlike QFuture, this is *not* thread-safe!! This avoids the need to do mutex locking at every
 /// access though.
 ///
-/// \ingroup Core classes
+/// \ingroup Core
 ///
 /// \since QXmpp 1.5
 ///
@@ -217,5 +217,29 @@ private:
 
     std::shared_ptr<QXmpp::Private::TaskData<T>> d;
 };
+
+namespace QXmpp {
+
+namespace Private {
+
+template<typename T>
+struct IsTaskHelper {
+    constexpr static bool Value = false;
+};
+template<typename T>
+struct IsTaskHelper<QXmppTask<T>> {
+    using Type = T;
+    constexpr static bool Value = true;
+};
+
+}  // namespace Private
+
+template<typename T>
+concept IsTask = Private::IsTaskHelper<T>::Value;
+
+template<IsTask T>
+using TaskValueType = typename Private::IsTaskHelper<T>::Type;
+
+}  // namespace QXmpp
 
 #endif  // QXMPPTASK_H

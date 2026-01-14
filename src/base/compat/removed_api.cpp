@@ -14,6 +14,7 @@
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppIbbIq.h"
+#include "QXmppJingleData.h"
 #include "QXmppMamIq.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppPingIq.h"
@@ -23,6 +24,7 @@
 #include "QXmppRosterIq.h"
 #include "QXmppSessionIq.h"
 #include "QXmppStartTlsPacket.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 #include "QXmppVersionIq.h"
@@ -463,9 +465,11 @@ void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->dataForms,
     });
 }
+/// \endcond
 
 // EntityTimeIq
 
+/// \cond
 bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
 {
     return isIqType(element, u"time", ns_entity_time);
@@ -510,6 +514,13 @@ bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
 bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
 {
     return isIqType(element, u"close", ns_ibb);
+}
+
+// JingleIq
+
+bool QXmppJingleIq::isJingleIq(const QDomElement &element)
+{
+    return QXmpp::isIqElement<QXmppJingleIq>(element);
 }
 
 // MamIq
@@ -595,6 +606,7 @@ void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
+/// \endcond
 
 // PubSubIq
 

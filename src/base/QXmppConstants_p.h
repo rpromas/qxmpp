@@ -59,6 +59,7 @@ inline constexpr QStringView ns_muc = u"http://jabber.org/protocol/muc";
 inline constexpr QStringView ns_muc_admin = u"http://jabber.org/protocol/muc#admin";
 inline constexpr QStringView ns_muc_owner = u"http://jabber.org/protocol/muc#owner";
 inline constexpr QStringView ns_muc_user = u"http://jabber.org/protocol/muc#user";
+inline constexpr QStringView ns_muc_roominfo = u"http://jabber.org/protocol/muc#roominfo";
 // XEP-0047: In-Band Bytestreams
 inline constexpr QStringView ns_ibb = u"http://jabber.org/protocol/ibb";
 // XEP-0048: Bookmarks
@@ -139,6 +140,7 @@ inline constexpr QStringView ns_captcha = u"urn:xmpp:captcha";
 inline constexpr QStringView ns_jingle = u"urn:xmpp:jingle:1";
 inline constexpr QStringView ns_jingle_raw_udp = u"urn:xmpp:jingle:transports:raw-udp:1";
 inline constexpr QStringView ns_jingle_ice_udp = u"urn:xmpp:jingle:transports:ice-udp:1";
+inline constexpr QStringView ns_jingle_errors = u"urn:xmpp:jingle:errors:1";
 // XEP-0167: Jingle RTP Sessions
 inline constexpr QStringView ns_jingle_rtp = u"urn:xmpp:jingle:apps:rtp:1";
 inline constexpr QStringView ns_jingle_rtp_audio = u"urn:xmpp:jingle:apps:rtp:audio";
@@ -234,6 +236,8 @@ inline constexpr QStringView ns_omemo_2_devices = u"urn:xmpp:omemo:2:devices";
 inline constexpr QStringView ns_bind2 = u"urn:xmpp:bind:0";
 // XEP-0388: Extensible SASL Profile
 inline constexpr QStringView ns_sasl_2 = u"urn:xmpp:sasl:2";
+// XEP-0402: PEP Native Bookmarks
+inline constexpr QStringView ns_bookmarks2 = u"urn:xmpp:bookmarks:1";
 // XEP-0403: Mediated Information eXchange (MIX): Presence Support
 inline constexpr QStringView ns_mix_node_presence = u"urn:xmpp:mix:nodes:presence";
 // XEP-0404: Mediated Information eXchange (MIX): JID Hidden Channels
@@ -250,6 +254,8 @@ inline constexpr QStringView ns_mix_node_banned = u"urn:xmpp:mix:nodes:banned";
 inline constexpr QStringView ns_mix_node_config = u"urn:xmpp:mix:nodes:config";
 // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
 inline constexpr QStringView ns_mix_misc = u"urn:xmpp:mix:misc:0";
+// XEP-0421: Occupant identifiers for semi-anonymous MUCs
+inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
 // XEP-0428: Fallback Indication
 inline constexpr QStringView ns_fallback_indication = u"urn:xmpp:fallback:0";
 // XEP-0434: Trust Messages (TM)
@@ -270,6 +276,11 @@ inline constexpr QStringView ns_reply = u"urn:xmpp:reply:0";
 inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
 inline constexpr QStringView ns_fast = u"urn:xmpp:fast:0";
+
+// XEP-0421: Occupant identifiers for semi-anonymous MUCs
+struct MucOccupantId {
+    constexpr static std::tuple<QStringView, QStringView> XmlTag = { u"occupant-id", ns_muc_occupant_id };
+};
 
 }  // namespace QXmpp::Private
 

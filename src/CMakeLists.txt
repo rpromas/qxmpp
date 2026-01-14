@@ -57,6 +57,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppMixIq_p.h
     base/QXmppMixParticipantItem.h
     base/QXmppMucIq.h
+    base/QXmppMucForms.h
     base/QXmppNonza.h
     base/QXmppNonSASLAuth.h
     base/QXmppOutOfBandUrl.h
@@ -85,11 +86,13 @@ set(INSTALL_HEADER_FILES
     base/QXmppStreamError.h
     base/QXmppStreamFeatures.h
     base/QXmppStun.h
+    base/QXmppStunServer.h
     base/QXmppTask.h
     base/QXmppThumbnail.h
     base/QXmppTrustMessageElement.h
     base/QXmppTrustMessageKeyOwner.h
     base/QXmppTrustMessages.h
+    base/QXmppTurnServer.h
     base/QXmppUserTuneItem.h
     base/QXmppUtils.h
     base/QXmppUtils_p.h
@@ -138,6 +141,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppMixManager.h
     client/QXmppMovedManager.h
     client/QXmppMucManager.h
+    client/QXmppMucManagerV2.h
     client/QXmppOutgoingClient.h
     client/QXmppRegistrationManager.h
     client/QXmppPubSubEventHandler.h
@@ -205,6 +209,7 @@ set(SOURCE_FILES
     base/QXmppMixIq.cpp
     base/QXmppMixItems.cpp
     base/QXmppMucIq.cpp
+    base/QXmppMucForms.cpp
     base/QXmppNonza.cpp
     base/QXmppNonSASLAuth.cpp
     base/QXmppOutOfBandUrl.cpp
@@ -275,6 +280,7 @@ set(SOURCE_FILES
     client/QXmppMixManager.cpp
     client/QXmppMovedManager.cpp
     client/QXmppMucManager.cpp
+    client/QXmppMucManagerV2.cpp
     client/QXmppOutgoingClient.cpp
     client/QXmppRosterManager.cpp
     client/QXmppRegistrationManager.cpp

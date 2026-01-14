@@ -24,6 +24,7 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 ///
@@ -40,7 +41,8 @@ using namespace QXmpp::Private;
 /// Handles the PubSub event.
 ///
 /// \param element QDomElement of the &lt;message/&gt; stanza
-/// \param pubSubService JID of the PubSub service
+/// \param pubSubService JID of the PubSub service (if the message's 'from' attribute is empty then
+/// the user's bare JID is used here since QXmpp 1.13)
 /// \param nodeName Name of the PubSub node on the service
 /// \returns Whether the event has been handled and should not be handled by other event handlers.
 ///
@@ -220,11 +222,11 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
     Q_ASSERT(discoManager);
 
     return chain<FeaturesResult>(discoManager->info(serviceJid), this, [=](auto &&result) -> FeaturesResult {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            return std::move(*error);
+        if (hasError(result)) {
+            return getError(std::move(result));
         }
 
-        auto &info = std::get<QXmppDiscoInfo>(result);
+        auto &info = getValue(result);
         const auto &identities = info.identities();
         const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoIdentity &identity) {
             if (identity.category() == u"pubsub") {
@@ -338,7 +340,7 @@ auto QXmppPubSubManager::createNode(const QString &jid, const QString &nodeName,
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \return
 ///
-QXmppTask<QXmppPubSubManager::InstantNodeResult> QXmppPubSubManager::createInstantNode(const QString &jid)
+auto QXmppPubSubManager::createInstantNode(const QString &jid) -> QXmppTask<InstantNodeResult>
 {
     PubSubIq request;
     request.setType(QXmppIq::Set);
@@ -864,7 +866,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 
 ///
-/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, const QString &itemId)
+/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, const QString &itemId, bool notify)
 ///
 /// Deletes an item from a PEP node.
 ///
@@ -873,10 +875,12 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// \param nodeName the name of the PEP node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.13,
+/// default: false)
 ///
 
 ///
-/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, StandardItemId itemId)
+/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, StandardItemId itemId, bool notify)
 ///
 /// Deletes an item from a PEP node.
 ///
@@ -885,6 +889,8 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// \param nodeName the name of the PEP node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.13,
+/// default: false)
 ///
 
 ///
@@ -974,7 +980,10 @@ bool QXmppPubSubManager::handleStanza(const QDomElement &element)
 
     auto event = firstChildElement(element, u"event", ns_pubsub_event);
     if (!event.isNull()) {
-        const auto service = element.attribute(u"from"_s);
+        auto service = element.attribute(u"from"_s);
+        if (service.isEmpty()) {
+            service = client()->configuration().jidBare();
+        }
         const auto node = event.firstChildElement().attribute(u"node"_s);
 
         const auto extensions = client()->extensions();

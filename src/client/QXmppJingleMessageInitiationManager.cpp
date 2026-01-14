@@ -26,17 +26,15 @@ using JmiType = JmiElement::Type;
 class QXmppJingleMessageInitiationPrivate
 {
 public:
-    QXmppJingleMessageInitiationPrivate(JmiManager *manager)
-        : manager(manager)
-    {
-    }
+    QXmppJingleMessageInitiationPrivate(JmiManager *manager, const QString &id, const QString &remoteJid) : manager(manager), id(id), remoteJid(remoteJid) { }
 
     QXmppTask<SendResult> request(JmiElement &&jmiElement);
 
     QXmppJingleMessageInitiationManager *manager;
     QString id;
-    QString callPartnerJid;
-    bool isProceeded { false };
+    QString remoteJid;
+    bool proceeded = false;
+    bool finished = false;
 };
 
 ///
@@ -46,7 +44,7 @@ public:
 QXmppTask<SendResult> QXmppJingleMessageInitiationPrivate::request(JmiElement &&jmiElement)
 {
     jmiElement.setId(id);
-    return manager->sendMessage(jmiElement, callPartnerJid);
+    return manager->sendMessage(jmiElement, remoteJid);
 }
 
 ///
@@ -61,8 +59,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiationPrivate::request(JmiElement &&
 ///
 /// \brief Constructs a Jingle Message Initiation object.
 ///
-QXmppJingleMessageInitiation::QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager)
-    : d(new QXmppJingleMessageInitiationPrivate(manager))
+QXmppJingleMessageInitiation::QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager, const QString &id, const QString &remoteJid)
+    : d(new QXmppJingleMessageInitiationPrivate(manager, id, remoteJid))
 {
 }
 
@@ -147,6 +145,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
 ///
 QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJingleReason> reason, const QString &migratedTo)
 {
+    d->finished = true;
+
     JmiElement jmiElement;
     jmiElement.setType(JmiType::Finish);
 
@@ -185,39 +185,47 @@ void QXmppJingleMessageInitiation::setId(const QString &id)
 /// However, attackers pretending to be the call partner can be mitigated by caching the call
 /// partner's JID.
 ///
-/// \param callPartnerJid bare JID of the call partner
+/// \param remoteJid bare JID of the call partner
 ///
-void QXmppJingleMessageInitiation::setCallPartnerJid(const QString &callPartnerJid)
+void QXmppJingleMessageInitiation::setRemoteJid(const QString &remoteJid)
 {
-    d->callPartnerJid = callPartnerJid;
+    d->remoteJid = remoteJid;
 }
 
 ///
 /// Returns the call partner's bare JID.
 ///
-/// \return the call partner's bare JID.
+/// \since QXmpp 1.14
 ///
-QString QXmppJingleMessageInitiation::callPartnerJid() const
+const QString &QXmppJingleMessageInitiation::remoteJid() const
 {
-    return d->callPartnerJid;
+    return d->remoteJid;
 }
 
 ///
-/// Returns the "isProceeded" flag, e.g., if the Jingle Message Initiation has already been
-/// proceeded.
+/// Returns the "proceeded" flag, e.g., if the Jingle Message Initiation has already been proceeded.
 ///
 bool QXmppJingleMessageInitiation::isProceeded() const
 {
-    return d->isProceeded;
+    return d->proceeded;
 }
 
 ///
-/// Sets the "isProceeded" flag, e.g., if the Jingle Message Initiation has already been
-/// proceeded.
+/// Sets the "proceeded" flag, e.g., if the Jingle Message Initiation has already been proceeded.
 ///
 void QXmppJingleMessageInitiation::setIsProceeded(bool isProceeded)
 {
-    d->isProceeded = isProceeded;
+    d->proceeded = isProceeded;
+}
+
+///
+/// Returns whether the call is finished.
+///
+/// This is needed to avoid a loop while responding to a </finish> element with the same one.
+///
+bool QXmppJingleMessageInitiation::isFinished() const
+{
+    return d->finished;
 }
 
 ///
@@ -232,7 +240,7 @@ void QXmppJingleMessageInitiation::setIsProceeded(bool isProceeded)
 /// Emitted when a propose request was successfully processed and accepted.
 ///
 /// \param id belonging JMI id
-/// \param callPartnerResource resource of the call partner about to be called
+/// \param remoteResource resource of the call partner about to be called
 ///
 
 ///
@@ -280,21 +288,38 @@ QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 ///
 /// Creates a proposal JMI element and passes it as a message.
 ///
-QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &callPartnerJid, const QXmppJingleDescription &description)
+/// \overload
+///
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &remoteJid, const QXmppJingleRtpDescription &description)
+{
+    return propose(QXmppUtils::generateStanzaUuid(), remoteJid, QList<QXmppJingleRtpDescription> { description });
+}
+
+///
+/// Creates a proposal JMI element and passes it as a message.
+///
+/// \since QXmpp 1.14
+///
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
+{
+    return propose(QXmppUtils::generateStanzaUuid(), remoteJid, descriptions);
+}
+
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &id, const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
 {
     QXmppPromise<ProposeResult> promise;
 
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);
-    jmiElement.setId(QXmppUtils::generateStanzaUuid());
-    jmiElement.setDescription(description);
+    jmiElement.setId(id);
+    jmiElement.setDescriptions(descriptions);
 
-    sendMessage(jmiElement, callPartnerJid).then(this, [this, promise, callPartnerJid](SendResult result) mutable {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error sending Jingle Message Initiation proposal: " + error->description);
-            promise.finish(*error);
+    sendMessage(jmiElement, remoteJid).then(this, [this, promise, id, remoteJid](SendResult result) mutable {
+        if (hasError(result)) {
+            warning(u"Error sending Jingle Message Initiation proposal: " + getError(result).description);
+            promise.finish(getError(std::move(result)));
         } else {
-            promise.finish(addJmi(callPartnerJid));
+            promise.finish(addJmi(id, remoteJid));
         }
     });
 
@@ -304,8 +329,7 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
 /// \cond
 bool QXmppJingleMessageInitiationManager::handleMessage(const QXmppMessage &message)
 {
-    // JMI messages must be of type "chat" and contain a <store/> hint.
-    if (message.type() != QXmppMessage::Chat || !message.hasHint(QXmppMessage::Store)) {
+    if (message.type() != QXmppMessage::Chat) {
         return false;
     }
 
@@ -319,15 +343,15 @@ bool QXmppJingleMessageInitiationManager::handleMessage(const QXmppMessage &mess
 /// \endcond
 
 ///
-/// Lets the client send a message to user with given callPartnerJid containing the JMI element.
+/// Lets the client send a message to user with given remoteJid containing the JMI element.
 ///
 /// \param jmiElement the JMI element to be passed
-/// \param callPartnerJid bare JID of the call partner
+/// \param remoteJid bare JID of the call partner
 ///
-QXmppTask<SendResult> QXmppJingleMessageInitiationManager::sendMessage(const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerJid)
+QXmppTask<SendResult> QXmppJingleMessageInitiationManager::sendMessage(const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteJid)
 {
     QXmppMessage message;
-    message.setTo(callPartnerJid);
+    message.setTo(remoteJid);
     message.addHint(QXmppMessage::Store);
     message.setJingleMessageInitiationElement(jmiElement);
 
@@ -346,7 +370,7 @@ void QXmppJingleMessageInitiationManager::clear(const std::shared_ptr<QXmppJingl
             d->jmis.begin(),
             d->jmis.end(),
             [&jmi](const auto &storedJmi) {
-                return jmi->id() == storedJmi->id() && jmi->callPartnerJid() == storedJmi->callPartnerJid();
+                return jmi->id() == storedJmi->id() && jmi->remoteJid() == storedJmi->remoteJid();
             }),
         d->jmis.end());
 }
@@ -359,23 +383,27 @@ void QXmppJingleMessageInitiationManager::clearAll()
     d->jmis.clear();
 }
 
-bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &senderJid)
+bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &remoteJid)
 {
     auto jmiElementId = jmiElement.id();
-    auto callPartnerJid = QXmppUtils::jidToBareJid(senderJid);
 
-    // Check if there's already a JMI object with jmiElementId and callPartnerJid in JMIs vector.
+    if (jmiElementId.isEmpty()) {
+        warning(u"Received JMI element with empty ID from %1. (ignoring)"_s.arg(remoteJid));
+        return false;
+    }
+
+    // Check if there's already a JMI object with jmiElementId and remoteJid in JMIs vector.
     // That means that a JMI has already been created with given (J)IDs.
-    auto itr = std::find_if(d->jmis.begin(), d->jmis.end(), [&jmiElementId, &callPartnerJid](const auto &jmi) {
-        return jmi->id() == jmiElementId && jmi->callPartnerJid() == callPartnerJid;
+    auto itr = std::find_if(d->jmis.begin(), d->jmis.end(), [&jmiElementId, &remoteJid](const auto &jmi) {
+        return jmi->id() == jmiElementId && QXmppUtils::jidToBareJid(jmi->remoteJid()) == QXmppUtils::jidToBareJid(remoteJid);
     });
 
     if (itr != d->jmis.end()) {
-        return handleExistingJmi(*itr, jmiElement, QXmppUtils::jidToResource(senderJid));
+        return handleExistingJmi(*itr, jmiElement, QXmppUtils::jidToResource(remoteJid));
     }
 
     if (jmiElement.type() == JmiType::Propose) {
-        return handleProposeJmiElement(jmiElement, callPartnerJid);
+        return handleProposeJmiElement(jmiElement, remoteJid);
     }
 
     return false;
@@ -386,17 +414,17 @@ bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageIni
 ///
 /// \param existingJmi JMI object to be handled
 /// \param jmiElement JMI element to be processed with the JMI object
-/// \param callPartnerResource resource of the call partner (i.e., phone, tablet etc.)
+/// \param remoteResource resource of the call partner (i.e., phone, tablet etc.)
 /// \return success (true) or failure
 ///
-bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_ptr<Jmi> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerResource)
+bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_ptr<Jmi> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource)
 {
     switch (jmiElement.type()) {
     case JmiType::Ringing:
         Q_EMIT existingJmi->ringing();
         return true;
     case JmiType::Proceed:
-        Q_EMIT existingJmi->proceeded(jmiElement.id(), callPartnerResource);
+        Q_EMIT existingJmi->proceeded(jmiElement.id(), remoteResource);
         existingJmi->setIsProceeded(true);
         return true;
     case JmiType::Reject:
@@ -408,9 +436,11 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
             Jmi::Retracted { jmiElement.reason(), jmiElement.containsTieBreak() });
         return true;
     case JmiType::Finish:
-        existingJmi->finish(jmiElement.reason(), jmiElement.migratedTo());
-        Q_EMIT existingJmi->closed(
-            Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+        if (!existingJmi->isFinished()) {
+            existingJmi->finish(jmiElement.reason(), jmiElement.migratedTo());
+            Q_EMIT existingJmi->closed(
+                Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+        }
         return true;
     default:
         return false;
@@ -421,26 +451,28 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
 /// Handles a propose JMI element.
 ///
 /// \param jmiElement to be handled
-/// \param callPartnerJid bare JID of the call partner
+/// \param remoteJid bare JID of the call partner
 /// \return success (true) or failure
 ///
-bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerJid)
+bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteJid)
 {
-    // Check if there's already a JMI object with provided callPartnerJid in JMIs vector.
+    // Check if there's already a JMI object with provided remoteJid in JMIs vector.
     // That means that a propose has already been sent.
     auto itr = std::find_if(
         d->jmis.cbegin(),
         d->jmis.cend(),
-        [&callPartnerJid](const auto &jmi) {
-            return jmi->callPartnerJid() == callPartnerJid;
+        [&remoteJid](const auto &jmi) {
+            return jmi->remoteJid() == remoteJid;
         });
 
     // Tie break case or usual JMI proposal?
     if (itr != d->jmis.end()) {
-        return handleTieBreak(*itr, jmiElement, callPartnerJid);
+        return handleTieBreak(*itr, jmiElement, remoteJid);
     }
 
-    Q_EMIT proposed(addJmi(callPartnerJid), jmiElement.id(), jmiElement.description());
+    auto jmi = addJmi(jmiElement.id(), remoteJid);
+    Q_EMIT proposed(jmi, jmiElement.id(), jmiElement.description());
+    Q_EMIT proposeReceived(jmi, jmiElement.id(), jmiElement.descriptions());
     return true;
 }
 
@@ -448,10 +480,10 @@ bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJin
 /// Handles a tie break case as defined in https://xmpp.org/extensions/xep-0353.html#tie-breaking.
 /// \param existingJmi existing JMI object to be handled
 /// \param jmiElement JMI element to be processed with existing JMI object
-/// \param callPartnerResource resource of the call partner (i.e., phone, tablet etc.)
+/// \param remoteResource resource of the call partner (i.e., phone, tablet etc.)
 /// \return success (true) or failure
 ///
-bool QXmppJingleMessageInitiationManager::handleTieBreak(const std::shared_ptr<Jmi> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerResource)
+bool QXmppJingleMessageInitiationManager::handleTieBreak(const std::shared_ptr<Jmi> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource)
 {
     // Tie break -> session is set to be expired
     QXmppJingleReason reason;
@@ -464,7 +496,7 @@ bool QXmppJingleMessageInitiationManager::handleTieBreak(const std::shared_ptr<J
 
     // Tie break in propose state (no existing session) - two parties try calling each other
     // at the same time, the proposal with the lower ID overrules the other one.
-    return handleNonExistingSession(existingJmi, jmiElement.id(), callPartnerResource);
+    return handleNonExistingSession(existingJmi, jmiElement.id(), remoteResource);
 }
 
 ///
@@ -484,15 +516,15 @@ bool QXmppJingleMessageInitiationManager::handleExistingSession(const std::share
     Q_EMIT existingJmi->closed(Jmi::Finished { reason, jmiElementId });
 
     existingJmi->finish(reason, jmiElementId).then(this, [this, existingJmi, jmiElementId](SendResult result) {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            Q_EMIT existingJmi->closed(*error);
+        if (hasError(result)) {
+            Q_EMIT existingJmi->closed(getError(std::move(result)));
         } else {
             // Then, proceed (accept) the new proposal and set the JMI ID
             // to the ID of the received JMI element.
             existingJmi->setId(jmiElementId);
             existingJmi->proceed().then(this, [existingJmi](SendResult result) {
-                if (auto *error = std::get_if<QXmppError>(&result)) {
-                    Q_EMIT existingJmi->closed(*error);
+                if (hasError(result)) {
+                    Q_EMIT existingJmi->closed(getError(std::move(result)));
                 } else {
                     // The session is now closed as it is finished.
                     existingJmi->setIsProceeded(true);
@@ -511,7 +543,7 @@ bool QXmppJingleMessageInitiationManager::handleExistingSession(const std::share
 /// \param existingJmi Current JMI object
 /// \param jmiElementId Counterpart's JMI element ID
 ///
-bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::shared_ptr<Jmi> &existingJmi, const QString &jmiElementId, const QString &callPartnerResource)
+bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::shared_ptr<Jmi> &existingJmi, const QString &jmiElementId, const QString &remoteResource)
 {
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Expired);
@@ -521,26 +553,26 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
         // Jingle message initiator with lower ID rejects the other proposal.
         existingJmi->setId(jmiElementId);
         existingJmi->reject(std::move(reason), true).then(this, [existingJmi](auto result) {
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                Q_EMIT existingJmi->closed(*error);
+            if (hasError(result)) {
+                Q_EMIT existingJmi->closed(getError(std::move(result)));
             }
         });
     } else {
         // Jingle message initiator with higher ID retracts its proposal.
-        existingJmi->retract(std::move(reason), true).then(this, [this, existingJmi, jmiElementId, callPartnerResource](auto result) {
-            if (auto error = std::get_if<QXmppError>(&result)) {
-                Q_EMIT existingJmi->closed(*error);
+        existingJmi->retract(std::move(reason), true).then(this, [this, existingJmi, jmiElementId, remoteResource](auto result) {
+            if (hasError(result)) {
+                Q_EMIT existingJmi->closed(getError(std::move(result)));
             } else {
                 // Afterwards, JMI ID is changed to lower ID.
                 existingJmi->setId(jmiElementId);
 
                 // Finally, the call is being accepted.
-                existingJmi->proceed().then(this, [existingJmi, jmiElementId, callPartnerResource](SendResult result) {
-                    if (auto *error = std::get_if<QXmppError>(&result)) {
-                        Q_EMIT existingJmi->closed(*error);
+                existingJmi->proceed().then(this, [existingJmi, jmiElementId, remoteResource](SendResult result) {
+                    if (hasError(result)) {
+                        Q_EMIT existingJmi->closed(getError(std::move(result)));
                     } else {
                         existingJmi->setIsProceeded(true);
-                        Q_EMIT existingJmi->proceeded(jmiElementId, callPartnerResource);
+                        Q_EMIT existingJmi->proceeded(jmiElementId, remoteResource);
                     }
                 });
             }
@@ -552,13 +584,12 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
 
 ///
 /// Adds a JMI object to the JMIs vector and sets the bare JID of the call partner in the JMI object.
-/// \param callPartnerJid bare JID of the call partner
+/// \param remoteJid bare JID of the call partner
 /// \return The newly created JMI
 ///
-std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &callPartnerJid)
+std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &id, const QString &remoteJid)
 {
-    auto jmi { std::make_shared<QXmppJingleMessageInitiation>(this) };
-    jmi->setCallPartnerJid(callPartnerJid);
+    auto jmi = std::shared_ptr<QXmppJingleMessageInitiation>(new QXmppJingleMessageInitiation(this, id, remoteJid));
     d->jmis.append(jmi);
     return jmi;
 }
@@ -579,4 +610,18 @@ const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &QXmppJingleMessage
 /// \param jmi Jingle Message Initiation object of proposed session
 /// \param id JMI element id
 /// \param description JMI element's description containing media type (i.e., audio, video)
+///
+/// \deprecated
+///
+
+///
+/// \fn QXmppJingleMessageInitiationManager::proposeReceived(const std::shared_ptr<QXmppJingleMessageInitiation> &, const QString &, const QList<QXmppJingleDescription> &)
+///
+/// Emitted when a call has been proposed.
+///
+/// \param jmi Jingle Message Initiation object of proposed session
+/// \param id JMI element id
+/// \param descriptions JMI element's description containing media type (i.e., audio, video)
+///
+/// \since QXmpp 1.14
 ///

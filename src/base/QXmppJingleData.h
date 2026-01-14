@@ -15,7 +15,7 @@
 #include <QHostAddress>
 
 class QXmppJingleCandidatePrivate;
-class QXmppJingleDescriptionPrivate;
+class QXmppJingleRtpDescriptionPrivate;
 class QXmppJingleIqContentPrivate;
 class QXmppJingleIqReasonPrivate;
 class QXmppJingleIqPrivate;
@@ -112,7 +112,7 @@ class QXMPP_EXPORT QXmppJingleRtpFeedbackProperty
 {
 public:
     QXmppJingleRtpFeedbackProperty();
-
+    QXmppJingleRtpFeedbackProperty(const QString &type, const QString &subtype = {});
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpFeedbackProperty)
 
     QString type() const;
@@ -171,7 +171,7 @@ public:
     };
 
     QXmppJingleRtpHeaderExtensionProperty();
-
+    QXmppJingleRtpHeaderExtensionProperty(const QString &uri, uint32_t id);
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpHeaderExtensionProperty)
 
     uint32_t id() const;
@@ -249,20 +249,18 @@ private:
     QSharedDataPointer<QXmppJinglePayloadTypePrivate> d;
 };
 
-class QXMPP_EXPORT QXmppJingleDescription
+class QXMPP_EXPORT QXmppJingleRtpDescription
 {
 public:
-    QXmppJingleDescription();
-    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleDescription)
+    QXmppJingleRtpDescription();
+    QXmppJingleRtpDescription(const QString &media, quint32 ssrc = 0, const QList<QXmppJinglePayloadType> &payloadTypes = {});
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpDescription)
 
     QString media() const;
     void setMedia(const QString &media);
 
     quint32 ssrc() const;
     void setSsrc(quint32 ssrc);
-
-    QString type() const;
-    void setType(const QString &type);
 
     void addPayloadType(const QXmppJinglePayloadType &payload);
     const QList<QXmppJinglePayloadType> &payloadTypes() const;
@@ -275,8 +273,12 @@ public:
     /// \endcond
 
 private:
-    QSharedDataPointer<QXmppJingleDescriptionPrivate> d;
+    QSharedDataPointer<QXmppJingleRtpDescriptionPrivate> d;
 };
+
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+using QXmppJingleDescription [[deprecated]] = QXmppJingleRtpDescription;
+#endif
 
 ///
 /// \brief The QXmppJingleCandidate class represents a transport candidate
@@ -352,22 +354,44 @@ public:
     /// This enum is used to describe a reason's type.
     enum Type {
         None,
+        /// The party prefers to use an existing session with the peer rather than initiate a new
+        /// session; the Jingle session ID of the alternative session SHOULD be provided as the XML
+        /// character data of the &lt;sid/&gt; child.
         AlternativeSession,
+        /// The party is busy and cannot accept a session.
         Busy,
+        /// The initiator wishes to formally cancel the session initiation request.
         Cancel,
+        /// The action is related to connectivity problems.
         ConnectivityError,
+        /// The party wishes to formally decline the session.
         Decline,
+        /// The session length has exceeded a pre-defined time limit (e.g., a meeting hosted at a
+        /// conference service).
         Expired,
+        /// The party has been unable to initialize processing related to the application type.
         FailedApplication,
+        /// The party has been unable to establish connectivity for the transport method.
         FailedTransport,
+        /// The action is related to a non-specific application error.
         GeneralError,
+        /// The entity is going offline or is no longer available.
         Gone,
+        /// The party supports the offered application type but does not support the offered or
+        /// negotiated parameters.
         IncompatibleParameters,
+        /// The action is related to media processing problems.
         MediaError,
+        /// The action is related to a violation of local security policies.
         SecurityError,
+        /// The action is generated during the normal course of state management and does not
+        /// reflect any error.
         Success,
+        /// A request has not been answered so the sender is timing out the request.
         Timeout,
+        /// The party supports none of the offered application types.
         UnsupportedApplications,
+        /// The party supports none of the offered transport methods.
         UnsupportedTransports
     };
 
@@ -407,7 +431,7 @@ private:
 
 ///
 /// \brief The QXmppJingleIq class represents an IQ used for initiating media
-/// sessions as specified by \xep{0166}: Jingle.
+/// sessions as specified by \xep{0166, Jingle}.
 ///
 /// \ingroup Stanzas
 ///
@@ -430,7 +454,7 @@ public:
         TransportAccept,
         TransportInfo,
         TransportReject,
-        TransportReplace
+        TransportReplace,
     };
 
     enum Creator {
@@ -485,8 +509,8 @@ public:
         void setSenders(const QString &senders);
 
         // XEP-0167: Jingle RTP Sessions
-        QXmppJingleDescription description() const;
-        void setDescription(const QXmppJingleDescription &description);
+        QXmppJingleRtpDescription description() const;
+        void setDescription(const QXmppJingleRtpDescription &description);
 
 #if QXMPP_DEPRECATED_SINCE(1, 6)
         QString descriptionMedia() const;
@@ -599,6 +623,8 @@ public:
     void setRtpSessionState(const std::optional<RtpSessionState> &rtpSessionState);
 
     /// \cond
+    static constexpr std::tuple<QStringView, QStringView> PayloadXmlTag = { u"jingle", QXmpp::Private::ns_jingle };
+    [[deprecated("Use QXmpp::isIqType()")]]
     static bool isJingleIq(const QDomElement &element);
     /// \endcond
 
@@ -634,8 +660,10 @@ public:
     QString id() const;
     void setId(const QString &id);
 
-    std::optional<QXmppJingleDescription> description() const;
-    void setDescription(std::optional<QXmppJingleDescription> description);
+    std::optional<QXmppJingleRtpDescription> description() const;
+    void setDescription(std::optional<QXmppJingleRtpDescription> description);
+    QList<QXmppJingleRtpDescription> descriptions() const;
+    void setDescriptions(const QList<QXmppJingleRtpDescription> &descriptions);
 
     std::optional<QXmppJingleReason> reason() const;
     void setReason(std::optional<QXmppJingleReason> reason);

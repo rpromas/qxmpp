@@ -14,7 +14,7 @@ class QXmppRegistrationManagerPrivate;
 ///
 /// \brief The QXmppRegistrationManager class manages in-band registration and
 /// account management tasks like changing the password as defined in
-/// \xep{0077}: In-Band Registration.
+/// \xep{0077, In-Band Registration}.
 ///
 /// <h3 id="activation">Activating the manager</h3>
 ///
@@ -29,20 +29,9 @@ class QXmppRegistrationManagerPrivate;
 /// <h3>Setting up service discovery correctly for this manager</h3>
 ///
 /// This manager automatically recognizes whether the local server supports
-/// \xep{0077} (see supportedByServer()). You just need to request the service
-/// discovery information from the server on connect as below:
-///
-/// \code
-/// connect(client, &QXmppClient::connected, [=]() {
-///     // The service discovery manager is added to the client by default.
-///     auto *discoManager = client->findExtension<QXmppDiscoveryManager>();
-///     discoManager->requestInfo(client->configuration().server());
-/// });
-/// \endcode
-///
-/// As soon as the result is retrieved, the supportedByServer() property should
-/// be correct and could be used to display the user whether account management
-/// tasks can be performed on this server.
+/// \xep{0077}. As soon as the result is retrieved, the supportedByServer() property should be
+/// correct and could be used to display the user whether account management tasks can be
+/// performed on this server.
 ///
 /// However, this is not relevant if you only want to
 /// <a href="#register-account">register a new account on a server</a>.
@@ -146,8 +135,7 @@ class QXmppRegistrationManagerPrivate;
 /// in an error (reported by registrationFailed()) or, if everything went well,
 /// the registration form is reported by registrationFormReceived().
 ///
-/// To handle everything correctly, you need to connect to both Q_SIGNALS:
-///
+/// To handle everything correctly, you need to connect to both signals:
 /// \code
 /// connect(registrationManager, &QXmppRegistrationManager::registrationFormReceived, [=](const QXmppRegisterIq &iq) {
 ///     qDebug() << "Form received:" << iq.instructions().
@@ -225,7 +213,7 @@ class QXMPP_EXPORT QXmppRegistrationManager : public QXmppClientExtension
 {
     Q_OBJECT
 
-    /// Whether support of \xep{0077}: In-band Registration has been discovered on the server.
+    /// Whether support of \xep{0077, In-band Registration} has been discovered on the server.
     Q_PROPERTY(bool supportedByServer READ supportedByServer NOTIFY supportedByServerChanged)
 
 public:
@@ -264,14 +252,13 @@ public:
     bool handleStanza(const QDomElement &stanza) override;
     /// \endcond
 
-Q_SIGNALS:
     ///
     /// Emitted, when registrationSupported() changed.
     ///
     /// This can happen after the service discovery info of the server was
     /// retrieved using QXmppDiscoveryManager::requestInfo() or on disconnect.
     ///
-    void supportedByServerChanged();
+    Q_SIGNAL void supportedByServerChanged();
 
     ///
     /// Emitted, when the password of the account was changed successfully.
@@ -280,14 +267,14 @@ Q_SIGNALS:
     ///
     /// \param newPassword The new password that was set on the server.
     ///
-    void passwordChanged(const QString &newPassword);
+    Q_SIGNAL void passwordChanged(const QString &newPassword);
 
     ///
     /// Emitted, when changing the password did not succeed.
     ///
     /// \param error Error returned from the service.
     ///
-    void passwordChangeFailed(QXmppStanza::Error error);
+    Q_SIGNAL void passwordChangeFailed(QXmppStanza::Error error);
 
     ///
     /// Emitted, when a registration form has been received.
@@ -297,17 +284,17 @@ Q_SIGNALS:
     /// empty (but not null) strings in the QXmppRegisterIq (i.e.
     /// QXmppRegisterIq::password().isNull() => false).
     ///
-    void registrationFormReceived(const QXmppRegisterIq &iq);
+    Q_SIGNAL void registrationFormReceived(const QXmppRegisterIq &iq);
 
     ///
     /// Emitted, when the account was deleted successfully.
     ///
-    void accountDeleted();
+    Q_SIGNAL void accountDeleted();
 
     ///
     /// Emitted, when the account could not be deleted.
     ///
-    void accountDeletionFailed(QXmppStanza::Error error);
+    Q_SIGNAL void accountDeletionFailed(QXmppStanza::Error error);
 
     ///
     /// Emitted, when the registration with a service completed successfully.
@@ -315,7 +302,7 @@ Q_SIGNALS:
     /// To connect with the account you still need to set the correct
     /// credentials in QXmppClient::configuration() and reconnect.
     ///
-    void registrationSucceeded();
+    Q_SIGNAL void registrationSucceeded();
 
     ///
     /// Emitted, when the registration failed.
@@ -331,14 +318,14 @@ Q_SIGNALS:
     /// \li type=Modify and condition=JidMalformed: No username was provided or
     /// the username has an illegal format.
     ///
-    void registrationFailed(const QXmppStanza::Error &error);
+    Q_SIGNAL void registrationFailed(const QXmppStanza::Error &error);
 
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    void handleDiscoInfo(const QXmppDiscoveryIq &iq);
+    void onConnected();
     void setSupportedByServer(bool supportedByServer);
     void handleAccountDeleted();
 

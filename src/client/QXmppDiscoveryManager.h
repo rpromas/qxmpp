@@ -56,17 +56,23 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
+#if QXMPP_DEPRECATED_SINCE(1, 13)
     /// This signal is emitted when an information response is received.
+    /// \deprecated
+    [[deprecated("Use info()")]]
     Q_SIGNAL void infoReceived(const QXmppDiscoveryIq &);
 
     /// This signal is emitted when an items response is received.
+    /// \deprecated
+    [[deprecated("Use items()")]]
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
+#endif
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
     QT_WARNING_PUSH
     QT_WARNING_DISABLE_DEPRECATED
-    using InfoResult [[deprecated]] = std::variant<QXmppDiscoveryIq, QXmppError>;
-    using ItemsResult [[deprecated]] = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
+    using InfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
+    using ItemsResult = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
     [[deprecated("Use info()")]]
     QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
     [[deprecated("Use items()")]]

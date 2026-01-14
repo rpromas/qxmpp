@@ -61,7 +61,6 @@ void QXmppMovedItem::serializePayload(QXmlStreamWriter *writer) const
 class QXmppMovedManagerPrivate
 {
 public:
-    QXmppDiscoveryManager *discoveryManager = nullptr;
     bool supportedByServer = false;
 };
 
@@ -190,8 +189,8 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QS
 
                                 const auto result = QXmppUri::fromString(e->redirectionUri());
 
-                                if (std::holds_alternative<QXmppUri>(result)) {
-                                    return std::get<QXmppUri>(result).jid();
+                                if (hasValue(result)) {
+                                    return getValue(result).jid();
                                 }
 
                                 return {};
@@ -232,23 +231,29 @@ QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &con
 /// \cond
 void QXmppMovedManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::connected, this, [this, client]() {
-        if (client->streamManagementState() == QXmppClient::NewStream) {
+    connect(client, &QXmppClient::connected, this, [this]() {
+        if (this->client()->streamManagementState() == QXmppClient::NewStream) {
             resetCachedData();
+
+            if (auto *disco = this->client()->findExtension<QXmppDiscoveryManager>()) {
+                disco->info(this->client()->configuration().domain()).then(this, [this](auto &&result) {
+                    if (hasValue(result)) {
+                        setSupportedByServer(getValue(result).features().contains(ns_moved));
+                    } else {
+                        warning(u"MovedManager: Could not fetch server features: %1"_s.arg(getError(result).description));
+                    }
+                });
+            } else {
+                warning(u"MovedManager: Missing recommended QXmppDiscoveryManager"_s);
+            }
         }
     });
-
-    d->discoveryManager = client->findExtension<QXmppDiscoveryManager>();
-    Q_ASSERT_X(d->discoveryManager, "QXmppMovedManager", "QXmppDiscoveryManager is missing");
-
-    connect(d->discoveryManager, &QXmppDiscoveryManager::infoReceived, this, &QXmppMovedManager::handleDiscoInfo);
 
     Q_ASSERT_X(client->findExtension<QXmppPubSubManager>(), "QXmppMovedManager", "QXmppPubSubManager is missing");
 }
 
 void QXmppMovedManager::onUnregistered(QXmppClient *client)
 {
-    disconnect(d->discoveryManager, &QXmppDiscoveryManager::infoReceived, this, &QXmppMovedManager::handleDiscoInfo);
     resetCachedData();
     disconnect(client, &QXmppClient::connected, this, nullptr);
 }
@@ -276,7 +281,7 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     case QXmppRosterIq::Item::From:
     case QXmppRosterIq::Item::Both:
         return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](Result &&result) mutable {
-            if (std::holds_alternative<QXmppError>(result)) {
+            if (hasError(result)) {
                 warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
                 presence.setOldJid({});
             }
@@ -286,20 +291,6 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     default:
         presence.setOldJid({});
         return makeReadyTask(std::move(presence));
-    }
-}
-
-///
-/// Handles incoming service infos specified by \xep{0030, Service Discovery}.
-///
-/// \param iq received Service Discovery IQ stanza
-///
-void QXmppMovedManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
-{
-    // Check the server's functionality to support MOVED feature.
-    if (iq.from().isEmpty() || iq.from() == client()->configuration().domain()) {
-        // Check whether MOVED is supported.
-        setSupportedByServer(iq.features().contains(ns_moved));
     }
 }
 

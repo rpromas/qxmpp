@@ -70,11 +70,11 @@ public:
 
     // Generic PubSub (the PubSub service is the given entity)
     QXmppTask<NodesResult> requestNodes(const QString &jid);
-    QXmppTask<Result> createNode(const QString &jid, const QString &nodeName);
-    QXmppTask<Result> createNode(const QString &jid, const QString &nodeName, const QXmppPubSubNodeConfig &config);
-    QXmppTask<InstantNodeResult> createInstantNode(const QString &jid);
-    QXmppTask<InstantNodeResult> createInstantNode(const QString &jid, const QXmppPubSubNodeConfig &config);
-    QXmppTask<Result> deleteNode(const QString &jid, const QString &nodeName);
+    auto createNode(const QString &jid, const QString &nodeName) -> QXmppTask<Result>;
+    auto createNode(const QString &jid, const QString &nodeName, const QXmppPubSubNodeConfig &config) -> QXmppTask<Result>;
+    auto createInstantNode(const QString &jid) -> QXmppTask<InstantNodeResult>;
+    auto createInstantNode(const QString &jid, const QXmppPubSubNodeConfig &config) -> QXmppTask<InstantNodeResult>;
+    auto deleteNode(const QString &jid, const QString &nodeName) -> QXmppTask<Result>;
     QXmppTask<ItemIdsResult> requestItemIds(const QString &serviceJid, const QString &nodeName);
     template<typename T = QXmppPubSubBaseItem>
     QXmppTask<ItemResult<T>> requestItem(const QString &jid, const QString &nodeName, const QString &itemId);
@@ -92,9 +92,9 @@ public:
     QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items);
     template<typename T>
     QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
-    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify = false);
-    QXmppTask<Result> retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify = false);
-    QXmppTask<Result> purgeItems(const QString &jid, const QString &nodeName);
+    auto retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify = false) -> QXmppTask<Result>;
+    auto retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify = false) -> QXmppTask<Result>;
+    auto purgeItems(const QString &jid, const QString &nodeName) -> QXmppTask<Result>;
     QXmppTask<SubscriptionsResult> requestSubscriptions(const QString &jid);
     QXmppTask<SubscriptionsResult> requestSubscriptions(const QString &jid, const QString &nodeName);
     QXmppTask<AffiliationsResult> requestNodeAffiliations(const QString &jid, const QString &nodeName);
@@ -130,8 +130,8 @@ public:
     QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
     template<typename T>
     QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items);
-    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, const QString &itemId) { return retractItem(client()->configuration().jidBare(), nodeName, itemId); }
-    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, StandardItemId itemId) { return retractItem(client()->configuration().jidBare(), nodeName, itemId); }
+    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, const QString &itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
+    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, StandardItemId itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
     QXmppTask<Result> purgeOwnPepItems(const QString &nodeName) { return purgeItems(client()->configuration().jidBare(), nodeName); }
     QXmppTask<NodeConfigResult> requestOwnPepNodeConfiguration(const QString &nodeName) { return requestNodeConfiguration(client()->configuration().jidBare(), nodeName); }
     QXmppTask<Result> configureOwnPepNode(const QString &nodeName, const QXmppPubSubNodeConfig &config) { return configureNode(client()->configuration().jidBare(), nodeName, config); }
