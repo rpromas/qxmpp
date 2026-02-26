@@ -535,6 +535,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
 
         // register call
         d->addCall(call.get());
+        debug(u"Adding new incoming call (sid=%1)"_s.arg(iq.sid()));
 
         // first send IQ ack (task may finish instantly)
         later(this, [this, contents, callPtr = call.release()]() mutable {
@@ -556,6 +557,8 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                         // terminate call
                         call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
                         call->terminated();
+                        // QMetaObject::invokeMethod(q, &QXmppCall::terminated);
+
                         return;
                     }
                 }
@@ -588,7 +591,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
         // for all other requests, require a valid call
         auto call = find(d->calls, iq.sid(), &QXmppCall::sid);
         // verify call found AND verify sender is correct
-        if (!call || call.value()->jid() != iq.from()) {
+        if (!call || QXmppUtils::jidToBareJid(call.value()->jid()) != QXmppUtils::jidToBareJid(iq.from())) {
             warning(u"Remote party %1 sent a request for an unknown call %2"_s.arg(iq.from(), iq.sid()));
             return Error { Error::Cancel, Error::ItemNotFound, u"Unknown call."_s };
         }
@@ -615,7 +618,7 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
 {
     if (d->refreshStunTurnConfigPromise.has_value()) {
         // attach to ongoing task
-        return d->refreshStunTurnConfigPromise->task();
+        return d->refreshStunTurnConfigPromise->generateTask();
     } else {
         if (d->stunTurnServers.has_value()) {
             // TODO: check expiry and refresh credentials
@@ -623,7 +626,8 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
         }
 
         // initial request of STUN/TURN credentials
-        d->refreshStunTurnConfigPromise = QXmppPromise<void>();
+        d->refreshStunTurnConfigPromise = MultiPromise<void>();
+        auto task = d->refreshStunTurnConfigPromise->generateTask();
 
         requestStunTurnConfig(client(), this).then(this, [this](const auto &result) {
             if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -638,6 +642,6 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
             p.finish();
         });
 
-        return d->refreshStunTurnConfigPromise->task();
+        return task;
     }
 }

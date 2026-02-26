@@ -58,6 +58,19 @@ void QXmppMovedItem::serializePayload(QXmlStreamWriter *writer) const
     });
 }
 
+// Ensures that both JIDs match.
+//
+// \param newBareJid JID of the contact that sent the subscription request
+// \param pepBareJid JID of the new account as fetched from the old account statement
+static QXmppMovedManager::Result movedJidsMatch(const QString &newBareJid, const QString &pepBareJid)
+{
+    if (newBareJid == pepBareJid) {
+        return Success();
+    }
+
+    return QXmppError { u"The JID does not match the user's statement."_s, {} };
+}
+
 class QXmppMovedManagerPrivate
 {
 public:
@@ -173,10 +186,10 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QS
         [=, this](QXmppPubSubManager::ItemResult<QXmppMovedItem> &&result) {
             return std::visit(
                 overloaded {
-                    [newBareJid, this](QXmppMovedItem item) -> Result {
+                    [newBareJid](QXmppMovedItem item) -> Result {
                         return movedJidsMatch(newBareJid, item.newJid());
                     },
-                    [newBareJid, this](QXmppError err) -> Result {
+                    [newBareJid](QXmppError err) -> Result {
                         // As a special case, if the attempt to retrieve the moved statement results in an error with the <gone/> condition
                         // as defined in RFC 6120, and that <gone/> element contains a valid XMPP URI (e.g. xmpp:user@example.com), then the
                         // error response MUST be handled equivalent to a <moved/> statement containing a <new-jid/> element with the JID
@@ -238,7 +251,7 @@ void QXmppMovedManager::onRegistered(QXmppClient *client)
             if (auto *disco = this->client()->findExtension<QXmppDiscoveryManager>()) {
                 disco->info(this->client()->configuration().domain()).then(this, [this](auto &&result) {
                     if (hasValue(result)) {
-                        setSupportedByServer(getValue(result).features().contains(ns_moved));
+                        setSupportedByServer(contains(getValue(result).features(), ns_moved));
                     } else {
                         warning(u"MovedManager: Could not fetch server features: %1"_s.arg(getError(result).description));
                     }
@@ -292,23 +305,6 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
         presence.setOldJid({});
         return makeReadyTask(std::move(presence));
     }
-}
-
-///
-/// Ensures that both JIDs match.
-///
-/// \param newBareJid JID of the contact that sent the subscription request
-/// \param pepBareJid JID of the new account as fetched from the old account statement
-///
-/// \return the result of the action
-///
-QXmppMovedManager::Result QXmppMovedManager::movedJidsMatch(const QString &newBareJid, const QString &pepBareJid) const
-{
-    if (newBareJid == pepBareJid) {
-        return Success();
-    }
-
-    return QXmppError { u"The JID does not match the user's statement."_s, {} };
 }
 
 ///

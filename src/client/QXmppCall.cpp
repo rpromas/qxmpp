@@ -52,13 +52,14 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
         qFatal("Failed to create pipeline");
         return;
     }
+
     rtpBin = gst_element_factory_make("rtpbin", nullptr);
     if (!rtpBin) {
         qFatal("Failed to create rtpbin");
         return;
     }
     // We do not want to build up latency over time
-    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, "do-retransmission", true, nullptr);
+    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 100, "do-retransmission", true, nullptr);
 
     if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
         qFatal("Could not add rtpbin to the pipeline");
@@ -87,11 +88,46 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
 
 QXmppCallPrivate::~QXmppCallPrivate()
 {
+    // gchar *dot = gst_debug_bin_to_dot_data(
+    //     GST_BIN(pipeline.get()),
+    //     GST_DEBUG_GRAPH_SHOW_ALL
+    // );
+
+    // if (dot) {
+    //     g_print("%s\n", dot);   // prints to console
+    //     g_free(dot);
+    // }
+
+    // GstElementPtr movedPointer;
+    // QList<QXmppCallStream *> streamsCopy;
+    // qDebug() << "1111";
+
+    // auto *thread = QThread::create([movedPointer = std::move(pipeline), streamsCopy = streams]() {
+    //     qDebug() << "2222";
+
+    //     if (gst_element_set_state(movedPointer, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+    //         qFatal("Unable to set the pipeline to the null state");
+    //     }
+
+    //     qDebug() << "3333";
+
+    //     qDeleteAll(streamsCopy);
+
+    //     qDebug() << "Did finish deleting pipeline";
+    // });
+    // connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    // thread->start();
+
+    Q_EMIT q->aboutToDeleteCall();
+    
+    qDebug() << "setting pipeline state to NULL";
+
     if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
         qFatal("Unable to set the pipeline to the null state");
     }
     // Delete streams before pipeline.
     // Streams still need to be children of QXmppCall for logging to work.
+
     qDeleteAll(streams);
 }
 
@@ -590,6 +626,8 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
 ///
 void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 {
+    q->debug(u"Call(sid=%1): Terminating: %2"_s.arg(sid, reason.text()));
+
     if (state == QXmppCall::DisconnectingState ||
         state == QXmppCall::FinishedState) {
         return;

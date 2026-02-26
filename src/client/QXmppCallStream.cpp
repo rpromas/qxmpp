@@ -269,8 +269,11 @@ GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int comp
 
     if (connection->component(component)->isConnected() &&
         connection->component(component)->sendDatagram(datagram) != datagram.size()) {
+        qWarning() << "Failed to send datagram of size" << datagram.size() << "on component" << component;
         return GST_FLOW_ERROR;
     }
+
+    // qDebug() << "Sent datagram of size" << datagram.size() << "on component" << component;
     return GST_FLOW_OK;
 }
 

@@ -82,6 +82,9 @@ public:
     /// \brief This signal is emitted when a stream is created.
     Q_SIGNAL void streamCreated(QXmppCallStream *stream);
 
+    // my shity signal to solve shity problem
+    Q_SIGNAL void aboutToDeleteCall(void);
+
 private:
     void onLocalCandidatesChanged(QXmppCallStream *stream);
     void terminated();
