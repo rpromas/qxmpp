@@ -7,6 +7,8 @@
 
 #include "QXmppStun.h"
 
+#include <QSet>
+
 class QUdpSocket;
 class QTimer;
 
@@ -129,6 +131,7 @@ private:
     typedef QPair<QHostAddress, quint16> Address;
     quint16 m_channelNumber = 0x4000;
     QMap<quint16, Address> m_channels;
+    QSet<quint16> m_confirmedChannels;
 
     // state
     quint32 m_lifetime = 600;

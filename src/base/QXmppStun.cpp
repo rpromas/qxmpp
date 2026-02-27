@@ -32,8 +32,8 @@ static const quint16 STUN_HEADER = 20;
 static constexpr auto STUN_ID_SIZE = 12;
 static const quint8 STUN_IPV4 = 0x01;
 static const quint8 STUN_IPV6 = 0x02;
-static constexpr auto STUN_RTO_INTERVAL = 500;
-static constexpr auto STUN_RTO_MAX = 7;
+static constexpr auto STUN_RTO_INTERVAL = 200;
+static constexpr auto STUN_RTO_MAX = 5;
 
 template<>
 struct Enums::Data<QXmppIceConnection::GatheringState> {
@@ -1272,6 +1272,7 @@ void QXmppTurnAllocation::disconnectFromHost()
 
     // clear channels and any outstanding transactions
     m_channels.clear();
+    m_confirmedChannels.clear();
     qDeleteAll(m_transactions);
     m_transactions.clear();
 
@@ -1299,8 +1300,8 @@ void QXmppTurnAllocation::sendStunMessage(QXmppStunMessage &&message)
         [this](const auto &stunMessage) { writeStun(stunMessage); },
         [this](QXmppStunTransaction *transaction) {
             m_transactions.removeAll(transaction);
-            transaction->deleteLater();
             handleTransactionFinished(transaction);
+            transaction->deleteLater();
         },
         this);
 }
@@ -1494,8 +1495,8 @@ void QXmppTurnAllocation::handleTransactionFinished(QXmppStunTransaction *transa
     // handle authentication
     const QXmppStunMessage reply = transaction->response();
     if (reply.messageClass() == QXmppStunMessage::Error &&
-        reply.errorCode == 401 &&
-        (reply.nonce() != m_nonce && reply.realm() != m_realm)) {
+        (reply.errorCode == 401 || reply.errorCode == 438) &&
+        (reply.nonce() != m_nonce || reply.realm() != m_realm)) {
         // update long-term credentials
         m_nonce = reply.nonce();
         m_realm = reply.realm();
@@ -1522,7 +1523,8 @@ void QXmppTurnAllocation::handleTransactionFinished(QXmppStunTransaction *transa
             return;
         }
         if (reply.xorRelayedHost.isNull() ||
-            reply.xorRelayedHost.protocol() != QAbstractSocket::IPv4Protocol ||
+            (reply.xorRelayedHost.protocol() != QAbstractSocket::IPv4Protocol &&
+             reply.xorRelayedHost.protocol() != QAbstractSocket::IPv6Protocol) ||
             !reply.xorRelayedPort) {
             warning(u"Allocation did not yield a valid relayed address"_s);
             setState(UnconnectedState);
@@ -1545,11 +1547,22 @@ void QXmppTurnAllocation::handleTransactionFinished(QXmppStunTransaction *transa
             warning(u"ChannelBind failed: %1 %2"_s.arg(QString::number(reply.errorCode), reply.errorPhrase));
 
             // remove channel
-            m_channels.remove(transaction->request().channelNumber());
+            const quint16 ch = transaction->request().channelNumber();
+            m_channels.remove(ch);
+            m_confirmedChannels.remove(ch);
             if (m_channels.isEmpty()) {
                 m_channelTimer->stop();
             }
             return;
+        }
+
+        // channel successfully bound, mark as confirmed for efficient data transfer
+        m_confirmedChannels.insert(transaction->request().channelNumber());
+
+    } else if (method == QXmppStunMessage::CreatePermission) {
+
+        if (reply.messageClass() == QXmppStunMessage::Error) {
+            warning(u"CreatePermission failed: %1 %2"_s.arg(QString::number(reply.errorCode), reply.errorPhrase));
         }
 
     } else if (method == QXmppStunMessage::Refresh) {
@@ -1584,7 +1597,18 @@ qint64 QXmppTurnAllocation::writeDatagram(const QByteArray &data, const QHostAdd
         channel = m_channelNumber++;
         m_channels.insert(channel, addr);
 
-        // bind channel
+        // create permission first (installs permission faster than ChannelBind)
+        QXmppStunMessage permRequest;
+        permRequest.setType(int(QXmppStunMessage::CreatePermission) | int(QXmppStunMessage::Request));
+        permRequest.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
+        permRequest.setNonce(m_nonce);
+        permRequest.setRealm(m_realm);
+        permRequest.setUsername(m_username);
+        permRequest.xorPeerHost = host;
+        permRequest.xorPeerPort = port;
+        sendStunMessage(std::move(permRequest));
+
+        // bind channel (for efficient data transfer once confirmed)
         QXmppStunMessage request;
         request.setType(int(QXmppStunMessage::ChannelBind) | int(QXmppStunMessage::Request));
         request.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
@@ -1602,17 +1626,31 @@ qint64 QXmppTurnAllocation::writeDatagram(const QByteArray &data, const QHostAdd
         }
     }
 
-    // send data
-    QByteArray channelData;
-    channelData.reserve(4 + data.size());
-    QDataStream stream(&channelData, QIODevice::WriteOnly);
-    stream << channel;
-    stream << quint16(data.size());
-    stream.writeRawData(data.data(), data.size());
-    if (socket->writeDatagram(channelData, m_turnHost, m_turnPort) == channelData.size()) {
-        return data.size();
+    if (m_confirmedChannels.contains(channel)) {
+        // channel is bound, use efficient channel data format
+        QByteArray channelData;
+        channelData.reserve(4 + data.size());
+        QDataStream stream(&channelData, QIODevice::WriteOnly);
+        stream << channel;
+        stream << quint16(data.size());
+        stream.writeRawData(data.data(), data.size());
+        if (socket->writeDatagram(channelData, m_turnHost, m_turnPort) == channelData.size()) {
+            return data.size();
+        } else {
+            return -1;
+        }
     } else {
-        return -1;
+        // channel not yet confirmed, use Send indication
+        // (works once CreatePermission or ChannelBind succeeds on the server)
+        QXmppStunMessage sendInd;
+        sendInd.setType(int(QXmppStunMessage::Send) | int(QXmppStunMessage::Indication));
+        sendInd.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
+        sendInd.xorPeerHost = host;
+        sendInd.xorPeerPort = port;
+        sendInd.setData(data);
+        // indications must not include MESSAGE-INTEGRITY per RFC 5389
+        socket->writeDatagram(sendInd.encode(QByteArray()), m_turnHost, m_turnPort);
+        return data.size();
     }
 }
 
@@ -1914,9 +1952,17 @@ void QXmppIceComponentPrivate::performCheck(CandidatePair *pair, bool nominate)
 
 void QXmppIceComponentPrivate::setSockets(QList<QUdpSocket *> sockets)
 {
-    // clear previous candidates and sockets
+    // clear all previous state for clean ICE restart
     localCandidates.clear();
+    remoteCandidates.clear();
     qDeleteAll(pairs);
+    pairs.clear();
+    activePair = nullptr;
+    fallbackPair = nullptr;
+    for (auto &[transaction, transport] : stunTransactions) {
+        delete transaction;
+    }
+    stunTransactions.clear();
     for (auto *transport : std::as_const(transports)) {
         if (transport != turnAllocation) {
             delete transport;
@@ -1950,8 +1996,9 @@ void QXmppIceComponentPrivate::setSockets(QList<QUdpSocket *> sockets)
                 continue;
             }
 
+            qDebug() << "MOVE REQUEST";
             request.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
-            sendStunMessage(std::move(request), transport, stunServer);
+            sendStunMessage(request, transport, stunServer);
         }
     }
 
@@ -2023,7 +2070,7 @@ QXmppIceComponent::QXmppIceComponent(int component, QXmppIcePrivate *config, QOb
       d(std::make_unique<QXmppIceComponentPrivate>(component, config, this))
 {
     d->timer = new QTimer(this);
-    d->timer->setInterval(500);
+    d->timer->setInterval(20);
     connect(d->timer, &QTimer::timeout,
             this, &QXmppIceComponent::checkCandidates);
 
@@ -2069,10 +2116,17 @@ void QXmppIceComponent::checkCandidates()
     }
     debug(u"Checking remote candidates"_s);
 
+
+    // Check up to 5 pairs in parallel instead of just 1
+    int checksStarted = 0;
+    static constexpr int MAX_PARALLEL_CHECKS = 5;
+
     for (auto *pair : std::as_const(d->pairs)) {
         if (pair->state() == CandidatePair::WaitingState) {
             d->performCheck(pair, d->config->iceControlling);
-            break;
+            if (++checksStarted >= MAX_PARALLEL_CHECKS) {
+                break;
+            }
         }
     }
 }
@@ -2085,9 +2139,13 @@ void QXmppIceComponent::close()
     for (auto *transport : std::as_const(d->transports)) {
         transport->disconnectFromHost();
     }
-    d->turnAllocation->disconnectFromHost();
+    // only disconnect TURN separately if it's not already in the transports list
+    if (!d->transports.contains(d->turnAllocation)) {
+        d->turnAllocation->disconnectFromHost();
+    }
     d->timer->stop();
     d->activePair = nullptr;
+    d->fallbackPair = nullptr;
 }
 
 ///
@@ -2361,6 +2419,34 @@ void QXmppIceComponent::turnConnected()
     debug(u"Adding relayed candidate %1 port %2"_s.arg(candidate.host().toString(), QString::number(candidate.port())));
     d->localCandidates << candidate;
 
+    // create pairs with existing remote candidates for the TURN transport
+    for (const auto &remoteCandidate : std::as_const(d->remoteCandidates)) {
+        if (!isCompatibleAddress(candidate.host(), remoteCandidate.host())) {
+            continue;
+        }
+
+        // check if pair already exists
+        bool exists = false;
+        for (const auto *pair : std::as_const(d->pairs)) {
+            if (pair->transport == d->turnAllocation &&
+                pair->remote.host() == remoteCandidate.host() &&
+                pair->remote.port() == remoteCandidate.port()) {
+                exists = true;
+                break;
+            }
+        }
+        if (exists) {
+            continue;
+        }
+
+        auto *pair = new CandidatePair(d->component, d->config->iceControlling, this);
+        pair->remote = remoteCandidate;
+        pair->transport = d->turnAllocation;
+        d->pairs << pair;
+    }
+
+    std::sort(d->pairs.begin(), d->pairs.end(), candidatePairPtrLessThan);
+
     Q_EMIT localCandidatesChanged();
     updateGatheringState();
 }
@@ -2552,7 +2638,7 @@ QXmppIceConnection::QXmppIceConnection(QObject *parent)
 {
     // timer to limit connection time to 30 seconds
     d->connectTimer = new QTimer(this);
-    d->connectTimer->setInterval(30000);
+    d->connectTimer->setInterval(10000);
     d->connectTimer->setSingleShot(true);
     connect(d->connectTimer, &QTimer::timeout,
             this, &QXmppIceConnection::slotTimeout);
