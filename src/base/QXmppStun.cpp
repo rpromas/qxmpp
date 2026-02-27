@@ -32,8 +32,8 @@ static const quint16 STUN_HEADER = 20;
 static constexpr auto STUN_ID_SIZE = 12;
 static const quint8 STUN_IPV4 = 0x01;
 static const quint8 STUN_IPV6 = 0x02;
-static constexpr auto STUN_RTO_INTERVAL = 500;
-static constexpr auto STUN_RTO_MAX = 7;
+static constexpr auto STUN_RTO_INTERVAL = 200;
+static constexpr auto STUN_RTO_MAX = 4;
 
 template<>
 struct Enums::Data<QXmppIceConnection::GatheringState> {
@@ -1194,7 +1194,7 @@ void QXmppStunTransaction::retry()
 
     // resend request
     Q_EMIT writeStun(m_request);
-    m_retryTimer->start(m_tries ? 2 * m_retryTimer->interval() : STUN_RTO_INTERVAL);
+    m_retryTimer->start(m_tries ? qMin(2 * m_retryTimer->interval(), 1600) : STUN_RTO_INTERVAL);
     m_tries++;
 }
 
@@ -1299,8 +1299,8 @@ void QXmppTurnAllocation::sendStunMessage(QXmppStunMessage &&message)
         [this](const auto &stunMessage) { writeStun(stunMessage); },
         [this](QXmppStunTransaction *transaction) {
             m_transactions.removeAll(transaction);
-            transaction->deleteLater();
             handleTransactionFinished(transaction);
+            transaction->deleteLater();
         },
         this);
 }
@@ -1494,8 +1494,8 @@ void QXmppTurnAllocation::handleTransactionFinished(QXmppStunTransaction *transa
     // handle authentication
     const QXmppStunMessage reply = transaction->response();
     if (reply.messageClass() == QXmppStunMessage::Error &&
-        reply.errorCode == 401 &&
-        (reply.nonce() != m_nonce && reply.realm() != m_realm)) {
+        (reply.errorCode == 401 || reply.errorCode == 438) &&
+        (reply.nonce() != m_nonce || reply.realm() != m_realm)) {
         // update long-term credentials
         m_nonce = reply.nonce();
         m_realm = reply.realm();
@@ -1830,8 +1830,7 @@ bool QXmppIceComponentPrivate::addRemoteCandidate(const QXmppJingleCandidate &ca
          candidate.type() != QXmppJingleCandidate::RelayedType &&
          candidate.type() != QXmppJingleCandidate::ServerReflexiveType) ||
         candidate.protocol() != u"udp" ||
-        (candidate.host().protocol() != QAbstractSocket::IPv4Protocol &&
-         candidate.host().protocol() != QAbstractSocket::IPv6Protocol)) {
+        (candidate.host().protocol() != QAbstractSocket::IPv4Protocol)) {
         return false;
     }
 
@@ -1942,16 +1941,16 @@ void QXmppIceComponentPrivate::setSockets(QList<QUdpSocket *> sockets)
     // TODO: is this clear() enough
     stunTransactions.clear();
     for (auto &stunServer : config->stunServers) {
-        QXmppStunMessage request;
-        request.setType(int(QXmppStunMessage::Binding) | int(QXmppStunMessage::Request));
         for (auto *transport : std::as_const(transports)) {
             const QXmppJingleCandidate local = transport->localCandidate(component);
             if (!isCompatibleAddress(local.host(), stunServer.host)) {
                 continue;
             }
 
+            QXmppStunMessage request;
+            request.setType(int(QXmppStunMessage::Binding) | int(QXmppStunMessage::Request));
             request.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
-            sendStunMessage(std::move(request), transport, stunServer);
+            sendStunMessage(request, transport, stunServer);
         }
     }
 
@@ -2023,7 +2022,7 @@ QXmppIceComponent::QXmppIceComponent(int component, QXmppIcePrivate *config, QOb
       d(std::make_unique<QXmppIceComponentPrivate>(component, config, this))
 {
     d->timer = new QTimer(this);
-    d->timer->setInterval(500);
+    d->timer->setInterval(100);
     connect(d->timer, &QTimer::timeout,
             this, &QXmppIceComponent::checkCandidates);
 
@@ -2069,10 +2068,15 @@ void QXmppIceComponent::checkCandidates()
     }
     debug(u"Checking remote candidates"_s);
 
+    // Check up to 5 pairs in parallel instead of just 1
+    int checksStarted = 0;
+    static constexpr int MAX_PARALLEL_CHECKS = 5;
     for (auto *pair : std::as_const(d->pairs)) {
         if (pair->state() == CandidatePair::WaitingState) {
             d->performCheck(pair, d->config->iceControlling);
-            break;
+            if (++checksStarted >= MAX_PARALLEL_CHECKS) {
+                break;
+            }
         }
     }
 }
@@ -2099,7 +2103,9 @@ void QXmppIceComponent::connectToHost()
         return;
     }
 
+    // Immediately check candidates (will check up to MAX_PARALLEL_CHECKS)
     checkCandidates();
+    // Also schedule repeated checks
     d->timer->start();
 }
 
@@ -2282,7 +2288,7 @@ void QXmppIceComponent::handleDatagram(const QByteArray &buffer, const QHostAddr
         if (remoteHost != pair->remote.host() || remotePort != pair->remote.port()) {
             QXmppStunMessage error;
             error.setType(QXmppStunMessage::Error);
-            error.errorPhrase = u"Received response from unexpected %1:%1"_s.arg(remoteHost.toString(), QString::number(remotePort));
+            error.errorPhrase = u"Received response from unexpected %1:%2"_s.arg(remoteHost.toString(), QString::number(remotePort));
             pair->transaction->readStun(error);
             return;
         }
@@ -2405,8 +2411,7 @@ QList<QHostAddress> QXmppIceComponent::discoverAddresses()
         const auto addressEntries = interface.addressEntries();
         for (const auto &entry : addressEntries) {
             QHostAddress ip = entry.ip();
-            if ((ip.protocol() != QAbstractSocket::IPv4Protocol &&
-                 ip.protocol() != QAbstractSocket::IPv6Protocol) ||
+            if ((ip.protocol() != QAbstractSocket::IPv4Protocol) ||
                 entry.netmask().isNull()) {
                 continue;
             }
@@ -2550,7 +2555,7 @@ QXmppIceConnection::QXmppIceConnection(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppIceConnectionPrivate>())
 {
-    // timer to limit connection time to 30 seconds
+    // timer to limit connection time to 10 seconds
     d->connectTimer = new QTimer(this);
     d->connectTimer->setInterval(30000);
     d->connectTimer->setSingleShot(true);

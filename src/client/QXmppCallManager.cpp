@@ -447,7 +447,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
             return;
         }
 
-        refreshStunTurnConfig().then(call, [this, call, media] {
+        // refreshStunTurnConfig().then(call, [this, call, media] {
             call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
             if (media == Media::AudioVideo) {
                 call->d->createStream(u"video"_s, u"initiator"_s, u"webcam"_s);
@@ -457,7 +457,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
             d->addCall(call);
 
             call->d->sendInvite();
-        });
+        // });
     });
 
     return call;
@@ -539,7 +539,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
 
         // first send IQ ack (task may finish instantly)
         later(this, [this, contents, callPtr = call.release()]() mutable {
-            refreshStunTurnConfig().then(this, [this, contents, callPtr]() mutable {
+            // refreshStunTurnConfig().then(this, [this, contents, callPtr]() mutable {
                 auto call = std::unique_ptr<QXmppCall>(callPtr);
 
                 for (const auto &content : contents) {
@@ -583,7 +583,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                     rawCall->d->terminate({ QXmppJingleReason::Decline, {}, {} });
                 }
                 return;
-            });
+            // });
         });
         return {};
     }
