@@ -1679,7 +1679,14 @@ qint64 QXmppUdpTransport::writeDatagram(const QByteArray &data, const QHostAddre
     if (isIPv6LinkLocalAddress(host)) {
         remoteHost.setScopeId(m_socket->localAddress().scopeId());
     }
-    return m_socket->writeDatagram(data, remoteHost, port);
+
+    qint64 result = m_socket->writeDatagram(data, remoteHost, port);
+    if (result == -1)
+    {
+        qDebug() << m_socket->error() << m_socket->errorString() << host << port << data.size() << m_socket->bytesToWrite() << m_socket->state();
+    }
+
+    return result;
 }
 /// \endcond
 
@@ -2066,7 +2073,7 @@ void QXmppIceComponent::checkCandidates()
     if (d->config->remoteUser.isEmpty()) {
         return;
     }
-    debug(u"Checking remote candidates"_s);
+    // debug(u"Checking remote candidates"_s);
 
     // Check up to 5 pairs in parallel instead of just 1
     int checksStarted = 0;
@@ -2503,8 +2510,10 @@ qint64 QXmppIceComponent::sendDatagram(const QByteArray &datagram)
 {
     CandidatePair *pair = d->activePair ? d->activePair : d->fallbackPair;
     if (!pair || pair->remote.host().isNull()) {
+        qDebug() << "pair" << pair << pair->remote.host();
         return -1;
     }
+
     return pair->transport->writeDatagram(datagram, pair->remote.host(), pair->remote.port());
 }
 

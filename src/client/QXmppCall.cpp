@@ -59,7 +59,7 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
         return;
     }
     // We do not want to build up latency over time
-    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 100, "do-retransmission", true, nullptr);
+    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 150, "do-retransmission", true, nullptr);
 
     if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
         qFatal("Could not add rtpbin to the pipeline");
@@ -319,6 +319,7 @@ bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingl
 
 std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJingleIq &&iq)
 {
+    qDebug() << "Call handling request: " << iq.action();
     using Error = QXmppStanza::Error;
 
     Q_ASSERT(manager);  // we are called only from the manager
@@ -506,6 +507,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         q->debug(u"Call: Using TURN server: " + turnServerHost + u"/" + QString::number(turnServer->port));
         stream->d->connection->setTurnServer(*turnServer);
     }
+
     stream->d->connection->bind(QXmppIceComponent::discoverAddresses());
 
     // connect signals

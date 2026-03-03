@@ -31,6 +31,8 @@
 
 #include <QDomElement>
 
+#include <QTimer>
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
@@ -348,6 +350,26 @@ QStringList QXmppCallManager::discoveryFeatures() const
 
 bool QXmppCallManager::handleStanza(const QDomElement &element)
 {
+    // When stanza queuing is enabled, store incoming Jingle IQs for later processing.
+    // This is used on iOS to defer Jingle processing until the app has foreground
+    // network access (e.g. after answering a VoIP push call on cellular).
+    if (d->stanzaQueueEnabled) {
+        // Only queue Jingle IQ stanzas (check namespace before deep-copying)
+        auto jingleEl = element.firstChildElement(u"jingle"_s);
+        if (!jingleEl.isNull() && jingleEl.namespaceURI() == ns_jingle) {
+            // Send IQ ack immediately to prevent the remote party from timing out
+            // QXmppIq ack;
+            // Private::sendIqReply(client(), element.attribute(u"id"_s), element.attribute(u"from"_s), std::nullopt, std::move(ack));
+
+            // Deep-copy the DOM element and store for later processing
+            QDomDocument doc;
+            doc.appendChild(doc.importNode(element, true));
+            d->queuedStanzas.append(std::move(doc));
+            debug(u"Queued Jingle stanza (queue size: %1)"_s.arg(d->queuedStanzas.size()));
+            return true;
+        }
+    }
+
     return handleIqRequests<QXmppJingleIq>(element, client(), [this](auto &&iq) {
         return handleIq(std::move(iq));
     });
@@ -453,7 +475,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
                 call->d->createStream(u"video"_s, u"initiator"_s, u"webcam"_s);
             }
 
-            // register call
+            // register calla
             d->addCall(call);
 
             call->d->sendInvite();
@@ -483,6 +505,66 @@ bool QXmppCallManager::dtlsRequired() const
 void QXmppCallManager::setDtlsRequired(bool dtlsRequired)
 {
     d->dtlsRequired = dtlsRequired;
+}
+
+///
+/// Enables or disables Jingle stanza queuing.
+///
+/// When enabled, incoming Jingle IQ stanzas are stored instead of being processed.
+/// Call processQueuedStanzas() to replay all stored stanzas.
+///
+/// This is intended for iOS VoIP push scenarios where the app wakes in background
+/// with restricted network access. By queuing stanzas until foreground, ICE
+/// gathering and TURN allocations happen with full network access.
+///
+void QXmppCallManager::setStanzaQueueEnabled(bool enabled)
+{
+    d->stanzaQueueEnabled = enabled;
+    debug(u"Jingle stanza queuing %1"_s.arg(enabled ? u"enabled" : u"disabled"));
+}
+
+///
+/// Processes all queued Jingle stanzas and disables queuing.
+///
+/// Call this when the app transitions to foreground and has full network access.
+/// Each queued stanza is replayed through the normal handleStanza() path.
+///
+void QXmppCallManager::processQueuedStanzas()
+{
+    d->stanzaQueueEnabled = false;
+
+    if (d->queuedStanzas.isEmpty()) {
+        return;
+    }
+
+    debug(u"Processing %1 queued Jingle stanza(s)"_s.arg(d->queuedStanzas.size()));
+
+    // auto stanzas = std::move(d->queuedStanzas);
+    if (d->queuedStanzas.isEmpty() == false)
+    {
+        QDomDocument doc;
+
+        if (auto iq = parseElement<QXmppJingleIq>(d->queuedStanzas.first().documentElement())) {
+            d->queuedStanzas.removeFirst();
+            // timing stanza handling each 100ms
+            QXmppJingleIq movedIq;
+            QTimer::singleShot(100, [this, movedIq = std::move(*iq)]() mutable
+            {
+                qDebug() << "Handling delayed stanza:";
+                handleIq(std::move(movedIq));
+                processQueuedStanzas();
+            });
+        }
+    }
+    // for (const auto &doc : std::as_const(stanzas)) {
+    //     // Parse the stored DOM into a QXmppJingleIq and call handleIq() directly.
+    //     // We bypass handleStanza()/handleIqRequests() because the IQ ack was already
+    //     // sent when the stanza was queued — going through the normal path would
+    //     // send a duplicate ack.
+    //     if (auto iq = parseElement<QXmppJingleIq>(doc.documentElement())) {
+    //         handleIq(std::move(*iq));
+    //     }
+    // }
 }
 
 void QXmppCallManager::onCallDestroyed(QObject *object)
@@ -543,7 +625,6 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                 auto call = std::unique_ptr<QXmppCall>(callPtr);
 
                 for (const auto &content : contents) {
-                    // create stream (with up-to-date STUN/TURN credentials)
                     auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
                     if (!stream) {
                         call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
@@ -553,12 +634,9 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                     // check content description and transport
                     if (!call->d->handleDescription(stream, content) ||
                         !call->d->handleTransport(stream, content)) {
-
                         // terminate call
                         call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
                         call->terminated();
-                        // QMetaObject::invokeMethod(q, &QXmppCall::terminated);
-
                         return;
                     }
                 }

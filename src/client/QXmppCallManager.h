@@ -40,6 +40,9 @@ public:
     bool dtlsRequired() const;
     void setDtlsRequired(bool);
 
+    void setStanzaQueueEnabled(bool enabled);
+    void processQueuedStanzas();
+
     /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;

@@ -16,6 +16,7 @@
 #include "Async.h"
 
 #include <QDateTime>
+#include <QDomDocument>
 
 class QXmppCallManager;
 class QXmppJingleReason;
@@ -77,6 +78,12 @@ public:
 
     bool dtlsRequired = false;
     bool supportsDtls = false;
+
+    // Stanza queuing: when enabled, incoming Jingle stanzas are stored
+    // instead of processed. Call processQueuedStanzas() to replay them.
+    // Used on iOS to defer all Jingle processing until foreground.
+    bool stanzaQueueEnabled = true;
+    QList<QDomDocument> queuedStanzas;
 
 private:
     QXmppCallManager *q;
