@@ -34,12 +34,10 @@ struct QXMPP_EXPORT QXmppError {
     template<typename T>
     std::optional<T> value() const
     {
-        // any_cast always checks this, to avoid an additional check we use exceptions
-        try {
-            return std::any_cast<T>(error);
-        } catch (const std::bad_any_cast &) {
-            return {};
+        if (auto ptr = std::any_cast<T>(&error)) {
+            return *ptr;
         }
+        return std::nullopt;
     }
     template<typename T>
     std::optional<T> takeValue()

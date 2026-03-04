@@ -82,7 +82,7 @@ public:
     // Stanza queuing: when enabled, incoming Jingle stanzas are stored
     // instead of processed. Call processQueuedStanzas() to replay them.
     // Used on iOS to defer all Jingle processing until foreground.
-    bool stanzaQueueEnabled = true;
+    bool stanzaQueueEnabled = false;
     QList<QDomDocument> queuedStanzas;
 
 private:

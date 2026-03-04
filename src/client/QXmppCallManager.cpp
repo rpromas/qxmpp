@@ -353,7 +353,10 @@ bool QXmppCallManager::handleStanza(const QDomElement &element)
     // When stanza queuing is enabled, store incoming Jingle IQs for later processing.
     // This is used on iOS to defer Jingle processing until the app has foreground
     // network access (e.g. after answering a VoIP push call on cellular).
-    if (d->stanzaQueueEnabled) {
+    // also checking if not session terminate (which should only arive in foreground) hacky but
+    // it checks that in ios call if we are in background it won't skip session terminate stanza and leave call hanging
+    auto iq = parseElement<QXmppJingleIq>(element);
+    if (d->stanzaQueueEnabled && iq->action() != QXmppJingleIq::SessionTerminate) {
         // Only queue Jingle IQ stanzas (check namespace before deep-copying)
         auto jingleEl = element.firstChildElement(u"jingle"_s);
         if (!jingleEl.isNull() && jingleEl.namespaceURI() == ns_jingle) {
@@ -531,30 +534,27 @@ void QXmppCallManager::setStanzaQueueEnabled(bool enabled)
 ///
 void QXmppCallManager::processQueuedStanzas()
 {
+    debug(u"Processing %1 queued Jingle stanza(s)"_s.arg(d->queuedStanzas.size()));
+
     d->stanzaQueueEnabled = false;
 
     if (d->queuedStanzas.isEmpty()) {
         return;
     }
 
-    debug(u"Processing %1 queued Jingle stanza(s)"_s.arg(d->queuedStanzas.size()));
-
     // auto stanzas = std::move(d->queuedStanzas);
-    if (d->queuedStanzas.isEmpty() == false)
-    {
-        QDomDocument doc;
+    QDomDocument doc;
 
-        if (auto iq = parseElement<QXmppJingleIq>(d->queuedStanzas.first().documentElement())) {
-            d->queuedStanzas.removeFirst();
-            // timing stanza handling each 100ms
-            QXmppJingleIq movedIq;
-            QTimer::singleShot(100, [this, movedIq = std::move(*iq)]() mutable
-            {
-                qDebug() << "Handling delayed stanza:";
-                handleIq(std::move(movedIq));
-                processQueuedStanzas();
-            });
-        }
+    if (auto iq = parseElement<QXmppJingleIq>(d->queuedStanzas.first().documentElement())) {
+        d->queuedStanzas.removeFirst();
+        // timing stanza handling each 100ms
+        QXmppJingleIq movedIq;
+        QTimer::singleShot(100, [this, movedIq = std::move(*iq)]() mutable
+        {
+            qDebug() << "Handling delayed stanza:";
+            handleIq(std::move(movedIq));
+            processQueuedStanzas();
+        });
     }
     // for (const auto &doc : std::as_const(stanzas)) {
     //     // Parse the stored DOM into a QXmppJingleIq and call handleIq() directly.
