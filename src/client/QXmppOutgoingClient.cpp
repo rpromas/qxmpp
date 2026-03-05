@@ -1276,7 +1276,7 @@ bool OutgoingIqManager::handleStanza(const QDomElement &stanza)
     // attribute or have it set to the user's bare JID.
     // If 'from' is empty, the IQ has been sent by the server. In this case we don't need to
     // do the check as we trust the server anyways.
-    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && from != expectedFrom) {
+    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && QXmppUtils::jidToBareJid(from) != QXmppUtils::jidToBareJid(expectedFrom)) {
         warning(u"Ignored received IQ response to request '%1' because of wrong sender '%2' instead of expected sender '%3'"_s
                     .arg(id, from, expectedFrom));
         return false;
