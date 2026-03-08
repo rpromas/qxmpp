@@ -549,7 +549,7 @@ void QXmppCallManager::processQueuedStanzas()
         d->queuedStanzas.removeFirst();
         // timing stanza handling each 100ms
         QXmppJingleIq movedIq;
-        QTimer::singleShot(100, [this, movedIq = std::move(*iq)]() mutable
+        QTimer::singleShot(50, [this, movedIq = std::move(*iq)]() mutable
         {
             qDebug() << "Handling delayed stanza:";
             handleIq(std::move(movedIq));

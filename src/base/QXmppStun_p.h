@@ -137,6 +137,7 @@ private:
     QByteArray m_nonce;
     AllocationState m_state = UnconnectedState;
     QList<QXmppStunTransaction *> m_transactions;
+    int m_allocateRetries = 0;
 };
 
 //

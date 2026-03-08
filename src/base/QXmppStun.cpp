@@ -32,8 +32,8 @@ static const quint16 STUN_HEADER = 20;
 static constexpr auto STUN_ID_SIZE = 12;
 static const quint8 STUN_IPV4 = 0x01;
 static const quint8 STUN_IPV6 = 0x02;
-static constexpr auto STUN_RTO_INTERVAL = 200;
-static constexpr auto STUN_RTO_MAX = 4;
+static constexpr auto STUN_RTO_INTERVAL = 250;
+static constexpr auto STUN_RTO_MAX = 7;
 
 template<>
 struct Enums::Data<QXmppIceConnection::GatheringState> {
@@ -119,6 +119,14 @@ static bool isIPv6LinkLocalAddress(const QHostAddress &addr)
     }
     Q_IPV6ADDR ipv6addr = addr.toIPv6Address();
     return (((ipv6addr[0] << 8) + ipv6addr[1]) & 0xffc0) == 0xfe80;
+}
+
+static bool isIPv4LinkLocalAddress(const QHostAddress &addr)
+{
+    if (addr.protocol() != QAbstractSocket::IPv4Protocol) {
+        return false;
+    }
+    return (addr.toIPv4Address() & 0xFFFF0000) == 0xA9FE0000; // 169.254.0.0/16
 }
 
 static bool isLoopbackAddress(const QHostAddress &addr)
@@ -1242,6 +1250,8 @@ void QXmppTurnAllocation::connectToHost()
         return;
     }
 
+    m_allocateRetries = 0;
+
     // start listening for UDP
     if (socket->state() == QAbstractSocket::UnconnectedState) {
         if (!socket->bind()) {
@@ -1517,6 +1527,14 @@ void QXmppTurnAllocation::handleTransactionFinished(QXmppStunTransaction *transa
     if (method == QXmppStunMessage::Allocate) {
 
         if (reply.messageClass() == QXmppStunMessage::Error) {
+            if (m_allocateRetries < 1) {
+                m_allocateRetries++;
+                warning(u"Allocation failed: %1 %2 — retrying"_s.arg(QString::number(reply.errorCode), reply.errorPhrase));
+                // retry after a short delay — must go through UnconnectedState for connectToHost() guard
+                setState(UnconnectedState);
+                QTimer::singleShot(500, this, &QXmppTurnAllocation::connectToHost);
+                return;
+            }
             warning(u"Allocation failed: %1 %2"_s.arg(QString::number(reply.errorCode), reply.errorPhrase));
             setState(UnconnectedState);
             return;
@@ -1584,6 +1602,17 @@ qint64 QXmppTurnAllocation::writeDatagram(const QByteArray &data, const QHostAdd
         channel = m_channelNumber++;
         m_channels.insert(channel, addr);
 
+        // create permission for peer address (RFC 5766 §9)
+        QXmppStunMessage permRequest;
+        permRequest.setType(int(QXmppStunMessage::CreatePermission) | int(QXmppStunMessage::Request));
+        permRequest.setId(QXmppUtils::generateRandomBytes(STUN_ID_SIZE));
+        permRequest.setNonce(m_nonce);
+        permRequest.setRealm(m_realm);
+        permRequest.setUsername(m_username);
+        permRequest.xorPeerHost = host;
+        permRequest.xorPeerPort = port;
+        sendStunMessage(std::move(permRequest));
+
         // bind channel
         QXmppStunMessage request;
         request.setType(int(QXmppStunMessage::ChannelBind) | int(QXmppStunMessage::Request));
@@ -1612,6 +1641,7 @@ qint64 QXmppTurnAllocation::writeDatagram(const QByteArray &data, const QHostAdd
     if (socket->writeDatagram(channelData, m_turnHost, m_turnPort) == channelData.size()) {
         return data.size();
     } else {
+        warning(u"TURN channel data send failed: %1"_s.arg(socket->errorString()));
         return -1;
     }
 }
@@ -1865,6 +1895,14 @@ bool QXmppIceComponentPrivate::addRemoteCandidate(const QXmppJingleCandidate &ca
         }
     }
 
+    // Reset failed pairs to waiting so they can be retried — helps recover
+    // from transient socket failures (e.g. iOS network glitches during call setup)
+    for (auto *pair : std::as_const(pairs)) {
+        if (pair->state() == CandidatePair::FailedState) {
+            pair->setState(CandidatePair::WaitingState);
+        }
+    }
+
     std::sort(pairs.begin(), pairs.end(), candidatePairPtrLessThan);
 
     return true;
@@ -2073,16 +2111,40 @@ void QXmppIceComponent::checkCandidates()
     if (d->config->remoteUser.isEmpty()) {
         return;
     }
-    // debug(u"Checking remote candidates"_s);
 
-    // Check up to 5 pairs in parallel instead of just 1
     int checksStarted = 0;
     static constexpr int MAX_PARALLEL_CHECKS = 5;
+
+    // First pass: check non-relay pairs (up to MAX_PARALLEL_CHECKS - 1)
     for (auto *pair : std::as_const(d->pairs)) {
         if (pair->state() == CandidatePair::WaitingState) {
+            if (pair->transport == d->turnAllocation) {
+                continue; // skip relay pairs in first pass
+            }
             d->performCheck(pair, d->config->iceControlling);
-            if (++checksStarted >= MAX_PARALLEL_CHECKS) {
+            if (++checksStarted >= MAX_PARALLEL_CHECKS - 1) {
                 break;
+            }
+        }
+    }
+
+    // Second pass: always try at least one relay pair if available
+    for (auto *pair : std::as_const(d->pairs)) {
+        if (pair->state() == CandidatePair::WaitingState && pair->transport == d->turnAllocation) {
+            d->performCheck(pair, d->config->iceControlling);
+            checksStarted++;
+            break;
+        }
+    }
+
+    // Fill remaining slots with any waiting pairs
+    if (checksStarted < MAX_PARALLEL_CHECKS) {
+        for (auto *pair : std::as_const(d->pairs)) {
+            if (pair->state() == CandidatePair::WaitingState && !pair->transaction) {
+                d->performCheck(pair, d->config->iceControlling);
+                if (++checksStarted >= MAX_PARALLEL_CHECKS) {
+                    break;
+                }
             }
         }
     }
@@ -2374,6 +2436,23 @@ void QXmppIceComponent::turnConnected()
     debug(u"Adding relayed candidate %1 port %2"_s.arg(candidate.host().toString(), QString::number(candidate.port())));
     d->localCandidates << candidate;
 
+    // Create pairs for already-received remote candidates using the TURN transport.
+    // Remote candidates that arrived before the TURN allocation completed would not
+    // have been paired with the TURN transport (isCompatibleAddress fails when
+    // relayedHost is null), so we must create those pairs now.
+    for (const auto &remote : std::as_const(d->remoteCandidates)) {
+        if (!isCompatibleAddress(candidate.host(), remote.host())) {
+            continue;
+        }
+        auto *pair = new CandidatePair(d->component, d->config->iceControlling, this);
+        pair->remote = remote;
+        pair->transport = d->turnAllocation;
+        d->pairs << pair;
+    }
+    if (!d->remoteCandidates.isEmpty()) {
+        std::sort(d->pairs.begin(), d->pairs.end(), candidatePairPtrLessThan);
+    }
+
     Q_EMIT localCandidatesChanged();
     updateGatheringState();
 }
@@ -2426,6 +2505,12 @@ QList<QHostAddress> QXmppIceComponent::discoverAddresses()
             // FIXME: for some reason we can have loopback addresses
             // even if the interface does not have the loopback flag
             if (isLoopbackAddress(ip)) {
+                continue;
+            }
+
+            // skip IPv4 link-local addresses (169.254.x.x) — they cannot
+            // route to external hosts and waste ICE candidate pairs
+            if (isIPv4LinkLocalAddress(ip)) {
                 continue;
             }
 
@@ -2564,7 +2649,7 @@ QXmppIceConnection::QXmppIceConnection(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppIceConnectionPrivate>())
 {
-    // timer to limit connection time to 10 seconds
+    // timer to limit ICE connection time
     d->connectTimer = new QTimer(this);
     d->connectTimer->setInterval(30000);
     d->connectTimer->setSingleShot(true);
