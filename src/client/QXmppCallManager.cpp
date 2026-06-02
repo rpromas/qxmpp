@@ -575,6 +575,7 @@ void QXmppCallManager::onCallDestroyed(QObject *object)
 // Handles disconnection from server.
 void QXmppCallManager::onDisconnected()
 {
+    warning(u"[RYSYS] XMPP disconnected — terminating %1 active call(s)"_s.arg(d->calls.size()));
     for (auto *call : std::as_const(d->calls)) {
         call->d->terminate({ QXmppJingleReason::Gone, {}, {} });
     }
@@ -686,6 +687,7 @@ void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
 
     if (auto call = find(std::as_const(d->calls), presence.from(), &QXmppCall::jid)) {
         // the remote party has gone away, terminate call
+        warning(u"[RYSYS] Remote %1 went unavailable — terminating call"_s.arg(presence.from()));
         auto &callObject = call.value();
         callObject->d->error = { u"Received unavailable presence"_s, {} };
         callObject->d->terminate({ QXmppJingleReason::Gone, {}, {} });

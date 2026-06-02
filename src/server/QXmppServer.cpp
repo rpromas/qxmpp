@@ -638,6 +638,7 @@ void QXmppServer::addIncomingClient(QXmppIncomingClient *stream)
 
     connect(stream, &QXmppIncomingClient::connected, this, &QXmppServer::_q_clientConnected);
     connect(stream, &QXmppIncomingClient::disconnected, this, &QXmppServer::_q_clientDisconnected);
+    connect(stream, &QXmppIncomingClient::clientPinged, this, &QXmppServer::_q_clientPinged);
     connect(stream, &QXmppIncomingClient::elementReceived, this, &QXmppServer::handleElement);
 
     // add stream
@@ -682,6 +683,20 @@ void QXmppServer::_q_clientConnected()
 
     // emit signal
     Q_EMIT clientConnected(jid);
+}
+
+/// Relay a stream management ack request (<r/>) as a per-JID liveness signal.
+void QXmppServer::_q_clientPinged()
+{
+    auto *client = qobject_cast<QXmppIncomingClient *>(sender());
+    if (!client) {
+        return;
+    }
+
+    const QString jid = client->jid();
+    if (!jid.isEmpty()) {
+        Q_EMIT clientPinged(jid);
+    }
 }
 
 /// Handle a stream disconnection for a client.

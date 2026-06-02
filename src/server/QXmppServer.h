@@ -84,6 +84,10 @@ public:
     /// This signal is emitted when a client has disconnected.
     Q_SIGNAL void clientDisconnected(const QString &jid);
 
+    /// This signal is emitted when a connected client sends a stream management
+    /// ack request (<r/>), which serves as a keepalive/liveness signal.
+    Q_SIGNAL void clientPinged(const QString &jid);
+
     /// This signal is emitted when the logger changes.
     Q_SIGNAL void loggerChanged(QXmppLogger *logger);
 
@@ -93,6 +97,7 @@ private:
     Q_SLOT void _q_clientConnection(QSslSocket *socket);
     Q_SLOT void _q_clientConnected();
     Q_SLOT void _q_clientDisconnected();
+    Q_SLOT void _q_clientPinged();
     Q_SLOT void _q_dialbackRequestReceived(const QXmppDialback &dialback);
     Q_SLOT void _q_outgoingServerDisconnected();
     Q_SLOT void _q_serverConnection(QSslSocket *socket);

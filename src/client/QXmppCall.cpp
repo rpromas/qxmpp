@@ -628,7 +628,8 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
 ///
 void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 {
-    q->debug(u"Call(sid=%1): Terminating: %2"_s.arg(sid, reason.text()));
+    q->warning(u"[RYSYS] Call terminating — sid=%1 reason-type=%2 (%3)"_s
+        .arg(sid, QString::number(int(reason.type())), reason.text()));
 
     if (state == QXmppCall::DisconnectingState ||
         state == QXmppCall::FinishedState) {

@@ -6,9 +6,11 @@
 
 #include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppPacket_p.h"
 #include "QXmppPasswordChecker.h"
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
+#include "QXmppStreamManagement_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -23,6 +25,7 @@
 #include <QSslSocket>
 #include <QTimer>
 
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
@@ -36,6 +39,7 @@ public:
 
     QTimer *idleTimer = nullptr;
     XmppSocket socket;
+    StreamAckManager streamAckManager;
 
     QString domain;
     QString jid;
@@ -57,6 +61,7 @@ private:
 
 QXmppIncomingClientPrivate::QXmppIncomingClientPrivate(QSslSocket *socket, QXmppIncomingClient *qq)
     : socket(socket, qq),
+      streamAckManager(this->socket),
       q(qq)
 {
 }
@@ -232,6 +237,10 @@ void QXmppIncomingClient::sendStreamFeatures()
             features.setBindMode(QXmppStreamFeatures::Required);
         }
         features.setSessionMode(QXmppStreamFeatures::Enabled);
+        // Advertise Stream Management (XEP-0198). Only basic acking is
+        // supported (no <resume/>), which is enough for the client to detect
+        // whether outgoing stanzas actually reached the server.
+        features.setStreamManagementMode(QXmppStreamFeatures::Enabled);
     } else if (d->passwordChecker) {
         QStringList mechanisms;
         mechanisms << u"PLAIN"_s;
@@ -262,7 +271,29 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
         d->socket.internalSocket()->flush();
         d->socket.internalSocket()->startServerEncryption();
         return;
-    } else if (ns == ns_sasl_2) {
+    }
+
+    // Stream Management (XEP-0198)
+    if (ns == ns_stream_management && SmEnable::fromDom(nodeRecv)) {
+        // Enable basic stream management. resetSequenceNumber=true clears any
+        // counts accumulated during binding so both sides start from zero.
+        d->streamAckManager.enableStreamManagement(true);
+        // We do not support resumption, so reply with a plain <enabled/>.
+        sendData(serializeXml(SmEnabled {}));
+        return;
+    }
+    // An <r/> ack request is the stream-management replacement for the periodic
+    // XMPP ping, so surface it as a liveness signal before it gets consumed.
+    if (ns == ns_stream_management && SmRequest::fromDom(nodeRecv)) {
+        Q_EMIT clientPinged();
+    }
+    // Counts incoming stanzas and answers the client's <r/> with <a h='N'/>;
+    // returns true once it has consumed an <r/> or <a/> control element.
+    if (d->streamAckManager.handleStanza(nodeRecv)) {
+        return;
+    }
+
+    if (ns == ns_sasl_2) {
         if (!d->passwordChecker) {
             warning(u"Cannot perform authentication, no password checker"_s);
             sendData(serializeXml(Sasl2::Failure { Sasl::ErrorCondition::TemporaryAuthFailure, {} }));

@@ -3009,6 +3009,8 @@ void QXmppIceConnection::slotTimeout()
 {
     warning(u"ICE negotiation timed out"_s);
     for (auto *socket : std::as_const(d->components)) {
+        warning(u"[RYSYS] ICE component %1 connected=%2"_s
+            .arg(socket->component()).arg(socket->isConnected()));
         socket->close();
     }
     Q_EMIT disconnected();

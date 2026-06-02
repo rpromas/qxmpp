@@ -49,6 +49,11 @@ public:
     /// This signal is emitted when the stream is disconnected.
     Q_SIGNAL void disconnected();
 
+    /// This signal is emitted when a stream management ack request (<r/>) is
+    /// received from the client. With stream management enabled this replaces
+    /// the periodic XMPP ping, so it doubles as a client liveness signal.
+    Q_SIGNAL void clientPinged();
+
 protected:
     /// \cond
     void handleStart();
