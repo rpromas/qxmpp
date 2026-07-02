@@ -81,6 +81,10 @@ constexpr auto DEVICE_REMOVAL_INTERVAL = 24h * 7 * 12;
 // interval to check for devices removed from their servers
 constexpr auto DEVICE_REMOVAL_CHECK_INTERVAL = 24h;
 
+// minimum interval between session rebuilds for a device after a failed key
+// exchange
+constexpr qint64 SESSION_REPAIR_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
 constexpr QStringView PAYLOAD_CIPHER_TYPE = u"aes256";
 constexpr QCA::Cipher::Mode PAYLOAD_CIPHER_MODE = QCA::Cipher::CBC;
 constexpr QCA::Cipher::Padding PAYLOAD_CIPHER_PADDING = QCA::Cipher::PKCS7;
@@ -153,6 +157,11 @@ public:
     QHash<QString, QHash<uint32_t, QXmppOmemoStorage::Device>> devices;
 
     QList<QString> jidsOfManuallySubscribedDevices;
+
+    // (JID, device ID) mapped to the last session repair attempt; throttles
+    // session rebuilds after failed key exchanges so two devices with broken
+    // sessions cannot flood each other with key exchange messages.
+    QHash<QPair<QString, uint32_t>, QDateTime> sessionRepairAttempts;
 
     OmemoContextPtr globalContext;
     StoreContextPtr storeContext;
@@ -323,6 +332,7 @@ public:
 
     QXmppTask<bool> buildSessionForNewDevice(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device);
     QXmppTask<bool> buildSessionWithDeviceBundle(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device);
+    void repairSessionAfterFailedKeyExchange(const QString &senderJid, uint32_t senderDeviceId);
     bool buildSession(signal_protocol_address address, const QXmppOmemoDeviceBundle &deviceBundle);
     bool createSessionBundle(session_pre_key_bundle **sessionBundle,
                              const QByteArray &serializedPublicIdentityKey,

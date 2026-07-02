@@ -173,9 +173,20 @@ QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(con
 {
     using namespace QXmpp::Private;
     return chainIq(client()->sendIq(requestItemsIq(jid, nodeName, { itemId })), this,
-                   [](PubSubIq<T> &&iq) -> ItemResult<T> {
-                       if (!iq.items().isEmpty()) {
-                           return iq.items().constFirst();
+                   [itemId](PubSubIq<T> &&iq) -> ItemResult<T> {
+                       // Non-conforming servers may return more items than the one
+                       // requested; picking by id instead of blindly taking the first
+                       // item keeps e.g. OMEMO device bundles from being mixed up.
+                       const auto items = iq.items();
+                       for (const auto &item : items) {
+                           if (item.id() == itemId) {
+                               return item;
+                           }
+                       }
+                       // Tolerate a server that returns a single item without echoing
+                       // its id.
+                       if (items.size() == 1 && items.constFirst().id().isEmpty()) {
+                           return items.constFirst();
                        }
                        return QXmppError { QStringLiteral("No such item has been found."), {} };
                    });

@@ -1648,6 +1648,9 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
                 switch (session_cipher_decrypt_pre_key_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
                 case SG_ERR_INVALID_MESSAGE:
                     warning(u"OMEMO envelope data for key exchange is not valid"_s);
+                    // The sender's session is broken (e.g., built from another
+                    // device's bundle) - rebuild and send a key exchange back.
+                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
                     interface.finish(std::nullopt);
                     break;
                 case SG_ERR_DUPLICATE_MESSAGE:
@@ -1661,11 +1664,13 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
                 case SG_ERR_INVALID_KEY_ID: {
                     const auto preKeyId = QString::number(pre_key_signal_message_get_pre_key_id(omemoEnvelopeData.get()));
                     warning(u"Pre key with ID '" + preKeyId + u"' of OMEMO envelope data for key exchange could not be found locally");
+                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
                     interface.finish(std::nullopt);
                     break;
                 }
                 case SG_ERR_INVALID_KEY:
                     warning(u"OMEMO envelope data for key exchange is incorrectly formatted"_s);
+                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
                     interface.finish(std::nullopt);
                     break;
                 case SG_ERR_UNTRUSTED_IDENTITY:
@@ -1726,8 +1731,10 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
             case SG_ERR_NO_SESSION:
                 warning(u"Session for OMEMO envelope data could not be found"_s);
                 interface.finish(std::nullopt);
+                break;
             case SG_SUCCESS:
                 reportResult(payloadDecryptionDataBuffer);
+                break;
             }
         }
     }
@@ -3305,6 +3312,42 @@ QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(const QString &jid,
     });
 
     return interface.task();
+}
+
+//
+// Rebuilds the session with a device whose key exchange message could not be
+// decrypted.
+//
+// A key exchange that fails to decrypt means the sender built its session from
+// wrong data (e.g., another device's bundle); without intervention, that broken
+// session persists on the sender's side and every following message fails too.
+// Rebuilding the session from the device's bundle and sending an empty key
+// exchange message back makes the sender's OMEMO library replace its broken
+// session, healing both directions.
+//
+// Rate-limited per device to avoid key exchange loops between two devices with
+// mutually broken sessions.
+//
+// \param senderJid bare JID of the device's owner
+// \param senderDeviceId ID of the device whose key exchange failed
+//
+void ManagerPrivate::repairSessionAfterFailedKeyExchange(const QString &senderJid, uint32_t senderDeviceId)
+{
+    const auto repairKey = qMakePair(senderJid, senderDeviceId);
+    const auto now = QDateTime::currentDateTimeUtc();
+
+    if (const auto lastAttempt = sessionRepairAttempts.value(repairKey);
+        lastAttempt.isValid() && lastAttempt.msecsTo(now) < SESSION_REPAIR_MIN_INTERVAL_MS) {
+        return;
+    }
+    sessionRepairAttempts.insert(repairKey, now);
+
+    warning(u"Rebuilding OMEMO session with JID '" + senderJid + u"' and device ID '" +
+            QString::number(senderDeviceId) + u"' after failed key exchange");
+
+    auto &device = devices[senderJid][senderDeviceId];
+    auto future = buildSessionWithDeviceBundle(senderJid, senderDeviceId, device);
+    future.then(q, [](bool) {});
 }
 
 //
