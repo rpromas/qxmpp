@@ -793,21 +793,24 @@ QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(const QStrin
 
     auto future = d->unsubscribeFromDeviceList(jid);
     future.then(this, [=, this](QXmppPubSubManager::Result result) mutable {
+        // The local wipe must not depend on the server-side unsubscription: if
+        // stale devices/sessions survive a contact removal, a later re-add
+        // reuses them and encrypts messages the contact can no longer decrypt.
         if (std::holds_alternative<QXmppError>(result)) {
-            warning(u"Contact '" + jid + u"' could not be removed because the device list subscription could not be removed");
-            interface.finish(std::move(result));
-        } else {
-            d->devices.remove(jid);
-
-            auto future = d->omemoStorage->removeDevices(jid);
-            future.then(this, [=, this]() mutable {
-                auto future = d->trustManager->removeKeys(ns_omemo_2.toString(), jid);
-                future.then(this, [=, this]() mutable {
-                    interface.finish(std::move(result));
-                    Q_EMIT devicesRemoved(jid);
-                });
-            });
+            warning(u"Device list subscription for contact '" + jid + u"' could not be removed - removing the contact's devices locally anyway");
+            result = QXmpp::Success();
         }
+
+        d->devices.remove(jid);
+
+        auto future = d->omemoStorage->removeDevices(jid);
+        future.then(this, [=, this]() mutable {
+            auto future = d->trustManager->removeKeys(ns_omemo_2.toString(), jid);
+            future.then(this, [=, this]() mutable {
+                interface.finish(std::move(result));
+                Q_EMIT devicesRemoved(jid);
+            });
+        });
     });
 
     return interface.task();

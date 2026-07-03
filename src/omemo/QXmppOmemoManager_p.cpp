@@ -1097,11 +1097,16 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
 
                     const auto address = Address(jid, deviceId);
 
-                    auto addOmemoEnvelope = [this, payloadEncryptionResult, omemoElement, address, jid, deviceId, controlDeviceProcessing](bool isKeyExchange = false) mutable {
+                    auto addOmemoEnvelope = [this, payloadEncryptionResult, omemoElement, address, jid, deviceId, controlDeviceProcessing]() mutable {
                         // Create and add an OMEMO envelope only if its data could be created
                         // and the corresponding device has not been removed by another method
                         // in the meantime.
-                        if (const auto data = createOmemoEnvelopeData(address.data(), payloadEncryptionResult.decryptionData); data.isEmpty()) {
+                        // Whether the envelope carries key exchange data is determined by the
+                        // OMEMO library's output: a new session keeps producing key exchange
+                        // data for every message until the recipient replies (e.g., all
+                        // messages sent while the recipient is offline).
+                        bool isKeyExchange = false;
+                        if (const auto data = createOmemoEnvelopeData(address.data(), payloadEncryptionResult.decryptionData, &isKeyExchange); data.isEmpty()) {
                             warning(u"OMEMO envelope for recipient JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"' could not be created because its data could not be encrypted");
                             controlDeviceProcessing(false);
                         } else if (devices.value(jid).contains(deviceId)) {
@@ -1134,7 +1139,7 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
                             warning(u"Session could not be created for JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"'");
                             controlDeviceProcessing(false);
                         } else {
-                            addOmemoEnvelope(true);
+                            addOmemoEnvelope();
                         }
                     };
 
@@ -1324,11 +1329,16 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
 // \param address address of a recipient device
 // \param payloadDecryptionData data used for symmetric encryption being asymmetrically
 //        encrypted
+// \param isKeyExchange if not nullptr, set to whether the created envelope data contains key
+//        exchange data. The OMEMO library emits key exchange data for ALL messages sent on a
+//        new session until the recipient's first reply arrives - not only for the message
+//        that triggered the session build. The envelope's kex flag must reflect that, or
+//        recipients parse key exchange data as a normal message and fail to decrypt it.
 //
 // \return the encrypted and serialized OMEMO envelope data or a default-constructed byte array
 //         on failure
 //
-QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData) const
+QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData, bool *isKeyExchange) const
 {
     SessionCipherPtr sessionCipher;
 
@@ -1343,6 +1353,10 @@ QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address
     if (session_cipher_encrypt(sessionCipher.get(), reinterpret_cast<const uint8_t *>(payloadDecryptionData.constData()), payloadDecryptionData.size(), encryptedOmemoEnvelopeData.ptrRef()) != SG_SUCCESS) {
         warning(u"Payload decryption data could not be encrypted"_s);
         return {};
+    }
+
+    if (isKeyExchange) {
+        *isKeyExchange = ciphertext_message_get_type(encryptedOmemoEnvelopeData.get()) == CIPHERTEXT_PREKEY_TYPE;
     }
 
     signal_buffer *serializedEncryptedOmemoEnvelopeData = ciphertext_message_get_serialized(encryptedOmemoEnvelopeData.get());
@@ -1419,6 +1433,13 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
 
         return interface.task();
     } else {
+        // Without this warning, a message encrypted only for other devices is
+        // indistinguishable from a decryption failure in the logs.
+        warning(u"OMEMO message from '" + stanza.from() + u"' with sender device ID '" +
+                QString::number(omemoElement.senderDeviceId()) +
+                u"' contains no envelope for this device (JID '" + ownBareJid() +
+                u"', device ID '" + QString::number(ownDevice.id) +
+                u"') - it was encrypted for other devices only");
         return makeReadyTask<std::optional<QXmppMessage>>(std::nullopt);
     }
 }
@@ -1458,6 +1479,10 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDo
             return {};
         });
     }
+    warning(u"OMEMO IQ from '" + iq.from() + u"' with sender device ID '" +
+            QString::number(omemoElement.senderDeviceId()) +
+            u"' contains no envelope for this device (JID '" + ownBareJid() +
+            u"', device ID '" + QString::number(ownDevice.id) + u"')");
     return makeReadyTask<Result>(std::nullopt);
 }
 
@@ -1609,6 +1634,89 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
         interface.finish(std::move(payloadDecryptionData));
     };
 
+    const auto serializedOmemoEnvelopeData = omemoEnvelope.data();
+
+    // Decrypts key exchange data and builds a session with it.
+    auto processKeyExchange = [&](const RefCountedPtr<pre_key_signal_message> &omemoEnvelopeData) {
+        BufferPtr publicIdentityKeyBuffer(ec_public_key_get_ed(pre_key_signal_message_get_identity_key(omemoEnvelopeData.get())));
+
+        if (const auto key = publicIdentityKeyBuffer.toByteArray(); key.isEmpty()) {
+            warning(u"Public Identity key could not be retrieved"_s);
+            interface.finish(std::nullopt);
+        } else {
+            auto &device = devices[senderJid][senderDeviceId];
+            auto &storedKeyId = device.keyId;
+
+            // Store the key if its ID has changed.
+            if (storedKeyId != key) {
+                storedKeyId = key;
+                omemoStorage->addDevice(senderJid, senderDeviceId, device);
+                Q_EMIT q->deviceChanged(senderJid, senderDeviceId);
+            }
+
+            // Decrypt the OMEMO envelope data and build a session.
+            switch (session_cipher_decrypt_pre_key_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
+            case SG_ERR_INVALID_MESSAGE:
+                warning(u"OMEMO envelope data for key exchange is not valid"_s);
+                // The sender's session is broken (e.g., built from another
+                // device's bundle) - rebuild and send a key exchange back.
+                repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_DUPLICATE_MESSAGE:
+                warning(u"OMEMO envelope data for key exchange is already received"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_LEGACY_MESSAGE:
+                warning(u"OMEMO envelope data for key exchange format is deprecated"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_INVALID_KEY_ID: {
+                const auto preKeyId = QString::number(pre_key_signal_message_get_pre_key_id(omemoEnvelopeData.get()));
+                warning(u"Pre key with ID '" + preKeyId + u"' of OMEMO envelope data for key exchange could not be found locally");
+                repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
+                interface.finish(std::nullopt);
+                break;
+            }
+            case SG_ERR_INVALID_KEY:
+                warning(u"OMEMO envelope data for key exchange is incorrectly formatted"_s);
+                repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_UNTRUSTED_IDENTITY:
+                warning(u"Identity key of OMEMO envelope data for key exchange is not trusted by OMEMO library"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_SUCCESS:
+                reportResult(payloadDecryptionDataBuffer);
+
+                // Send an empty message back to the sender in order to notify the sender's
+                // device that the session initiation is completed.
+                // Do not send an empty message if the received stanza is an IQ stanza
+                // because a response is already directly sent.
+                if (isMessageStanza) {
+                    sendEmptyMessage(senderJid, senderDeviceId);
+                }
+
+                // Store the key's trust level if it is not stored yet.
+                auto future = q->trustLevel(senderJid, storedKeyId);
+                future.then(q, [=, this](TrustLevel trustLevel) mutable {
+                    if (trustLevel == TrustLevel::Undecided) {
+                        storeKeyDependingOnSecurityPolicy(senderJid, key);
+                    }
+                });
+            }
+        }
+    };
+
+    auto tryDeserializeKeyExchange = [&](RefCountedPtr<pre_key_signal_message> &omemoEnvelopeData) {
+        return pre_key_signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(),
+                                                        reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()),
+                                                        serializedOmemoEnvelopeData.size(),
+                                                        senderDeviceId,
+                                                        globalContext.get()) >= 0;
+    };
+
     // There are three cases:
     // 1. If the stanza contains key exchange data, a new session is automatically built by the
     // OMEMO library during decryption.
@@ -1616,108 +1724,37 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
     // stanza cannot be decrypted but a new session is built for future communication.
     // 3. If the stanza does not contain key exchange data and there is an existing session,
     // that session is used to decrypt the stanza.
+    //
+    // Senders (older QXmpp versions) may label messages carrying key exchange data as normal
+    // messages while their session initiation is still unacknowledged. Envelope data that
+    // cannot be processed as labeled is therefore also tried as key exchange data.
     if (omemoEnvelope.isUsedForKeyExchange()) {
         RefCountedPtr<pre_key_signal_message> omemoEnvelopeData;
-        const auto serializedOmemoEnvelopeData = omemoEnvelope.data();
 
-        if (pre_key_signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(),
-                                                     reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()),
-                                                     serializedOmemoEnvelopeData.size(),
-                                                     senderDeviceId,
-                                                     globalContext.get()) < 0) {
+        if (!tryDeserializeKeyExchange(omemoEnvelopeData)) {
             warning(u"OMEMO envelope data could not be deserialized"_s);
             interface.finish(std::nullopt);
         } else {
-            BufferPtr publicIdentityKeyBuffer(ec_public_key_get_ed(pre_key_signal_message_get_identity_key(omemoEnvelopeData.get())));
-
-            if (const auto key = publicIdentityKeyBuffer.toByteArray(); key.isEmpty()) {
-                warning(u"Public Identity key could not be retrieved"_s);
-                interface.finish(std::nullopt);
-            } else {
-                auto &device = devices[senderJid][senderDeviceId];
-                auto &storedKeyId = device.keyId;
-
-                // Store the key if its ID has changed.
-                if (storedKeyId != key) {
-                    storedKeyId = key;
-                    omemoStorage->addDevice(senderJid, senderDeviceId, device);
-                    Q_EMIT q->deviceChanged(senderJid, senderDeviceId);
-                }
-
-                // Decrypt the OMEMO envelope data and build a session.
-                switch (session_cipher_decrypt_pre_key_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
-                case SG_ERR_INVALID_MESSAGE:
-                    warning(u"OMEMO envelope data for key exchange is not valid"_s);
-                    // The sender's session is broken (e.g., built from another
-                    // device's bundle) - rebuild and send a key exchange back.
-                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
-                    interface.finish(std::nullopt);
-                    break;
-                case SG_ERR_DUPLICATE_MESSAGE:
-                    warning(u"OMEMO envelope data for key exchange is already received"_s);
-                    interface.finish(std::nullopt);
-                    break;
-                case SG_ERR_LEGACY_MESSAGE:
-                    warning(u"OMEMO envelope data for key exchange format is deprecated"_s);
-                    interface.finish(std::nullopt);
-                    break;
-                case SG_ERR_INVALID_KEY_ID: {
-                    const auto preKeyId = QString::number(pre_key_signal_message_get_pre_key_id(omemoEnvelopeData.get()));
-                    warning(u"Pre key with ID '" + preKeyId + u"' of OMEMO envelope data for key exchange could not be found locally");
-                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
-                    interface.finish(std::nullopt);
-                    break;
-                }
-                case SG_ERR_INVALID_KEY:
-                    warning(u"OMEMO envelope data for key exchange is incorrectly formatted"_s);
-                    repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
-                    interface.finish(std::nullopt);
-                    break;
-                case SG_ERR_UNTRUSTED_IDENTITY:
-                    warning(u"Identity key of OMEMO envelope data for key exchange is not trusted by OMEMO library"_s);
-                    interface.finish(std::nullopt);
-                    break;
-                case SG_SUCCESS:
-                    reportResult(payloadDecryptionDataBuffer);
-
-                    // Send an empty message back to the sender in order to notify the sender's
-                    // device that the session initiation is completed.
-                    // Do not send an empty message if the received stanza is an IQ stanza
-                    // because a response is already directly sent.
-                    if (isMessageStanza) {
-                        sendEmptyMessage(senderJid, senderDeviceId);
-                    }
-
-                    // Store the key's trust level if it is not stored yet.
-                    auto future = q->trustLevel(senderJid, storedKeyId);
-                    future.then(q, [=, this](TrustLevel trustLevel) mutable {
-                        if (trustLevel == TrustLevel::Undecided) {
-                            storeKeyDependingOnSecurityPolicy(senderJid, key);
-                        }
-                    });
-                }
-            }
+            processKeyExchange(omemoEnvelopeData);
         }
-    } else if (auto &device = devices[senderJid][senderDeviceId]; device.session.isEmpty()) {
-        warning(u"Received OMEMO stanza cannot be decrypted because there is no session with "
-                "sending device, new session is being built"_s);
-
-        auto future = buildSessionWithDeviceBundle(senderJid, senderDeviceId, device);
-        future.then(q, [=](auto) mutable {
-            interface.finish(std::nullopt);
-        });
     } else {
-        RefCountedPtr<signal_message> omemoEnvelopeData;
-        const auto serializedOmemoEnvelopeData = omemoEnvelope.data();
+        auto &device = devices[senderJid][senderDeviceId];
 
-        if (signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(), reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()), serializedOmemoEnvelopeData.size(), globalContext.get()) < 0) {
-            warning(u"OMEMO envelope data could not be deserialized"_s);
-            interface.finish(std::nullopt);
-        } else {
+        RefCountedPtr<signal_message> omemoEnvelopeData;
+        const bool isDeserializedSignalMessage =
+            !device.session.isEmpty() &&
+            signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(), reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()), serializedOmemoEnvelopeData.size(), globalContext.get()) >= 0;
+
+        if (isDeserializedSignalMessage) {
             // Decrypt the OMEMO envelope data.
             switch (session_cipher_decrypt_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
             case SG_ERR_INVALID_MESSAGE:
                 warning(u"OMEMO envelope data is not valid"_s);
+                // The sender encrypted with a session this device no longer
+                // has (e.g., it was removed together with the contact while
+                // the sender kept using it) - rebuild and send a key exchange
+                // so the sender switches to a shared session.
+                repairSessionAfterFailedKeyExchange(senderJid, senderDeviceId);
                 interface.finish(std::nullopt);
                 break;
             case SG_ERR_DUPLICATE_MESSAGE:
@@ -1736,6 +1773,21 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
                 reportResult(payloadDecryptionDataBuffer);
                 break;
             }
+        } else if (RefCountedPtr<pre_key_signal_message> keyExchangeData; tryDeserializeKeyExchange(keyExchangeData)) {
+            warning(u"OMEMO envelope data of a message not labeled as key exchange contains key "
+                    "exchange data - processing it as key exchange"_s);
+            processKeyExchange(keyExchangeData);
+        } else if (device.session.isEmpty()) {
+            warning(u"Received OMEMO stanza cannot be decrypted because there is no session with "
+                    "sending device, new session is being built"_s);
+
+            auto future = buildSessionWithDeviceBundle(senderJid, senderDeviceId, device);
+            future.then(q, [=](auto) mutable {
+                interface.finish(std::nullopt);
+            });
+        } else {
+            warning(u"OMEMO envelope data could not be deserialized"_s);
+            interface.finish(std::nullopt);
         }
     }
 
@@ -3603,7 +3655,13 @@ QXmppTask<QXmpp::SendResult> ManagerPrivate::sendEmptyMessage(const QString &rec
     const auto address = Address(recipientJid, recipientDeviceId);
     const auto decryptionData = QCA::SecureArray(EMPTY_MESSAGE_DECRYPTION_DATA_SIZE);
 
-    if (const auto data = createOmemoEnvelopeData(address.data(), decryptionData); data.isEmpty()) {
+    // The kex flag is set from the ciphertext the OMEMO library actually
+    // produced instead of the caller's intent; the two can disagree (e.g., a
+    // session that was acknowledged in the meantime).
+    Q_UNUSED(isKeyExchange)
+    bool isKeyExchangeData = false;
+
+    if (const auto data = createOmemoEnvelopeData(address.data(), decryptionData, &isKeyExchangeData); data.isEmpty()) {
         warning(u"OMEMO envelope for recipient JID '" + recipientJid + u"' and device ID '" + QString::number(recipientDeviceId) + u"' could not be created because its data could not be encrypted");
         QXmppError error {
             u"OMEMO envelope could not be created"_s,
@@ -3613,7 +3671,7 @@ QXmppTask<QXmpp::SendResult> ManagerPrivate::sendEmptyMessage(const QString &rec
     } else {
         QXmppOmemoEnvelope omemoEnvelope;
         omemoEnvelope.setRecipientDeviceId(recipientDeviceId);
-        if (isKeyExchange) {
+        if (isKeyExchangeData) {
             omemoEnvelope.setUsedForKeyExchange(true);
         }
         omemoEnvelope.setData(data);

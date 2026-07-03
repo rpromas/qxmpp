@@ -206,7 +206,7 @@ public:
     std::optional<PayloadEncryptionResult> encryptPayload(const QByteArray &payload) const;
     template<typename T>
     QByteArray createSceEnvelope(const T &stanza);
-    QByteArray createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData) const;
+    QByteArray createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData, bool *isKeyExchange = nullptr) const;
 
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(const QDomElement &iqElement);
